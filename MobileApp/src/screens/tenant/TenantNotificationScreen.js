@@ -31,6 +31,7 @@ const TenantNotificationScreen = () => {
   const { isConnected } = useNetwork();
   const ws = useRef(null);
   const navigation = useNavigation();
+  const { tenantPhone } = useContext(TenantContext);
   const {
     requests,
     setRequests,
