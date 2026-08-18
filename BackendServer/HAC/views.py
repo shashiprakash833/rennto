@@ -1129,8 +1129,8 @@ def send_tenant_notification(request):
     notification = TenantNotification.objects.create(
         tenant_phone=tenant_phone,
         title=title,
-        message=message,
     )
+    print(f"BACKEND: CREATE NOTIFICATION: Tenant ({tenant_phone}) => '{title}'")
 
     # ---------- WebSocket broadcast ----------
     try:
@@ -1178,13 +1178,30 @@ def send_tenant_notification(request):
 
 @api_view(['GET'])
 @jwt_required()
-def get_notifications(request, phone):
+def get_unread_notification_count(request):
     try:
-        if request.jwt_payload.get('role') == 'owner':
+        role = request.jwt_payload.get('role')
+        phone = request.query_params.get('phone') or request.jwt_payload.get('phone')
+        if role == 'owner':
             owner_obj = getattr(request, 'owner_account', None) or request.custom_user
             if owner_obj:
                 phone = owner_obj.owner_id
-        result = NotificationService.get_notifications(phone)
+        result = NotificationService.get_unread_count(phone, role=role)
+        return Response(result, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@jwt_required()
+def get_notifications(request, phone):
+    try:
+        role = request.jwt_payload.get('role')
+        if role == 'owner':
+            owner_obj = getattr(request, 'owner_account', None) or request.custom_user
+            if owner_obj:
+                phone = owner_obj.owner_id
+        result = NotificationService.get_notifications(phone, role=role)
         return Response(result, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1204,11 +1221,12 @@ def mark_notification_read(request, notification_id):
 @jwt_required()
 def mark_all_notifications_read(request, phone):
     try:
-        if request.jwt_payload.get('role') == 'owner':
+        role = request.jwt_payload.get('role')
+        if role == 'owner':
             owner_obj = getattr(request, 'owner_account', None) or request.custom_user
             if owner_obj:
                 phone = owner_obj.owner_id
-        result = NotificationService.mark_all_notifications_read(phone)
+        result = NotificationService.mark_all_notifications_read(phone, role=role)
         return Response(result, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
