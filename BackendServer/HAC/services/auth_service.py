@@ -328,8 +328,8 @@ class AuthService:
  
         raise ValueError("Invalid role")
 
-    ADMIN_PHONES = ["6281808454", "9347074726"]
-    ADMIN_PHONE = "9347074726"
+    ADMIN_PHONES = ["6281808454", "9347074726", "8919326265"]
+    ADMIN_PHONE = "8919326265"
 
     @classmethod
     def is_admin_phone(cls, phone):
