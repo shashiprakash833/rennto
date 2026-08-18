@@ -573,7 +573,7 @@ export default function TenantHomeScreen({ route }) {
   useFocusEffect(
     useCallback(() => {
       bookingContext?.fetchUnreadCount?.();
-    }, [bookingContext])
+    }, [])
   );
 
   const fetchTenantRequests = () => {

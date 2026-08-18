@@ -140,7 +140,7 @@ const OwnerNotificationScreen = ({ route }) => {
       fetchUnreadCount?.();
       markAllNotificationsRead?.();
       markAllAsSeen?.();
-    }, [phone, refreshTrigger, fetchUnreadCount, markAllNotificationsRead, markAllAsSeen])
+    }, [phone, refreshTrigger])
   );
 
   const onRefresh = useCallback(() => {

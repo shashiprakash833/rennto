@@ -39,7 +39,7 @@ export const BookingProvider = ({ children }) => {
   // Dedicated Unread Notification Count Fetcher
   const fetchUnreadCount = useCallback(async () => {
     if (!userPhone) {
-      setUnreadNotificationCount(0);
+      setUnreadNotificationCount((prev) => (prev !== 0 ? 0 : prev));
       return;
     }
     try {
@@ -49,7 +49,7 @@ export const BookingProvider = ({ children }) => {
       if (res.ok) {
         const data = await res.json();
         const count = typeof data.unread_count === "number" ? data.unread_count : 0;
-        setUnreadNotificationCount(count);
+        setUnreadNotificationCount((prev) => (prev !== count ? count : prev));
         if (userRole === "tenant") {
           console.log(`[TENANT] NOTIFICATION COUNT: ${count}`);
         } else if (userRole === "owner") {
@@ -388,31 +388,45 @@ export const BookingProvider = ({ children }) => {
     return [...requests, ...mockRequests];
   }, [requests, mockRequests]);
 
+  const contextValue = useMemo(() => ({
+    requests: combinedRequests,
+    setRequests,
+    isJoined,
+    joinedProperty,
+    pendingCount,
+    unreadNotificationCount,
+    fetchUnreadCount,
+    markNotificationRead,
+    markAllNotificationsRead,
+    userPhone,
+    setuserPhone,
+    userRole,
+    setUserRole,
+    refreshTrigger,
+    setRefreshTrigger,
+    markAllAsSeen,
+    clearAllNotifications,
+    clearedIds,
+    submitOwnerRequest,
+    updateOwnerRequestStatus
+  }), [
+    combinedRequests,
+    isJoined,
+    joinedProperty,
+    pendingCount,
+    unreadNotificationCount,
+    fetchUnreadCount,
+    markNotificationRead,
+    markAllNotificationsRead,
+    userPhone,
+    userRole,
+    refreshTrigger,
+    seenIds,
+    clearedIds
+  ]);
+
   return (
-    <BookingContext.Provider
-      value={{
-        requests: combinedRequests, // Combine real and mock
-        setRequests,
-        isJoined,
-        joinedProperty,
-        pendingCount,
-        unreadNotificationCount,
-        fetchUnreadCount,
-        markNotificationRead,
-        markAllNotificationsRead,
-        userPhone,
-        setuserPhone,
-        userRole,
-        setUserRole,
-        refreshTrigger,
-        setRefreshTrigger,
-        markAllAsSeen,
-        clearAllNotifications,
-        clearedIds,
-        submitOwnerRequest,
-        updateOwnerRequestStatus
-      }}
-    >
+    <BookingContext.Provider value={contextValue}>
       {children}
     </BookingContext.Provider>
   );

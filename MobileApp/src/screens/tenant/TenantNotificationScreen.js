@@ -233,7 +233,7 @@ const TenantNotificationScreen = () => {
       fetchUnreadCount?.();
       markAllNotificationsRead?.();
       markAllAsSeen?.();
-    }, [fetchUnreadCount, markAllNotificationsRead, markAllAsSeen])
+    }, [])
   );
 
   const onRefresh = useCallback(() => {
