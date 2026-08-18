@@ -1784,6 +1784,14 @@ export function PropertyDetailsScreen(props) {
   const bookingContext = useContext(BookingContext);
   const { requests = [], setRequests, isJoined, joinedProperty } = bookingContext || {};
 
+  // Hostel Change Request States & Hook for PropertyDetailsScreen
+  const { checkBookingStatus, createChangeRequest, getAvailableHostels, loading: hcLoading } = useHostelChangeRequest();
+  const [bookNowModalVisible, setBookNowModalVisible] = useState(false);
+  const [changeFormVisible, setChangeFormVisible] = useState(false);
+  const [targetHostelInfo, setTargetHostelInfo] = useState(null);
+  const [currentHostelInfo, setCurrentHostelInfo] = useState(null);
+  const [availableHostelList, setAvailableHostelList] = useState([]);
+
   // Find initial status from context to avoid flickering
   const initialStatus = requests.find(r => r.propertyName === property.name)?.status || "none";
   const [requestStatus, setRequestStatus] = useState(initialStatus);
