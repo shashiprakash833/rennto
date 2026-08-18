@@ -1,0 +1,1 @@
+const fs = require('fs'); let content = fs.readFileSync('MobileApp/src/components/ChangeHostelModal.jsx', 'utf8'); content = content.replace(/COLORS\.background/g, 'COLORS.BACKGROUND'); content = content.replace(/COLORS\.text(?!S)/g, 'COLORS.TEXT_PRIMARY'); content = content.replace(/COLORS\.warning(?!L)/g, 'COLORS.WARNING'); content = content.replace(/COLORS\.warningLight/g, '\
