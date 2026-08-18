@@ -1,0 +1,168 @@
+.ms-form-container {
+  max-width: 100%;
+  width: 100%;
+  margin: 0 auto;
+  color: #242424;
+}
+
+.ms-card {
+  background-color: #ffffff;
+  border-radius: 12px; 
+  box-shadow: 0 4px 16px rgba(108, 34, 245, 0.08);
+  padding: 24px 16px; 
+  box-sizing: border-box;
+}
+
+.ms-title {
+  font-size: 20px; 
+  font-weight: 600;
+  color: #1e1b4b;
+  margin-top: 0;
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+.ms-description {
+  font-size: 13px;
+  color: #424242;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  margin-top: 0;
+}
+
+.ms-required-note {
+  color: #c62828;
+  font-size: 12px;
+  margin-top: 16px;
+  margin-bottom: 20px;
+}
+
+.ms-question {
+  margin-bottom: 28px;
+}
+
+.ms-question-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e1b4b;
+  margin-bottom: 12px;
+}
+
+.ms-question-title.required::after {
+  content: " *";
+  color: #c62828;
+}
+
+/* Radio buttons */
+.ms-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ms-radio-label {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #424242;
+  cursor: pointer;
+  line-height: 1.4;
+  padding: 6px 0; /* Larger tap target */
+}
+
+.ms-radio-input {
+  margin-right: 12px;
+  width: 22px; 
+  height: 22px;
+  accent-color: #6c22f5;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Inputs */
+.ms-input, .ms-select {
+  width: 100%;
+  padding: 14px 12px; 
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px; /* Critical for preventing mobile zoom */
+  color: #242424;
+  outline: none;
+  background-color: #f8f6fc;
+  transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.ms-input:focus, .ms-select:focus {
+  border-color: #6c22f5;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(108, 34, 245, 0.1);
+}
+
+.ms-select {
+  cursor: pointer;
+}
+
+/* Error message */
+.ms-error-text {
+  color: #c62828;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* Buttons */
+.ms-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.ms-btn {
+  flex: 1; 
+  background-color: #ffffff;
+  color: #242424;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 14px 16px; 
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  font-family: inherit;
+  text-align: center;
+}
+
+.ms-btn:hover {
+  background-color: #f3f4f6;
+  color: #6c22f5;
+}
+
+.ms-btn-primary {
+  background-color: #6c22f5;
+  color: #ffffff;
+  border: none;
+}
+
+.ms-btn-primary:hover {
+  background-color: #5514c8;
+  color: #ffffff;
+}
+
+.ms-clear-btn {
+  background: none;
+  border: none;
+  color: #6c22f5;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 12px 0; 
+  margin-top: 12px;
+  text-decoration: none;
+  width: 100%;
+  text-align: center;
+  display: block;
+}
+.ms-clear-btn:hover {
+  text-decoration: underline;
+}

@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment variables
+.env
+**/.env
+*.env
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+.expo/
+**/.expo/
+web-build/
+**/web-build/
+*.apk
+*.aab
+
+# Python virtual environment & cache
+BackendServer/demo/
+venv/
+**/venv/
+env/
+**/env/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
