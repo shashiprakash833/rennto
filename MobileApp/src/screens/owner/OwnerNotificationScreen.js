@@ -114,7 +114,25 @@ const OwnerNotificationScreen = ({ route }) => {
         console.log("Could not fetch dedicated vacate requests:", vErr);
       }
 
-      const combinedData = [...vacateData, ...mappedData];
+      let hostelChangeData = [];
+      try {
+        const hcRes = await fetchWithAuth(`${BASE_URL}/api/hostel-change/pending/${encodeURIComponent(phone)}/`);
+        if (hcRes.ok) {
+          const hcJson = await hcRes.json();
+          hostelChangeData = (Array.isArray(hcJson.requests) ? hcJson.requests : []).map(hc => ({
+            ...hc,
+            type: "hostel_change_request",
+            title: "Hostel Change Request 📩",
+            tenant_name: hc.tenant_name || "Tenant",
+            tenant_phone: hc.tenant_phone || "",
+            message: `${hc.tenant_name || "Tenant"} requested to move from ${hc.current_hostel_name || 'Current Hostel'} to ${hc.target_hostel_name || 'Target Hostel'}.`,
+          }));
+        }
+      } catch (hcErr) {
+        console.log("Could not fetch hostel change requests:", hcErr);
+      }
+
+      const combinedData = [...hostelChangeData, ...vacateData, ...mappedData];
 
       const filteredData = combinedData.filter(item => {
         if (!ownerPropertyType) return true; // If no type passed, show all
@@ -140,7 +158,7 @@ const OwnerNotificationScreen = ({ route }) => {
       fetchUnreadCount?.();
       markAllNotificationsRead?.();
       markAllAsSeen?.();
-    }, [phone, refreshTrigger, fetchUnreadCount, markAllNotificationsRead, markAllAsSeen])
+    }, [phone, refreshTrigger])
   );
 
   const onRefresh = useCallback(() => {
@@ -318,6 +336,127 @@ const OwnerNotificationScreen = ({ route }) => {
             </View>
           </View>
         </TouchableOpacity>
+      );
+    }
+
+    if (item.type === "hostel_change_request") {
+      const handleApproveHC = async (reqId) => {
+        Alert.alert(
+          "Approve Hostel Change",
+          "Approve this hostel change request?",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Approve",
+              onPress: async () => {
+                try {
+                  const response = await fetchWithAuth(`${BASE_URL}/api/hostel-change/approve/${reqId}/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({}),
+                  });
+                  if (response.ok) {
+                    Alert.alert("Approved ✅", "Hostel change request approved.");
+                    fetchRequests();
+                    fetchUnreadCount?.();
+                  } else {
+                    const errJson = await response.json();
+                    Alert.alert("Error", errJson.error || "Failed to approve.");
+                  }
+                } catch (e) {
+                  Alert.alert("Error", e.message);
+                }
+              }
+            }
+          ]
+        );
+      };
+
+      const handleRejectHC = async (reqId) => {
+        Alert.alert(
+          "Reject Hostel Change",
+          "Reject this hostel change request?",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Reject",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  const response = await fetchWithAuth(`${BASE_URL}/api/hostel-change/reject/${reqId}/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ rejection_reason: "Owner rejected request" }),
+                  });
+                  if (response.ok) {
+                    Alert.alert("Rejected ❌", "Hostel change request rejected.");
+                    fetchRequests();
+                    fetchUnreadCount?.();
+                  } else {
+                    const errJson = await response.json();
+                    Alert.alert("Error", errJson.error || "Failed to reject.");
+                  }
+                } catch (e) {
+                  Alert.alert("Error", e.message);
+                }
+              }
+            }
+          ]
+        );
+      };
+
+      return (
+        <View key={`hostel-change-${item.id}`} style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.userInfo}>
+              <View style={[styles.avatar, { backgroundColor: "#EEF2FF" }]}>
+                <Ionicons name="git-compare-outline" size={20} color="#4F46E5" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.userName}>Hostel Change Request 📩</Text>
+                <Text style={[styles.userPhone, { color: COLORS.TEXT_PRIMARY, marginTop: 4 }]}>
+                  {item.tenant_name} ({item.tenant_phone})
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.statusTag, { backgroundColor: "#FEF3C7" }]}>
+              <Text style={[styles.statusTagText, { color: "#D97706" }]}>Pending</Text>
+            </View>
+          </View>
+
+          <View style={{ marginTop: 10, paddingHorizontal: 4 }}>
+            <Text style={{ fontSize: 13, color: COLORS.TEXT_SECONDARY, marginBottom: 4 }}>
+              Current: <Text style={{ fontWeight: "700", color: COLORS.TEXT_PRIMARY }}>{item.current_hostel_name}</Text>
+            </Text>
+            <Text style={{ fontSize: 13, color: COLORS.TEXT_SECONDARY, marginBottom: 4 }}>
+              Target: <Text style={{ fontWeight: "700", color: "#4F46E5" }}>{item.target_hostel_name}</Text>
+            </Text>
+            <Text style={{ fontSize: 12, color: COLORS.TEXT_SECONDARY }}>
+              Expected Joining: {item.expected_joining_date}
+            </Text>
+            {item.message_to_owner ? (
+              <Text style={{ fontSize: 12, color: "#6B7280", fontStyle: "italic", marginTop: 6 }}>
+                "{item.message_to_owner}"
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: "#EF4444", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
+              onPress={() => handleRejectHC(item.id)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Reject</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: "#10B981", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
+              onPress={() => handleApproveHC(item.id)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Approve</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       );
     }
 
