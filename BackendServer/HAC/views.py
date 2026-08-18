@@ -2428,7 +2428,7 @@ def create_hostel_change_request(request):
 def check_hostel_booking_status(request, tenant_phone, target_hostel_id):
     """Check if tenant can book or switch to target hostel"""
     try:
-        result = HostelChangeService.check_booking_eligibility(tenant_phone, target_hostel_id)
+        result = HostelChangeService.check_can_book_hostel(tenant_phone, target_hostel_id)
         return Response(result, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2443,7 +2443,7 @@ def get_pending_hostel_change_requests(request, owner_id):
         if role != 'owner':
             return Response({"error": "Only owners can view pending change requests"}, status=status.HTTP_403_FORBIDDEN)
         
-        requests_list = HostelChangeService.get_pending_owner_requests(owner_id)
+        requests_list = HostelChangeService.get_pending_requests_for_owner(owner_id)
         from HAC.serializers import HostelChangeRequestSerializer
         serializer = HostelChangeRequestSerializer(requests_list, many=True)
         return Response({"requests": serializer.data}, status=status.HTTP_200_OK)

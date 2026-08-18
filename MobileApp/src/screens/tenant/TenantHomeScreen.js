@@ -15,7 +15,8 @@ import BASE_URL, { fetchWithAuth } from "@/src/config/Api";
 import { useLanguage } from "../../utils/LanguageContext";
 import { useMaintenance } from "../../context/MaintenanceContext";
 import { LinearGradient } from "expo-linear-gradient";
-import FilterBottomSheet from "../../../components/FilterBottomScreen";
+import { BookNowModal, ChangeHostelRequestForm } from "@/src/components/ChangeHostelModal";
+import { useHostelChangeRequest } from "@/src/hooks/useHostelChangeRequest";
 import * as Notifications from "../../utils/NotificationsProxy";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
@@ -506,6 +507,14 @@ export default function TenantHomeScreen({ route }) {
   }, []);
 
   const [joinedProperty, setJoinedProperty] = useState(null);
+
+  // Hostel Change Request States & Hook
+  const { checkBookingStatus, createChangeRequest, getAvailableHostels, loading: hcLoading } = useHostelChangeRequest();
+  const [bookNowModalVisible, setBookNowModalVisible] = useState(false);
+  const [changeFormVisible, setChangeFormVisible] = useState(false);
+  const [targetHostelInfo, setTargetHostelInfo] = useState(null);
+  const [currentHostelInfo, setCurrentHostelInfo] = useState(null);
+  const [availableHostelList, setAvailableHostelList] = useState([]);
 
   useEffect(() => {
     const fetchJoinedProperty = async () => {
@@ -2134,8 +2143,34 @@ export function PropertyDetailsScreen(props) {
     if (checkReadOnly()) return;
     try {
       if (isJoined && (!joinedProperty || joinedProperty.property_name?.trim() !== property.name?.trim())) {
-        alert("You are already staying in a property. Please vacate or contact the owner before requesting another property.");
-        return;
+        const storedPhone = await AsyncStorage.getItem("tenantPhone");
+        if (storedPhone && property.id) {
+          try {
+            const statusRes = await checkBookingStatus(storedPhone, property.id);
+            if (statusRes.status === "already_staying") {
+              setCurrentHostelInfo(statusRes.current_hostel || { name: joinedProperty?.property_name || "Current Hostel", location: "" });
+              setTargetHostelInfo({ id: property.id, name: property.name, location: property.address });
+              setBookNowModalVisible(true);
+              return;
+            } else if (statusRes.status === "pending_request") {
+              Alert.alert("Request Pending ⏳", statusRes.message || "You have a pending hostel change request for this property.");
+              return;
+            } else if (statusRes.status === "approved_request") {
+              Alert.alert("Request Approved ✅", "Your hostel change request has been approved! Proceeding with room/bed selection.");
+            }
+          } catch (e) {
+            console.log("Check booking status error:", e);
+            setCurrentHostelInfo({ name: joinedProperty?.property_name || "Current Hostel", location: "" });
+            setTargetHostelInfo({ id: property.id, name: property.name, location: property.address });
+            setBookNowModalVisible(true);
+            return;
+          }
+        } else {
+          setCurrentHostelInfo({ name: joinedProperty?.property_name || "Current Hostel", location: "" });
+          setTargetHostelInfo({ id: property.id, name: property.name, location: property.address });
+          setBookNowModalVisible(true);
+          return;
+        }
       }
       // --- 1. Date Validation ---
       if (!checkIn.trim()) {
@@ -3939,6 +3974,53 @@ export function PropertyDetailsScreen(props) {
           </View>
         </View>
       </Modal>
+
+      {/* HOSTEL CHANGE REQUEST MODALS */}
+      <BookNowModal
+        visible={bookNowModalVisible}
+        onClose={() => setBookNowModalVisible(false)}
+        currentHostel={currentHostelInfo}
+        targetHostel={targetHostelInfo}
+        onBookNowPress={async () => {
+          setBookNowModalVisible(false);
+          try {
+            const hostels = await getAvailableHostels();
+            setAvailableHostelList(hostels);
+          } catch (e) {
+            console.log("Error loading hostels:", e);
+          }
+          setChangeFormVisible(true);
+        }}
+      />
+
+      <ChangeHostelRequestForm
+        visible={changeFormVisible}
+        onClose={() => setChangeFormVisible(false)}
+        currentHostel={currentHostelInfo}
+        targetHostel={targetHostelInfo}
+        availableHostels={availableHostelList}
+        loading={hcLoading}
+        onSubmit={async (formData) => {
+          try {
+            const storedPhone = await AsyncStorage.getItem("tenantPhone");
+            const res = await createChangeRequest(
+              storedPhone,
+              formData.target_hostel_id || targetHostelInfo?.id || property?.id,
+              formData.expectedJoiningDate,
+              formData.message,
+              formData
+            );
+            setChangeFormVisible(false);
+            if (res.success) {
+              Alert.alert("Request Sent! 🎉", "Your hostel change request has been sent successfully. Waiting for owner approval.");
+            } else {
+              Alert.alert("Notice", res.message || "Failed to send request.");
+            }
+          } catch (err) {
+            Alert.alert("Error", err.message || "Could not send hostel change request.");
+          }
+        }}
+      />
 
       {/* ADD UNIT MODAL */}
       <Modal visible={addUnitModalVisible} transparent animationType="slide">
