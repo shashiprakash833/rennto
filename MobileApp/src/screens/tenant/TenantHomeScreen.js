@@ -567,7 +567,14 @@ export default function TenantHomeScreen({ route }) {
     }
   };
 
-  const newNotifications = bookingContext?.pendingCount || 0;
+  const unreadCount = bookingContext?.unreadNotificationCount || 0;
+  const badgeText = unreadCount > 99 ? "99+" : `${unreadCount}`;
+
+  useFocusEffect(
+    useCallback(() => {
+      bookingContext?.fetchUnreadCount?.();
+    }, [bookingContext])
+  );
 
   const fetchTenantRequests = () => {
     // Rely on BookingContext to fetch and sync state. Just trigger a refresh if needed.
@@ -576,7 +583,7 @@ export default function TenantHomeScreen({ route }) {
 
   // Animation logic for pulsating notification
   useEffect(() => {
-    if (newNotifications > 0) {
+    if (unreadCount > 0) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -592,7 +599,7 @@ export default function TenantHomeScreen({ route }) {
         ])
       ).start();
     }
-  }, [newNotifications]);
+  }, [unreadCount]);
 
   const fetchProperties = async (coords = null) => {
     try {
@@ -1093,10 +1100,10 @@ export default function TenantHomeScreen({ route }) {
                       size={22}
                       color="#fff"
                     />
-                    {newNotifications > 0 && (
+                    {unreadCount > 0 && (
                       <View style={homeStyles.heroBadge}>
                         <Text style={homeStyles.heroBadgeText}>
-                          {newNotifications}
+                          {badgeText}
                         </Text>
                       </View>
                     )}
@@ -1188,10 +1195,10 @@ export default function TenantHomeScreen({ route }) {
                       size={22}
                       color="#fff"
                     />
-                    {newNotifications > 0 && (
+                    {unreadCount > 0 && (
                       <View style={homeStyles.heroBadge}>
                         <Text style={homeStyles.heroBadgeText}>
-                          {newNotifications}
+                          {badgeText}
                         </Text>
                       </View>
                     )}

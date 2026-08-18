@@ -215,13 +215,13 @@ const TenantNotificationScreen = () => {
     }
   };
 
-  // Mark all as seen when requests are loaded and screen is focused
+  // Mark all notifications as read when screen is focused
   useFocusEffect(
     useCallback(() => {
-      if (requests.length > 0) {
-        markAllAsSeen();
-      }
-    }, [requests])
+      fetchUnreadCount?.();
+      markAllNotificationsRead?.();
+      markAllAsSeen?.();
+    }, [fetchUnreadCount, markAllNotificationsRead, markAllAsSeen])
   );
 
   const onRefresh = useCallback(() => {
