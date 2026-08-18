@@ -15,6 +15,7 @@ import BASE_URL, { fetchWithAuth } from "@/src/config/Api";
 import { useLanguage } from "../../utils/LanguageContext";
 import { useMaintenance } from "../../context/MaintenanceContext";
 import { LinearGradient } from "expo-linear-gradient";
+import FilterBottomSheet from "../../../components/FilterBottomScreen";
 import { BookNowModal, ChangeHostelRequestForm } from "@/src/components/ChangeHostelModal";
 import { useHostelChangeRequest } from "@/src/hooks/useHostelChangeRequest";
 import * as Notifications from "../../utils/NotificationsProxy";
