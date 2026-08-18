@@ -251,6 +251,7 @@ class Tenent(models.Model):
     owner = models.ForeignKey(Owners, on_delete=models.SET_NULL, null=True, blank=True)
     name = models.CharField(max_length=100)
     phone = models.CharField(max_length=15)
+    email = models.EmailField(blank=True, null=True)
     push_token = models.CharField(max_length=255, blank=True, null=True)
     aadhar_id = models.CharField(max_length=12, unique=True, null=True, blank=True)
     aadhar_image = models.ImageField(upload_to='aadhar_proofs/', null=True, blank=True)
@@ -786,3 +787,68 @@ class SystemSettings(models.Model):
 
     def __str__(self):
         return self.maintenance_mode
+
+
+# ─────────────────────────────────────────────────────────────────────
+# HOSTEL CHANGE REQUEST MODEL
+# ─────────────────────────────────────────────────────────────────────
+class HostelChangeRequest(models.Model):
+    """
+    Stores requests from existing hostel tenants who want to move to another hostel.
+    Allows users currently staying in Hostel A to request booking Hostel B.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    tenant = models.ForeignKey(
+        Tenent,
+        on_delete=models.CASCADE,
+        related_name='hostel_change_requests'
+    )
+    
+    current_hostel = models.ForeignKey(
+        StayHostelDetails,
+        on_delete=models.CASCADE,
+        related_name='current_hostel_requests'
+    )
+    
+    target_hostel = models.ForeignKey(
+        StayHostelDetails,
+        on_delete=models.CASCADE,
+        related_name='target_hostel_requests'
+    )
+    
+    target_owner = models.ForeignKey(
+        Owners,
+        on_delete=models.CASCADE,
+        related_name='hostel_change_requests'
+    )
+    
+    # Request details
+    expected_joining_date = models.DateField()
+    days_remaining_in_current_hostel = models.IntegerField()
+    tenant_email = models.EmailField(blank=True, null=True)
+    requested_room_preference = models.CharField(max_length=120, blank=True, null=True)
+    additional_details = models.TextField(blank=True, null=True)
+    message_to_owner = models.TextField(blank=True, null=True)
+    
+    # Status tracking
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending'
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ('tenant', 'target_hostel', 'status')
+
+    def __str__(self):
+        return f"{self.tenant.name}: {self.current_hostel.hostelName} → {self.target_hostel.hostelName} ({self.status})"
