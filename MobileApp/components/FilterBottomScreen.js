@@ -706,10 +706,7 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
         statusBarTranslucent
         onRequestClose={() => setSelectorVisible(false)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalOverlay}
-        >
+        <View style={styles.modalOverlay}>
           <Pressable
             style={styles.backdropSpacer}
             onPress={() => setSelectorVisible(false)}
@@ -786,7 +783,7 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
               }
             />
           </Pressable>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
     </>
   );
@@ -1170,13 +1167,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: height * 0.75,
+    height: height * 0.65,
     paddingHorizontal: 24,
     paddingTop: 20,
     width: '100%',
   },
   selectorList: {
-    flexShrink: 1,
+    flex: 1,
   },
   selectorHeader: {
     flexDirection: 'row',
