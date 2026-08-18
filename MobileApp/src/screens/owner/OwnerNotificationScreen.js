@@ -66,7 +66,10 @@ const OwnerNotificationScreen = ({ route }) => {
     setRefreshTrigger,
     markAllAsSeen,
     clearAllNotifications,
-    clearedIds
+    clearedIds,
+    fetchUnreadCount,
+    markNotificationRead,
+    markAllNotificationsRead
   } = useContext(BookingContext);
 
   const [requests, setRequests] = useState([]);
@@ -134,16 +137,10 @@ const OwnerNotificationScreen = ({ route }) => {
   useFocusEffect(
     useCallback(() => {
       fetchRequests();
-    }, [phone, refreshTrigger])
-  );
-
-  // Clear badge count when new notifications are loaded and screen is focused
-  useFocusEffect(
-    useCallback(() => {
-      if (requests.length > 0) {
-        markAllAsSeen();
-      }
-    }, [requests])
+      fetchUnreadCount?.();
+      markAllNotificationsRead?.();
+      markAllAsSeen?.();
+    }, [phone, refreshTrigger, fetchUnreadCount, markAllNotificationsRead, markAllAsSeen])
   );
 
   const onRefresh = useCallback(() => {

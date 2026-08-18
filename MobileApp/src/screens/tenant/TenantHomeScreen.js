@@ -567,7 +567,14 @@ export default function TenantHomeScreen({ route }) {
     }
   };
 
-  const newNotifications = bookingContext?.pendingCount || 0;
+  const unreadCount = bookingContext?.unreadNotificationCount || 0;
+  const badgeText = unreadCount > 99 ? "99+" : `${unreadCount}`;
+
+  useFocusEffect(
+    useCallback(() => {
+      bookingContext?.fetchUnreadCount?.();
+    }, [bookingContext])
+  );
 
   const fetchTenantRequests = () => {
     // Rely on BookingContext to fetch and sync state. Just trigger a refresh if needed.
@@ -576,7 +583,7 @@ export default function TenantHomeScreen({ route }) {
 
   // Animation logic for pulsating notification
   useEffect(() => {
-    if (newNotifications > 0) {
+    if (unreadCount > 0) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -592,7 +599,7 @@ export default function TenantHomeScreen({ route }) {
         ])
       ).start();
     }
-  }, [newNotifications]);
+  }, [unreadCount]);
 
   const fetchProperties = async (coords = null) => {
     try {
@@ -1093,10 +1100,10 @@ export default function TenantHomeScreen({ route }) {
                       size={22}
                       color="#fff"
                     />
-                    {newNotifications > 0 && (
+                    {unreadCount > 0 && (
                       <View style={homeStyles.heroBadge}>
                         <Text style={homeStyles.heroBadgeText}>
-                          {newNotifications}
+                          {badgeText}
                         </Text>
                       </View>
                     )}
@@ -1188,10 +1195,10 @@ export default function TenantHomeScreen({ route }) {
                       size={22}
                       color="#fff"
                     />
-                    {newNotifications > 0 && (
+                    {unreadCount > 0 && (
                       <View style={homeStyles.heroBadge}>
                         <Text style={homeStyles.heroBadgeText}>
-                          {newNotifications}
+                          {badgeText}
                         </Text>
                       </View>
                     )}
@@ -1524,10 +1531,23 @@ export default function TenantHomeScreen({ route }) {
                                 {t(item.type?.toLowerCase()) || item.type} • {item.address}
                               </Text>
                               {item.rent ? (
-                                <Text style={[homeStyles.cardSub, { fontWeight: "bold", color: "#6C63FF", marginTop: 4 }]}>
+                                <Text style={homeStyles.cardRent}>
                                   ₹{item.rent} / {t("month_suffix") || "month"}
                                 </Text>
                               ) : null}
+                              {item.distance_km != null ? (
+                                <Text style={homeStyles.cardDistance}>
+                                  {item.distance_km} {t("km_away") || "km away"}
+                                </Text>
+                              ) : item.distance != null ? (
+                                <Text style={homeStyles.cardDistance}>
+                                  {item.distance} {t("km_away") || "km away"}
+                                </Text>
+                              ) : (
+                                <Text style={homeStyles.cardDistance}>
+                                  0.0 {t("km_away") || "km away"}
+                                </Text>
+                              )}
                             </View>
                           </View>
                         </TouchableOpacity>
@@ -1656,13 +1676,21 @@ export default function TenantHomeScreen({ route }) {
                             {t(item.type?.toLowerCase()) || item.type} • {item.address}
                           </Text>
                           {item.rent ? (
-                            <Text style={[homeStyles.cardSub, { fontWeight: "bold", color: "#6C63FF", marginTop: 4 }]}>
+                            <Text style={homeStyles.cardRent}>
                               ₹{item.rent} / {t("month_suffix") || "month"}
                             </Text>
                           ) : null}
-                          {item.distance_km != null && (
-                            <Text style={[homeStyles.cardSub, { color: "#555", marginTop: 2 }]}>
+                          {item.distance_km != null ? (
+                            <Text style={homeStyles.cardDistance}>
                               {item.distance_km} {t("km_away") || "km away"}
+                            </Text>
+                          ) : item.distance != null ? (
+                            <Text style={homeStyles.cardDistance}>
+                              {item.distance} {t("km_away") || "km away"}
+                            </Text>
+                          ) : (
+                            <Text style={homeStyles.cardDistance}>
+                              0.0 {t("km_away") || "km away"}
                             </Text>
                           )}
                         </View>
@@ -4600,49 +4628,70 @@ const homeStyles = StyleSheet.create({
 
 
   gridItem: {
-    width: "48%",
-    marginBottom: 14,
+    width: "100%",
+    marginBottom: 18,
   },
   propertyGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
+    flexDirection: "column",
     paddingHorizontal: 16,
+    width: "100%",
   },
 
   card: {
     backgroundColor: "#fff",
     borderRadius: 18,
     overflow: "hidden",
-    elevation: 4,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    width: "100%",
   },
 
   cardImg: {
     width: "100%",
-    height: 120,
+    height: 185,
     backgroundColor: "#f0f0f0",
   },
 
-  cardBody: { padding: 15 },
+  cardBody: {
+    padding: 16,
+  },
 
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 4,
   },
 
   cardName: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "700",
+    color: "#1e293b",
     flex: 1,
+    marginRight: 8,
   },
 
   cardSub: {
-    color: "gray",
-    fontSize: 11,
+    color: "#64748b",
+    fontSize: 13,
     marginTop: 4,
-    lineHeight: 16,
-    height: 32,
+    lineHeight: 18,
+  },
+
+  cardRent: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#6C63FF",
+    marginTop: 6,
+  },
+
+  cardDistance: {
+    color: "#64748b",
+    fontSize: 12,
+    marginTop: 4,
   },
 
   noResults: {

@@ -4,10 +4,10 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import { BookingContext } from "@/src/context/BookingContext";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useContext } from "react";
 import { useWindowDimensions } from "react-native";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import BASE_URL, { fetchWithAuth } from "@/src/config/Api";
 import COLORS from "@/src/theme/colors";
 import { useMaintenance } from "../../context/MaintenanceContext";
@@ -92,7 +92,16 @@ export default function BuildingScreen({ route }) {
   const [response_data, setResponseData] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editableLayout, setEditableLayout] = useState([]);
-  const { pendingCount, setRequests, refreshTrigger, setRefreshTrigger } = useContext(BookingContext);
+  const { unreadNotificationCount, fetchUnreadCount, pendingCount, setRequests, refreshTrigger, setRefreshTrigger } = useContext(BookingContext);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCount?.();
+    }, [fetchUnreadCount])
+  );
+
+  const ownerUnreadCount = unreadNotificationCount || 0;
+  const ownerBadgeText = ownerUnreadCount > 99 ? "99+" : `${ownerUnreadCount}`;
   const { selectedAccount } = useContext(OwnerAccountContext);
   const phone = selectedAccount ? selectedAccount.id : (route?.params?.phone || "");
   // const propertyStayType = response_data?.stay_type || "hostel";
@@ -1461,10 +1470,10 @@ try {
                 activeOpacity={0.7}
               >
                 <Ionicons name="notifications-outline" size={20} color="#FFF" />
-                {pendingCount > 0 && (
+                {ownerUnreadCount > 0 && (
                   <Animated.View style={styles.pulseBadge}>
                     <Text style={styles.badgeText}>
-                      {pendingCount}
+                      {ownerBadgeText}
                     </Text>
                   </Animated.View>
                 )}
