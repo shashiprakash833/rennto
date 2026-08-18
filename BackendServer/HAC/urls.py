@@ -166,6 +166,7 @@ urlpatterns = [
     # =====================================================
     path('send-owner-notification/', views.send_owner_notification),
     path('send-tenant-notification/', views.send_tenant_notification),
+    path('notifications/unread-count/', views.get_unread_notification_count),
     path('notifications/<str:phone>/', views.get_notifications),
     path('notifications/<int:notification_id>/read/', views.mark_notification_read),
     path('notifications/<str:phone>/mark-all-read/', views.mark_all_notifications_read),
