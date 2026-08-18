@@ -328,9 +328,8 @@ class AuthService:
  
         raise ValueError("Invalid role")
 
-<<<<<<< Updated upstream
-    ADMIN_PHONES = ["6281808454", "9347074726"]
-    ADMIN_PHONE = "9347074726"
+    ADMIN_PHONES = ["6281808454", "9347074726", "8919326265"]
+    ADMIN_PHONE = "8919326265"
 
     @classmethod
     def is_admin_phone(cls, phone):
@@ -340,9 +339,6 @@ class AuthService:
         if clean_phone in cls.ADMIN_PHONES:
             return True
         return AdminPassword.objects.filter(phone=clean_phone).exists()
-=======
-    ADMIN_PHONE = "8919326265"
->>>>>>> Stashed changes
 
     # ⏰ PASSWORD EXPIRY DURATION
     # For TESTING: timedelta(minutes=2)
