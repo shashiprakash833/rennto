@@ -975,7 +975,7 @@ const OwnerPaymentScreen = () => {
   if (hasInitialized && isSetupMode) {
     return (
       <SafeAreaView style={styles.setupGateContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#5F259F" translucent={false} />
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
         <View style={styles.setupGateContent}>
           <View style={styles.setupGateCard}>
             <View style={styles.setupGateHeader}>
@@ -1111,8 +1111,8 @@ const OwnerPaymentScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor="#5F259F" translucent={false} />
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -2499,7 +2499,7 @@ const styles = StyleSheet.create({
   // Header
   header: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 60,
     paddingBottom: 24,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,

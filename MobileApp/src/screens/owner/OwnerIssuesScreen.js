@@ -365,306 +365,312 @@ export default function OwnerIssues() {
   if (isConnected === false && issues.length === 0) {
     return <OfflineView />;
   }
-
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#5F259F" translucent={false} />
-      <LinearGradient
-        colors={['#5F259F', '#7C3AED', '#8B5CF6']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <View style={styles.headerLeftContainer}>
-          <View>
-            <Text style={styles.headerTitle}>{t("issues")}</Text>
-            <Text style={styles.headerSubtitle}>{t("manage_requests")}</Text>
+    <View style={{ flex: 1, backgroundColor: "#5F259F" }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F5F5F7" }}
+        edges={['left', 'right', 'bottom']}>
+
+
+        <StatusBar barStyle="light-content"
+          backgroundColor="transparent"
+          translucent={true} />
+        <LinearGradient
+          colors={['#5F259F', '#7C3AED', '#8B5CF6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <View style={styles.headerLeftContainer}>
+            <View>
+              <Text style={styles.headerTitle}>{t("issues")}</Text>
+              <Text style={styles.headerSubtitle}>{t("manage_requests")}</Text>
+            </View>
           </View>
+        </LinearGradient>
+
+        <View style={styles.summaryRow}>
+          {["All", "Pending", "In Progress", "Completed"].map((status) => {
+            const isActive = activeFilter === status;
+            const color =
+              status === "All" ? COLORS.PRIMARY : STATUS_COLORS[status];
+            const count =
+              status === "All"
+                ? issues.length
+                : issues.filter((i) => i.status === status).length;
+
+            const label = status === "All" ? (t('all') || "All") :
+              status === "Pending" ? (t('pending_count') || "Pending") :
+                status === "In Progress" ? (t('progress') || "Progress") :
+                  (t('completed') || "Completed");
+
+            return (
+              <TouchableOpacity
+                key={status}
+                style={{ flex: 1 }}
+                onPress={() => setActiveFilter(status)}
+              >
+                <SummaryCard
+                  label={label}
+                  count={count}
+                  color={color}
+                  isActive={isActive}
+                />
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      </LinearGradient>
 
-      <View style={styles.summaryRow}>
-        {["All", "Pending", "In Progress", "Completed"].map((status) => {
-          const isActive = activeFilter === status;
-          const color =
-            status === "All" ? COLORS.PRIMARY : STATUS_COLORS[status];
-          const count =
-            status === "All"
-              ? issues.length
-              : issues.filter((i) => i.status === status).length;
+        <Text style={styles.sectionHeader}>{t('history') || 'History'}</Text>
 
-          const label = status === "All" ? (t('all') || "All") :
-            status === "Pending" ? (t('pending_count') || "Pending") :
-              status === "In Progress" ? (t('progress') || "Progress") :
-                (t('completed') || "Completed");
+        <TextInput
+          placeholder={t('search by name')}
+          style={styles.search}
+          value={search}
+          onChangeText={handleSearch}
+        />
 
-          return (
-            <TouchableOpacity
-              key={status}
-              style={{ flex: 1 }}
-              onPress={() => setActiveFilter(status)}
-            >
-              <SummaryCard
-                label={label}
-                count={count}
-                color={color}
-                isActive={isActive}
-              />
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+        {filteredIssues.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="search-outline" size={48} color={COLORS.TEXT_LIGHT} />
+            <Text style={styles.emptyText}>{t('No Issues Found') || 'No Issues Found'}</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredIssues}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+            renderItem={({ item }) => (
+              <TouchableOpacity onPress={() => openDetails(item)}>
+                <View style={styles.card}>
+                  <View style={styles.cardHeaderRow}>
+                    <Text style={styles.title}>{item.title}</Text>
+                    {item.image && (
+                      <Ionicons name="image" size={18} color={COLORS.PRIMARY} />
+                    )}
+                  </View>
+                  <Text style={styles.sub}>
+                    {item.tenant_name}
+                    {(!item.floor_no || item.floor_no === "N/A" || item.floor_no === "None") ? (
+                      " • No active room allocation"
+                    ) : (
+                      <>
+                        {item.property_name && item.property_name !== "N/A" && item.property_name !== "None" && ` • ${item.property_name}`}
+                        {` • Floor: ${item.floor_no}`}
+                        {` • ${getRoomLabel(item.property_type)}: ${item.room_no}`}
+                        {item.property_type === 'hostel' && item.bed_no && item.bed_no !== "N/A" && item.bed_no !== "None" && ` • Bed: ${item.bed_no}`}
+                      </>
+                    )}
+                  </Text>
 
-      <Text style={styles.sectionHeader}>{t('history') || 'History'}</Text>
-
-      <TextInput
-        placeholder={t('search by name')}
-        style={styles.search}
-        value={search}
-        onChangeText={handleSearch}
-      />
-
-      {filteredIssues.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="search-outline" size={48} color={COLORS.TEXT_LIGHT} />
-          <Text style={styles.emptyText}>{t('No Issues Found') || 'No Issues Found'}</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredIssues}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
-          renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => openDetails(item)}>
-              <View style={styles.card}>
-                <View style={styles.cardHeaderRow}>
-                  <Text style={styles.title}>{item.title}</Text>
-                  {item.image && (
-                    <Ionicons name="image" size={18} color={COLORS.PRIMARY} />
-                  )}
+                  <View style={styles.rowBetween}>
+                    <StatusBadge status={item.status} />
+                    <Text style={styles.date}>
+                      {new Date(item.date).toLocaleDateString()}
+                    </Text>
+                  </View>
                 </View>
-                 <Text style={styles.sub}>
-                  {item.tenant_name}
-                  {(!item.floor_no || item.floor_no === "N/A" || item.floor_no === "None") ? (
-                    " • No active room allocation"
+              </TouchableOpacity>
+            )}
+          />
+        )}
+
+        <Modal visible={modalVisible} animationType="slide">
+          {selectedIssue && (
+            <View style={{ flex: 1, backgroundColor: COLORS.BACKGROUND }}>
+              <View style={styles.modalHeaderClose}>
+                <Text style={styles.modalTitleHeader}>{t('issue details') || 'Issue Details'}</Text>
+                <TouchableOpacity
+                  onPress={() => setModalVisible(false)}
+                  style={styles.closeModalBtn}
+                >
+                  <Ionicons name="close-circle" size={32} color={COLORS.TEXT_SECONDARY} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.modal}>
+                <Text style={styles.modalTitle}>{selectedIssue.title}</Text>
+
+                <View style={styles.detailCard}>
+                  <Detail label={t('tenant')} value={selectedIssue.tenant_name} />
+                  {selectedIssue.property_name && selectedIssue.property_name !== "N/A" && selectedIssue.property_name !== "None" && (
+                    <Detail label="Property Name" value={selectedIssue.property_name} />
+                  )}
+                  {(!selectedIssue.floor_no || selectedIssue.floor_no === "N/A" || selectedIssue.floor_no === "None") ? (
+                    <Detail label="Allocation Status" value="No Active Room Allocation" />
                   ) : (
                     <>
-                      {item.property_name && item.property_name !== "N/A" && item.property_name !== "None" && ` • ${item.property_name}`}
-                      {` • Floor: ${item.floor_no}`}
-                      {` • ${getRoomLabel(item.property_type)}: ${item.room_no}`}
-                      {item.property_type === 'hostel' && item.bed_no && item.bed_no !== "N/A" && item.bed_no !== "None" && ` • Bed: ${item.bed_no}`}
+                      <Detail label="Floor Number" value={String(selectedIssue.floor_no)} />
+                      <Detail label={`${getRoomLabel(selectedIssue.property_type)} Number`} value={String(selectedIssue.room_no)} />
+                      {selectedIssue.property_type === 'hostel' && selectedIssue.bed_no && selectedIssue.bed_no !== "N/A" && selectedIssue.bed_no !== "None" && (
+                        <Detail label="Bed Number" value={String(selectedIssue.bed_no)} />
+                      )}
                     </>
                   )}
-                </Text>
-
-                <View style={styles.rowBetween}>
-                  <StatusBadge status={item.status} />
-                  <Text style={styles.date}>
-                    {new Date(item.date).toLocaleDateString()}
-                  </Text>
+                  <Detail label={t('phone_number')} value={selectedIssue.tenant_phone} />
+                  <Detail label={t('date') || 'Date'} value={new Date(selectedIssue.date).toLocaleString()} />
+                  <Detail label="Severity" value={selectedIssue.severity} />
+                  <Detail label={t('status')} value={selectedIssue.status} />
                 </View>
-              </View>
-            </TouchableOpacity>
-          )}
-        />
-      )}
 
-      <Modal visible={modalVisible} animationType="slide">
-        {selectedIssue && (
-          <View style={{ flex: 1, backgroundColor: COLORS.BACKGROUND }}>
-            <View style={styles.modalHeaderClose}>
-              <Text style={styles.modalTitleHeader}>{t('issue details') || 'Issue Details'}</Text>
-              <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                style={styles.closeModalBtn}
-              >
-                <Ionicons name="close-circle" size={32} color={COLORS.TEXT_SECONDARY} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modal}>
-              <Text style={styles.modalTitle}>{selectedIssue.title}</Text>
+                <View style={styles.descCard}>
+                  <Text style={styles.descTitle}>{t('Description')}</Text>
+                  <Text style={styles.descText}>{selectedIssue.description}</Text>
+                </View>
 
-              <View style={styles.detailCard}>
-                 <Detail label={t('tenant')} value={selectedIssue.tenant_name} />
-                {selectedIssue.property_name && selectedIssue.property_name !== "N/A" && selectedIssue.property_name !== "None" && (
-                  <Detail label="Property Name" value={selectedIssue.property_name} />
+                {selectedIssue.image && (
+                  <View style={styles.detailCard}>
+                    <Text style={styles.updateTitle}>Attachment</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedImage(selectedIssue.image.startsWith('http') ? selectedIssue.image : `${BASE_URL}${selectedIssue.image}`);
+                        setViewerVisible(true);
+                      }}
+                      style={{ position: 'relative' }}
+                    >
+                      <Image
+                        source={{ uri: selectedIssue.image.startsWith('http') ? selectedIssue.image : `${BASE_URL}${selectedIssue.image}` }}
+                        style={{ width: '100%', height: 200, borderRadius: 12 }}
+                        resizeMode="cover"
+                      />
+                      <View style={{ position: 'absolute', right: 10, bottom: 10, backgroundColor: 'rgba(0,0,0,0.5)', padding: 4, borderRadius: 10 }}>
+                        <Ionicons name="expand" size={20} color="#FFF" />
+                      </View>
+                    </TouchableOpacity>
+                  </View>
                 )}
-                {(!selectedIssue.floor_no || selectedIssue.floor_no === "N/A" || selectedIssue.floor_no === "None") ? (
-                  <Detail label="Allocation Status" value="No Active Room Allocation" />
-                ) : (
-                  <>
-                    <Detail label="Floor Number" value={String(selectedIssue.floor_no)} />
-                    <Detail label={`${getRoomLabel(selectedIssue.property_type)} Number`} value={String(selectedIssue.room_no)} />
-                    {selectedIssue.property_type === 'hostel' && selectedIssue.bed_no && selectedIssue.bed_no !== "N/A" && selectedIssue.bed_no !== "None" && (
-                      <Detail label="Bed Number" value={String(selectedIssue.bed_no)} />
-                    )}
-                  </>
-                )}
-                <Detail label={t('phone_number')} value={selectedIssue.tenant_phone} />
-                <Detail label={t('date') || 'Date'} value={new Date(selectedIssue.date).toLocaleString()} />
-                <Detail label="Severity" value={selectedIssue.severity} />
-                <Detail label={t('status')} value={selectedIssue.status} />
-              </View>
 
-              <View style={styles.descCard}>
-                <Text style={styles.descTitle}>{t('Description')}</Text>
-                <Text style={styles.descText}>{selectedIssue.description}</Text>
-              </View>
-
-              {selectedIssue.image && (
                 <View style={styles.detailCard}>
-                  <Text style={styles.updateTitle}>Attachment</Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSelectedImage(selectedIssue.image.startsWith('http') ? selectedIssue.image : `${BASE_URL}${selectedIssue.image}`);
-                      setViewerVisible(true);
-                    }}
-                    style={{ position: 'relative' }}
-                  >
-                    <Image
-                      source={{ uri: selectedIssue.image.startsWith('http') ? selectedIssue.image : `${BASE_URL}${selectedIssue.image}` }}
-                      style={{ width: '100%', height: 200, borderRadius: 12 }}
-                      resizeMode="cover"
-                    />
-                    <View style={{ position: 'absolute', right: 10, bottom: 10, backgroundColor: 'rgba(0,0,0,0.5)', padding: 4, borderRadius: 10 }}>
-                      <Ionicons name="expand" size={20} color="#FFF" />
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              )}
+                  <Text style={styles.updateTitle}>{t('Update Status')}</Text>
+                  <View style={styles.statusRow}>
+                    {["Pending", "In Progress", "Completed"].map((status) => {
+                      const isSelected = localStatus === status;
+                      const color = STATUS_COLORS[status];
 
-              <View style={styles.detailCard}>
-                <Text style={styles.updateTitle}>{t('Update Status')}</Text>
-                <View style={styles.statusRow}>
-                  {["Pending", "In Progress", "Completed"].map((status) => {
-                    const isSelected = localStatus === status;
-                    const color = STATUS_COLORS[status];
+                      const label = status === "Pending" ? t('pending count') :
+                        status === "In Progress" ? t('in progress') :
+                          t('completed');
 
-                    const label = status === "Pending" ? t('pending count') :
-                      status === "In Progress" ? t('in progress') :
-                        t('completed');
-
-                    return (
-                      <TouchableOpacity
-                        key={status}
-                        onPress={() => updateStatus(status)}
-                        style={[
-                          styles.statusBtn,
-                          {
-                            borderColor: color,
-                            backgroundColor: isSelected ? color : COLORS.WHITE,
-                          },
-                        ]}
-                      >
-                        <Text
+                      return (
+                        <TouchableOpacity
+                          key={status}
+                          onPress={() => updateStatus(status)}
                           style={[
-                            styles.statusText,
-                            { color: isSelected ? COLORS.WHITE : color },
+                            styles.statusBtn,
+                            {
+                              borderColor: color,
+                              backgroundColor: isSelected ? color : COLORS.WHITE,
+                            },
                           ]}
                         >
-                          {label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                          <Text
+                            style={[
+                              styles.statusText,
+                              { color: isSelected ? COLORS.WHITE : color },
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
 
-              <View style={styles.detailCard}>
-                <Text style={styles.updateTitle}>Owner Comment</Text>
+                <View style={styles.detailCard}>
+                  <Text style={styles.updateTitle}>Owner Comment</Text>
 
-                <TextInput
-                  placeholder="Write a comment for tenant..."
-                  multiline
-                  value={ownerComment}
-                  onChangeText={setOwnerComment}
-                  style={styles.commentInput}
-                />
-              </View>
+                  <TextInput
+                    placeholder="Write a comment for tenant..."
+                    multiline
+                    value={ownerComment}
+                    onChangeText={setOwnerComment}
+                    style={styles.commentInput}
+                  />
+                </View>
 
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 40 }}>
-                <TouchableOpacity style={[styles.closeBtn, { flex: 1, backgroundColor: '#666' }]} onPress={() => setModalVisible(false)}>
-                  <Text style={styles.updateBtnText}>Close</Text>
-                </TouchableOpacity>
-                 <TouchableOpacity 
-                  style={[styles.closeBtn, { flex: 1 }, isReadOnly && { opacity: 0.5 }]} 
-                  onPress={handleUpdate}
-                  disabled={isReadOnly}
-                >
-                  <Text style={styles.updateBtnText}>
-                    {isReadOnly ? "Unavailable" : "Save Updates"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        )}
-      </Modal>
-      {/* FULL IMAGE VIEWER MODAL */}
-      <Modal visible={viewerVisible} transparent animationType="fade">
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <View style={styles.viewerBackground}>
-            <TouchableOpacity
-              style={styles.viewerClose}
-              onPress={closeViewer}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.viewerCloseText}>✕ Close</Text>
-            </TouchableOpacity>
-            {selectedImage && (
-              <PanGestureHandler
-                ref={panRef}
-                simultaneousHandlers={pinchRef}
-                onGestureEvent={onPanEvent}
-                onHandlerStateChange={onPanStateChange}
-              >
-                <Animated.View
-                  style={{
-                    width: "100%",
-                    height: "80%",
-                    overflow: "hidden",
-                    backgroundColor: "#000",
-                    borderRadius: 8,
-                  }}
-                >
-                  <PinchGestureHandler
-                    ref={pinchRef}
-                    simultaneousHandlers={panRef}
-                    onGestureEvent={onPinchEvent}
-                    onHandlerStateChange={onPinchStateChange}
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 40 }}>
+                  <TouchableOpacity style={[styles.closeBtn, { flex: 1, backgroundColor: '#666' }]} onPress={() => setModalVisible(false)}>
+                    <Text style={styles.updateBtnText}>Close</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.closeBtn, { flex: 1 }, isReadOnly && { opacity: 0.5 }]}
+                    onPress={handleUpdate}
+                    disabled={isReadOnly}
                   >
-                    <Animated.View
-                      collapsable={false}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        justifyContent: "center",
-                        alignItems: "center",
-                      }}
+                    <Text style={styles.updateBtnText}>
+                      {isReadOnly ? "Unavailable" : "Save Updates"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          )}
+        </Modal>
+        {/* FULL IMAGE VIEWER MODAL */}
+        <Modal visible={viewerVisible} transparent animationType="fade">
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <View style={styles.viewerBackground}>
+              <TouchableOpacity
+                style={styles.viewerClose}
+                onPress={closeViewer}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.viewerCloseText}>✕ Close</Text>
+              </TouchableOpacity>
+              {selectedImage && (
+                <PanGestureHandler
+                  ref={panRef}
+                  simultaneousHandlers={pinchRef}
+                  onGestureEvent={onPanEvent}
+                  onHandlerStateChange={onPanStateChange}
+                >
+                  <Animated.View
+                    style={{
+                      width: "100%",
+                      height: "80%",
+                      overflow: "hidden",
+                      backgroundColor: "#000",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <PinchGestureHandler
+                      ref={pinchRef}
+                      simultaneousHandlers={panRef}
+                      onGestureEvent={onPinchEvent}
+                      onHandlerStateChange={onPinchStateChange}
                     >
-                      <Animated.Image
-                        source={{ uri: selectedImage }}
-                        style={[
-                          styles.fullImage,
-                          {
-                            transform: [
-                              { scale: scale },
-                              { translateX: translateX },
-                              { translateY: translateY },
-                            ],
-                          },
-                        ]}
-                        resizeMode="contain"
-                      />
-                    </Animated.View>
-                  </PinchGestureHandler>
-                </Animated.View>
-              </PanGestureHandler>
-            )}
-          </View>
-        </GestureHandlerRootView>
-      </Modal>
-    </SafeAreaView>
+                      <Animated.View
+                        collapsable={false}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          justifyContent: "center",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Animated.Image
+                          source={{ uri: selectedImage }}
+                          style={[
+                            styles.fullImage,
+                            {
+                              transform: [
+                                { scale: scale },
+                                { translateX: translateX },
+                                { translateY: translateY },
+                              ],
+                            },
+                          ]}
+                          resizeMode="contain"
+                        />
+                      </Animated.View>
+                    </PinchGestureHandler>
+                  </Animated.View>
+                </PanGestureHandler>
+              )}
+            </View>
+          </GestureHandlerRootView>
+        </Modal>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -735,18 +741,20 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 26,
+    paddingHorizontal: 20,
+    height: 145,
+    paddingTop: 45,
     paddingBottom: 30,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
     marginBottom: 18,
     shadowColor: "#6D28D9",
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.18,
     shadowRadius: 12,
     elevation: 8,
   },
+
 
   headerLeftContainer: {
     flexDirection: "row",
