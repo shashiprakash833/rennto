@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 const BASE_URL = "http://192.168.88.26:8000";
+=======
+const BASE_URL = "http://192.168.88.37:8000";
+>>>>>>> Stashed changes
 // const BASE_URL = "https://api.rennto.in";
 // WebSocket base URL (safe conversion)
 export const WS_BASE_URL = BASE_URL.replace("http://", "ws://").replace("https://", "wss://");

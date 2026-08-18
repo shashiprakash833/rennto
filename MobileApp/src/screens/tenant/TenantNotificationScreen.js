@@ -24,6 +24,8 @@ import COLORS from "../../theme/colors";
 import { useNetwork } from "../../hooks/useNetwork";
 import OfflineView from "../../components/OfflineView";
 import { useLanguage } from "../../utils/LanguageContext";
+import { CommonActions } from "@react-navigation/native";
+
 const TenantNotificationScreen = () => {
   const { t } = useLanguage();
   const { isConnected } = useNetwork();
@@ -401,32 +403,35 @@ const TenantNotificationScreen = () => {
     return `${date.toLocaleDateString("en-US", dateOptions)}, ${timeStr}`;
   };
 
-  const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
-  const filteredRequests = visibleRequests; // No longer grouping by property to show multiple payment attempts
+const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
+  const filteredRequests = visibleRequests;
   const grouped = groupNotifications(filteredRequests);
-
+ 
+  const handleNotificationNavigation = (item) => {
+    const rawType = (item?.type || "").toLowerCase();
+    const title = (item?.title || "").toLowerCase();
+    const msg = (item?.message || "").toLowerCase();
+    if (rawType.includes("payment") || title.includes("payment")||title.includes("due") || title.includes("rent") || msg.includes("payment")) {
+      navigation.dispatch(CommonActions.navigate({ name: "TenantNavigation", params: { screen: "Payment" } }));
+      return;
+    }
+    if (rawType.includes("issue") || title.includes("issue") || msg.includes("issue")) {
+      navigation.dispatch(CommonActions.navigate({ name: "TenantNavigation", params: { screen: "Issues" } }));
+      return;
+    }
+    navigation.dispatch(CommonActions.navigate({ name: "TenantNavigation", params: { screen: "Home", params: { screen: "TenantHome" } } }));
+  };
+ 
   const renderCard = (item) => {
     const data = getData(item);
     return (
-      <TouchableOpacity
+<TouchableOpacity
         key={item.id}
         activeOpacity={0.7}
         style={styles.cardContainer}
-        onPress={() => {
-          if (item.type === "PAYMENT") {
-            navigation.navigate("TenantNavigation", {
-              screen: "Payment",
-            });
-          } else {
-            // Navigate to Home tab and open property details
-            navigation.navigate("TenantNavigation", {
-              screen: "Home",
-              params: { propertyName: item.propertyName },
-            });
-          }
-        }}
-      >
-        <View style={styles.card}>
+        onPress={() => handleNotificationNavigation(item)}
+>
+<View style={styles. Card}>
           <View style={[styles.statusIndicator, { backgroundColor: data.color }]} />
 
           <View style={[styles.iconContainer, { backgroundColor: data.lightColor }]}>

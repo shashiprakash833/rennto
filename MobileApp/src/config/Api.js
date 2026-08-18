@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+<<<<<<< Updated upstream
 const getDevBaseUrl = () => {
   const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
   if (hostUri) {
@@ -18,6 +19,16 @@ const getDevBaseUrl = () => {
 
 const BASE_URL = __DEV__
   ? getDevBaseUrl()
+=======
+// const BASE_URL = "http://192.168.88.37:8000";
+// const BASE_URL = "http://10.70.249.174:8000";
+// const BASE_URL = "https://api.rennto.in";
+
+
+
+const BASE_URL = __DEV__
+  ? "http://192.168.88.37:8000"
+>>>>>>> Stashed changes
   : "https://api.rennto.in";
 
 export const WS_BASE_URL = BASE_URL
