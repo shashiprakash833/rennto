@@ -1977,7 +1977,7 @@ export function PropertyDetailsScreen(props) {
   const handleChangeRequestSubmit = async (formDataOrDate, message) => {
     try {
       // Handle both old and new form data structures
-      let expectedJoiningDate, messageToOwner, targetHostelId, currentHostelId;
+      let expectedJoiningDate, messageToOwner, targetHostelId, currentHostelId, bedSharing;
       
       if (typeof formDataOrDate === 'object') {
         // New form submission with object data
@@ -1985,12 +1985,14 @@ export function PropertyDetailsScreen(props) {
         messageToOwner = formDataOrDate.message;
         targetHostelId = formDataOrDate.target_hostel_id;
         currentHostelId = formDataOrDate.current_hostel_id;
+        bedSharing = formDataOrDate.bedSharing;
       } else {
         // Old format compatibility
         expectedJoiningDate = formDataOrDate;
         messageToOwner = message;
         targetHostelId = targetHostelForChange?.id;
         currentHostelId = currentHostelForChange?.id;
+        bedSharing = "";
       }
 
       if (!expectedJoiningDate) {
@@ -2021,7 +2023,7 @@ export function PropertyDetailsScreen(props) {
         {
           tenantName: tenantName || "",
           tenantEmail,
-          roomPreference: property?.sharing || property?.type || "Standard",
+          roomPreference: bedSharing || property?.sharing || property?.type || "Standard",
           additionalDetails: messageToOwner,
         }
       );

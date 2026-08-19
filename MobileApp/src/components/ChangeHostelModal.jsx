@@ -230,6 +230,7 @@ export const ChangeHostelRequestForm = ({
     targetHostel: targetHostel?.name || "",
     expectedJoiningDate: "",
     message: "",
+    bedSharing: "",
   });
 
   const [currentHostelSearchQuery, setCurrentHostelSearchQuery] = useState("");
@@ -296,9 +297,20 @@ export const ChangeHostelRequestForm = ({
     }));
   };
 
+  const handleBedSharingChange = (text) => {
+    setFormData(prev => ({
+      ...prev,
+      bedSharing: text,
+    }));
+  };
+
   const handleSubmit = () => {
     if (!formData.expectedJoiningDate) {
       Alert.alert("Error", "Please select an expected joining date");
+      return;
+    }
+    if (!formData.bedSharing || formData.bedSharing.trim() === "") {
+      Alert.alert("Error", "Please specify the bed sharing preference");
       return;
     }
 
@@ -407,6 +419,20 @@ export const ChangeHostelRequestForm = ({
                 }}
               />
             )}
+
+            {/* Bed Sharing Input */}
+            <View style={styles.formSection}>
+              <Text style={styles.label}>
+                <MaterialCommunityIcons name="bed" size={13} color={COLORS.primary} /> Bed Sharing *
+              </Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g. 2 sharing, Single room, etc."
+                value={formData.bedSharing}
+                onChangeText={handleBedSharingChange}
+                placeholderTextColor="#a0aec0"
+              />
+            </View>
 
             {/* Message to Owner with Auto-save */}
             <View style={styles.formSection}>
