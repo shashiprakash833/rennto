@@ -1791,6 +1791,25 @@ export function PropertyDetailsScreen(props) {
   const [targetHostelInfo, setTargetHostelInfo] = useState(null);
   const [currentHostelInfo, setCurrentHostelInfo] = useState(null);
   const [availableHostelList, setAvailableHostelList] = useState([]);
+  const [hcBookingStatus, setHcBookingStatus] = useState(null);
+
+  const refreshHcBookingStatus = async () => {
+    try {
+      const storedPhone = await AsyncStorage.getItem("tenantPhone");
+      if (storedPhone && property?.id && isJoined) {
+        const statusRes = await checkBookingStatus(storedPhone, property.id);
+        setHcBookingStatus(statusRes);
+      }
+    } catch (e) {
+      console.log("Error checking hc status:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (isJoined && property?.id) {
+      refreshHcBookingStatus();
+    }
+  }, [property, isJoined]);
 
   // Find initial status from context to avoid flickering
   const initialStatus = requests.find(r => r.propertyName === property.name)?.status || "none";
@@ -2414,11 +2433,37 @@ export function PropertyDetailsScreen(props) {
           isJoined && 
           (!joinedProperty || joinedProperty.property_name?.trim() !== property.name?.trim())
         ) {
-          Alert.alert(
-            "Already Staying",
-            "You are already staying in a property. Please vacate or contact the owner before requesting another property."
-          );
-          return;
+          const storedPhone = await AsyncStorage.getItem("tenantPhone");
+          if (storedPhone && property.id) {
+            try {
+              const statusRes = await checkBookingStatus(storedPhone, property.id);
+              setHcBookingStatus(statusRes);
+              if (statusRes.status === "already_staying") {
+                setCurrentHostelInfo(statusRes.current_hostel || { name: joinedProperty?.property_name || "Current Hostel", location: "" });
+                setTargetHostelInfo({ id: property.id, name: property.name, location: property.address });
+                setBookNowModalVisible(true);
+                return;
+              } else if (statusRes.status === "pending_request") {
+                Alert.alert("Request Pending ⏳", statusRes.message || "Your hostel change request is currently pending owner response.");
+                return;
+              } else if (statusRes.status === "approved_request") {
+                Alert.alert("Request Approved ✅", "Your hostel change request has been approved by the owner! Please select your floor, room, and bed.");
+                setTenantTypeModalVisible(true);
+                return;
+              }
+            } catch (e) {
+              console.log("Check booking status error:", e);
+              setCurrentHostelInfo({ name: joinedProperty?.property_name || "Current Hostel", location: "" });
+              setTargetHostelInfo({ id: property.id, name: property.name, location: property.address });
+              setBookNowModalVisible(true);
+              return;
+            }
+          } else {
+            setCurrentHostelInfo({ name: joinedProperty?.property_name || "Current Hostel", location: "" });
+            setTargetHostelInfo({ id: property.id, name: property.name, location: property.address });
+            setBookNowModalVisible(true);
+            return;
+          }
         }
         setTenantTypeModalVisible(true);
         return;
@@ -3173,30 +3218,34 @@ export function PropertyDetailsScreen(props) {
               </Text>
             </TouchableOpacity>
           </View>
-        ) : isJoined && buttonAction === "book" && (!joinedProperty || joinedProperty.property_name?.trim() !== property.name?.trim()) ? (
-          <View style={{ flex: 1, paddingLeft: 12, justifyContent: "center" }}>
-            <Text style={{ color: "#e74c3c", fontSize: 11, fontWeight: "600", textAlign: "center" }}>
-              You are already staying in a property. Please vacate or contact the owner before requesting another property.
-            </Text>
-          </View>
         ) : (
           <TouchableOpacity
-            disabled={buttonDisabled}
+            disabled={buttonDisabled || hcBookingStatus?.status === "pending_request"}
             onPress={handleBookingAction}
             style={{
-              backgroundColor: buttonColor,
+              backgroundColor: hcBookingStatus?.status === "pending_request"
+                ? "#F59E0B"
+                : hcBookingStatus?.status === "approved_request"
+                ? "#10B981"
+                : buttonColor,
               flex: 1,
               height: 50,
               borderRadius: 12,
               alignItems: "center",
               justifyContent: "center",
-              opacity: (buttonDisabled && requestStatus !== "accepted") ? 0.6 : 1,
+              opacity: (buttonDisabled && requestStatus !== "accepted") || hcBookingStatus?.status === "pending_request" ? 0.85 : 1,
             }}
           >
             <Text
               style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}
             >
-              {buttonText}
+              {hcBookingStatus?.status === "pending_request"
+                ? "Request Pending ⏳"
+                : hcBookingStatus?.status === "approved_request"
+                ? "Select Room & Bed"
+                : isJoined && property?.type === "Hostel" && (!joinedProperty || joinedProperty.property_name?.trim() !== property.name?.trim())
+                ? "Request Hostel Change"
+                : buttonText}
             </Text>
           </TouchableOpacity>
         )}
@@ -4022,6 +4071,7 @@ export function PropertyDetailsScreen(props) {
             setChangeFormVisible(false);
             if (res.success) {
               Alert.alert("Request Sent! 🎉", "Your hostel change request has been sent successfully. Waiting for owner approval.");
+              refreshHcBookingStatus();
             } else {
               Alert.alert("Notice", res.message || "Failed to send request.");
             }
