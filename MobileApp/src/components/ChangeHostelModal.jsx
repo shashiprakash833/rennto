@@ -139,13 +139,12 @@ export const BookNowModal = ({
             {/* Warning Message */}
             <View style={styles.messageBox}>
               <MaterialCommunityIcons
-                name="alert-circle"
+                name="office-building-transfer"
                 size={24}
-                color={COLORS.warning}
+                color={COLORS.primary || "#5F259F"}
               />
               <Text style={styles.messageText}>
-                You are already staying in a property. Please vacate or contact
-                the owner before requesting another property.
+                You are currently registered in a property. You can request a hostel change to this property below.
               </Text>
             </View>
 
