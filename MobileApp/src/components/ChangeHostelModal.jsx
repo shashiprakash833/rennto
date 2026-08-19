@@ -29,6 +29,7 @@ const HostelSearchField = ({
   showSearch,
   setShowSearch,
   filteredHostels,
+  hidePencil,
 }) => {
   return (
     <View style={styles.formSection}>
@@ -49,7 +50,7 @@ const HostelSearchField = ({
             <Text style={styles.readOnlyText}>{selectedHostel.name}</Text>
             <Text style={styles.hostelLocationText}>{selectedHostel.location}</Text>
           </View>
-          <MaterialCommunityIcons name="pencil" size={16} color={COLORS.primary} />
+          {!hidePencil && <MaterialCommunityIcons name="pencil" size={16} color={COLORS.primary} />}
         </TouchableOpacity>
       ) : (
         <TouchableOpacity
@@ -360,6 +361,7 @@ export const ChangeHostelRequestForm = ({
               showSearch={showCurrentHostelSearch}
               setShowSearch={setShowCurrentHostelSearch}
               filteredHostels={filteredCurrentHostels}
+              hidePencil={true}
             />
 
 
@@ -723,9 +725,9 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   submitButton: {
-    backgroundColor: "#3b82f6",
+    backgroundColor: COLORS.primary,
     elevation: 6,
-    shadowColor: "#3b82f6",
+    shadowColor: COLORS.primary,
     shadowOpacity: 0.5,
     shadowRadius: 10,
     paddingVertical: 18,
