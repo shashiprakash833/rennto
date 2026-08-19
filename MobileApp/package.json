@@ -4,6 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
+    "start:lan": "set REACT_NATIVE_PACKAGER_HOSTNAME=192.168.88.42&& expo start -c",
+    "tunnel": "expo start --tunnel -c",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",

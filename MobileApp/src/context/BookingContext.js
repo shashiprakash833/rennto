@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useRef, useMemo } from "react";
+import React, { createContext, useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLanguage } from '../utils/LanguageContext';
@@ -12,6 +12,7 @@ export const BookingProvider = ({ children }) => {
   const [requests, setRequests] = useState([]);
   const [userPhone, setuserPhone] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [seenIds, setSeenIds] = useState([]);
   const [clearedIds, setClearedIds] = useState([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -34,6 +35,69 @@ export const BookingProvider = ({ children }) => {
   const [isTenantVacated, setIsTenantVacated] = useState(false);
   const [tenantStatus, setTenantStatus] = useState("");
   const [joinedProperty, setJoinedProperty] = useState(null);
+
+  // Dedicated Unread Notification Count Fetcher
+  const fetchUnreadCount = useCallback(async () => {
+    if (!userPhone) {
+      setUnreadNotificationCount((prev) => (prev !== 0 ? 0 : prev));
+      return;
+    }
+    try {
+      const res = await fetchWithAuth(
+        `${BASE_URL}/api/notifications/unread-count/?phone=${encodeURIComponent(userPhone)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const count = typeof data.unread_count === "number" ? data.unread_count : 0;
+        setUnreadNotificationCount((prev) => (prev !== count ? count : prev));
+        if (userRole === "tenant") {
+          console.log(`[TENANT] NOTIFICATION COUNT: ${count}`);
+        } else if (userRole === "owner") {
+          console.log(`[OWNER] NOTIFICATION COUNT: ${count}`);
+        }
+      }
+    } catch (e) {
+      console.log("Error fetching unread notification count:", e);
+    }
+  }, [userPhone, userRole]);
+
+  const markNotificationRead = useCallback(async (notificationId) => {
+    if (!notificationId) return;
+    try {
+      const res = await fetchWithAuth(`${BASE_URL}/api/notifications/${notificationId}/read/`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        if (userRole === "tenant") {
+          console.log(`[TENANT] MARKED READ: ${notificationId}`);
+        } else if (userRole === "owner") {
+          console.log(`[OWNER] MARKED READ: ${notificationId}`);
+        }
+        await fetchUnreadCount();
+      }
+    } catch (e) {
+      console.log("Error marking notification read:", e);
+    }
+  }, [userRole, fetchUnreadCount]);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    if (!userPhone) return;
+    try {
+      const res = await fetchWithAuth(`${BASE_URL}/api/notifications/${encodeURIComponent(userPhone)}/mark-all-read/`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        if (userRole === "tenant") {
+          console.log("[TENANT] MARKED ALL READ");
+        } else if (userRole === "owner") {
+          console.log("[OWNER] MARKED ALL READ");
+        }
+        setUnreadNotificationCount(0);
+      }
+    } catch (e) {
+      console.log("Error marking all notifications read:", e);
+    }
+  }, [userPhone, userRole]);
 
   // 1. Initial Data Load & User Phone Sync
   useEffect(() => {
@@ -73,6 +137,7 @@ export const BookingProvider = ({ children }) => {
           setUserRole(role);
           if (!activePhone) {
             setRequests([]);
+            setUnreadNotificationCount(0);
             setIsTenantVacated(false);
             setTenantStatus("");
             setIsJoined(false);
@@ -170,26 +235,23 @@ export const BookingProvider = ({ children }) => {
 
   useEffect(() => {
     fetchRequests();
-  }, [userPhone, refreshTrigger]);
+    fetchUnreadCount();
+  }, [userPhone, refreshTrigger, fetchUnreadCount]);
 
-  useEffect(() => {
-
-  }, [requests, isTenantVacated, isJoined]);
-
-  // NEW: Poling as backup to WebSocket for robust UI updates
+  // Backup polling interval for unread count & UI updates
   useEffect(() => {
     if (!userPhone) return;
     const interval = setInterval(() => {
+      fetchUnreadCount();
       setRefreshTrigger((prev) => prev + 1);
-    }, 10000); // 10 seconds
+    }, 10000);
     return () => clearInterval(interval);
-  }, [userPhone]);
+  }, [userPhone, fetchUnreadCount]);
 
   // 2. WebSocket Connection Management
   useEffect(() => {
     if (!userPhone) return;
 
-    // Use tenant-notifications path for tenants, normal notifications path for owners/others
     const sanitizedPhone = userPhone
       .replace('+', '')
       .replace('@', '_')
@@ -201,39 +263,28 @@ export const BookingProvider = ({ children }) => {
       : `${BASE_URL.replace(/^http/, "ws")}/ws/notifications/${sanitizedPhone}/`;
 
     const connectWS = () => {
-
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data);
-          console.log("WS Data Received:", data);
-
-          // Trigger a full refresh when any notification comes in
-          setRefreshTrigger((prev) => prev + 1);
-
-          // Show popup alert if message exists
           const msgText = data.content?.message || data.message;
           const msgType = data.content?.type || data.type;
 
+          if (userRole === "tenant") {
+            console.log("[TENANT] NEW NOTIFICATION:", msgText || data);
+          } else if (userRole === "owner") {
+            console.log("[OWNER] NEW NOTIFICATION:", msgText || data);
+          }
+
+          // Immediately update unread count & refresh trigger
+          fetchUnreadCount();
+          setRefreshTrigger((prev) => prev + 1);
+
           if (msgText) {
-            // Check if this is a real-time status update or join request
-            if (msgType === "status_update" || msgType === "incoming_request" || msgType === "ISSUE" || msgType === "PAYMENT" || msgType === "PAYMENT_VERIFIED") {
-              playSound();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              setRefreshTrigger((prev) => prev + 1); // Immediate UI refresh!
-              Alert.alert("New Notification 🔔", msgText);
-            }
-            if (msgType === "tenant_removed") {
-              playSound();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              // Force an immediate refresh so screens reflect the vacated state
-              setRefreshTrigger((prev) => prev + 1);
-              Alert.alert(
-                "Removed from Property ⚠️",
-                "The owner has removed you from the property.",
-              );
-            }
+            playSound();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Alert.alert("New Notification 🔔", msgText);
           }
 
         } catch (err) {
@@ -249,7 +300,7 @@ export const BookingProvider = ({ children }) => {
     };
     connectWS();
     return () => ws.current?.close();
-  }, [userPhone, userRole]);
+  }, [userPhone, userRole, fetchUnreadCount]);
 
   // Handle Marking As Seen
   const markAllAsSeen = async () => {
@@ -337,25 +388,45 @@ export const BookingProvider = ({ children }) => {
     return [...requests, ...mockRequests];
   }, [requests, mockRequests]);
 
+  const contextValue = useMemo(() => ({
+    requests: combinedRequests,
+    setRequests,
+    isJoined,
+    joinedProperty,
+    pendingCount,
+    unreadNotificationCount,
+    fetchUnreadCount,
+    markNotificationRead,
+    markAllNotificationsRead,
+    userPhone,
+    setuserPhone,
+    userRole,
+    setUserRole,
+    refreshTrigger,
+    setRefreshTrigger,
+    markAllAsSeen,
+    clearAllNotifications,
+    clearedIds,
+    submitOwnerRequest,
+    updateOwnerRequestStatus
+  }), [
+    combinedRequests,
+    isJoined,
+    joinedProperty,
+    pendingCount,
+    unreadNotificationCount,
+    fetchUnreadCount,
+    markNotificationRead,
+    markAllNotificationsRead,
+    userPhone,
+    userRole,
+    refreshTrigger,
+    seenIds,
+    clearedIds
+  ]);
+
   return (
-    <BookingContext.Provider
-      value={{
-        requests: combinedRequests, // Combine real and mock
-        setRequests,
-        isJoined,
-        joinedProperty,
-        pendingCount,
-        userPhone,
-        setuserPhone,
-        refreshTrigger,
-        setRefreshTrigger,
-        markAllAsSeen,
-        clearAllNotifications,
-        clearedIds,
-        submitOwnerRequest,
-        updateOwnerRequestStatus
-      }}
-    >
+    <BookingContext.Provider value={contextValue}>
       {children}
     </BookingContext.Provider>
   );

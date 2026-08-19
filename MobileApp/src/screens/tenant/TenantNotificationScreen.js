@@ -32,7 +32,19 @@ const TenantNotificationScreen = () => {
   const ws = useRef(null);
   const navigation = useNavigation();
   const { tenantPhone } = useContext(TenantContext);
-  const { requests, setRequests, refreshTrigger, setRefreshTrigger, markAllAsSeen, clearAllNotifications, clearedIds } = useContext(BookingContext);
+  const {
+    requests,
+    setRequests,
+    refreshTrigger,
+    setRefreshTrigger,
+    markAllAsSeen,
+    clearAllNotifications,
+    clearedIds,
+    fetchUnreadCount,
+    markNotificationRead,
+    markAllNotificationsRead,
+    unreadNotificationCount
+  } = useContext(BookingContext);
   const [refreshing, setRefreshing] = useState(false);
   const [joiningIds, setJoiningIds] = useState([]);
   const [phone, setPhone] = useState("");
@@ -215,13 +227,13 @@ const TenantNotificationScreen = () => {
     }
   };
 
-  // Mark all as seen when requests are loaded and screen is focused
+  // Mark all notifications as read when screen is focused
   useFocusEffect(
     useCallback(() => {
-      if (requests.length > 0) {
-        markAllAsSeen();
-      }
-    }, [requests])
+      fetchUnreadCount?.();
+      markAllNotificationsRead?.();
+      markAllAsSeen?.();
+    }, [])
   );
 
   const onRefresh = useCallback(() => {

@@ -87,6 +87,21 @@ urlpatterns = [
     path('update_request_status/', views.update_request_status),
     path('clear_owner_request/<int:request_id>/', views.clear_owner_request),
 
+    # Hostel Change Requests
+    path('hostel-change/create/', views.create_hostel_change_request),
+    path('hostel-change/check-status/<str:tenant_phone>/<int:target_hostel_id>/', views.check_hostel_booking_status),
+    path('hostel-change/pending/<str:owner_id>/', views.get_pending_hostel_change_requests),
+    path('hostel-change/approve/<int:request_id>/', views.approve_hostel_change_request),
+    path('hostel-change/reject/<int:request_id>/', views.reject_hostel_change_request),
+    path('hostel-change/my-requests/<str:tenant_phone>/', views.get_tenant_hostel_change_requests),
+
+    path('api/hostel-change/create/', views.create_hostel_change_request),
+    path('api/hostel-change/check-status/<str:tenant_phone>/<int:target_hostel_id>/', views.check_hostel_booking_status),
+    path('api/hostel-change/pending/<str:owner_id>/', views.get_pending_hostel_change_requests),
+    path('api/hostel-change/approve/<int:request_id>/', views.approve_hostel_change_request),
+    path('api/hostel-change/reject/<int:request_id>/', views.reject_hostel_change_request),
+    path('api/hostel-change/my-requests/<str:tenant_phone>/', views.get_tenant_hostel_change_requests),
+
     # =====================================================
     # VACATE REQUESTS
     # =====================================================
@@ -166,6 +181,7 @@ urlpatterns = [
     # =====================================================
     path('send-owner-notification/', views.send_owner_notification),
     path('send-tenant-notification/', views.send_tenant_notification),
+    path('notifications/unread-count/', views.get_unread_notification_count),
     path('notifications/<str:phone>/', views.get_notifications),
     path('notifications/<int:notification_id>/read/', views.mark_notification_read),
     path('notifications/<str:phone>/mark-all-read/', views.mark_all_notifications_read),

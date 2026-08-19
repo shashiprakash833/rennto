@@ -19,6 +19,7 @@ import {
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -148,6 +149,7 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectorType, setSelectorType] = useState(''); // 'state', 'city', 'area', 'minPrice', 'maxPrice', 'sortBy'
   const [selectorSearch, setSelectorSearch] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   // Extract Dynamic Locations from active properties to merge with static values
   const dynamicLocations = useMemo(() => {
@@ -286,6 +288,7 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
   const openSelector = (type) => {
     setSelectorType(type);
     setSelectorSearch('');
+    setIsSearchFocused(false);
     setSelectorVisible(true);
   };
 
@@ -316,6 +319,7 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
     } else if (selectorType === 'sortBy') {
       setSortBy(item);
     }
+    setIsSearchFocused(false);
     setSelectorVisible(false);
   };
 
@@ -703,20 +707,39 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
         visible={selectorVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setSelectorVisible(false)}
+        statusBarTranslucent
+        onRequestClose={() => {
+          setIsSearchFocused(false);
+          setSelectorVisible(false);
+        }}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setSelectorVisible(false)}
-        >
-          <View style={styles.selectorContainer}>
+        <View style={[styles.modalOverlay, isSearchFocused && styles.modalOverlayTop]}>
+          {!isSearchFocused && (
+            <Pressable
+              style={styles.backdropSpacer}
+              onPress={() => {
+                setIsSearchFocused(false);
+                setSelectorVisible(false);
+              }}
+            />
+          )}
+          <Pressable
+            style={[styles.selectorContainer, isSearchFocused && styles.selectorContainerTop]}
+            onPress={(e) => e.stopPropagation()}
+          >
             <View style={styles.selectorHeader}>
               <Text style={styles.selectorTitle}>
                 {selectorType === 'state' ? (t('select_state') || 'Select State') :
                  selectorType === 'city' ? (t('select_city') || 'Select City') :
                  selectorType === 'area' ? (t('select_area') || 'Select Area') : (t('sort_by') || 'Sort By')}
               </Text>
-              <TouchableOpacity onPress={() => setSelectorVisible(false)}>
+              <TouchableOpacity
+                onPress={() => {
+                  setIsSearchFocused(false);
+                  setSelectorVisible(false);
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
                 <Ionicons name="close-circle" size={24} color="#ccc" />
               </TouchableOpacity>
             </View>
@@ -731,16 +754,25 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
                   placeholderTextColor="#999"
                   value={selectorSearch}
                   onChangeText={setSelectorSearch}
+                  onFocus={() => setIsSearchFocused(true)}
                   autoCorrect={false}
+                  autoCapitalize="none"
                 />
+                {selectorSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setSelectorSearch('')}>
+                    <Ionicons name="close-circle" size={16} color="#999" />
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
             <FlatList
               data={selectorData}
-              keyExtractor={(item) => item}
+              keyExtractor={(item, index) => `${item}-${index}`}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 20 }}
+              keyboardShouldPersistTaps="handled"
+              style={styles.selectorList}
+              contentContainerStyle={{ paddingBottom: 24 }}
               renderItem={({ item }) => {
                 let active = false;
                 if (selectorType === 'state') active = selectedState === item;
@@ -762,12 +794,12 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
               }}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No items found</Text>
+                  <Text style={styles.emptyText}>{t("no_items_found") || "No items found"}</Text>
                 </View>
               }
             />
-          </View>
-        </Pressable>
+          </Pressable>
+        </View>
       </Modal>
     </>
   );
@@ -1144,13 +1176,31 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
+  modalOverlayTop: {
+    justifyContent: 'flex-start',
+    backgroundColor: '#fff',
+  },
+  backdropSpacer: {
+    flex: 1,
+  },
   selectorContainer: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: height * 0.7,
+    height: height * 0.65,
     paddingHorizontal: 24,
     paddingTop: 20,
+    width: '100%',
+  },
+  selectorContainerTop: {
+    height: '100%',
+    flex: 1,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 24) + 12,
+  },
+  selectorList: {
+    flex: 1,
   },
   selectorHeader: {
     flexDirection: 'row',
