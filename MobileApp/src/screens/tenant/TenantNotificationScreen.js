@@ -32,7 +32,19 @@ const TenantNotificationScreen = () => {
   const ws = useRef(null);
   const navigation = useNavigation();
   const { tenantPhone } = useContext(TenantContext);
-  const { requests, setRequests, refreshTrigger, setRefreshTrigger, markAllAsSeen, clearAllNotifications, clearedIds } = useContext(BookingContext);
+  const {
+    requests,
+    setRequests,
+    refreshTrigger,
+    setRefreshTrigger,
+    markAllAsSeen,
+    clearAllNotifications,
+    clearedIds,
+    fetchUnreadCount,
+    markNotificationRead,
+    markAllNotificationsRead,
+    unreadNotificationCount
+  } = useContext(BookingContext);
   const [refreshing, setRefreshing] = useState(false);
   const [joiningIds, setJoiningIds] = useState([]);
   const [phone, setPhone] = useState("");
@@ -221,7 +233,7 @@ const TenantNotificationScreen = () => {
       fetchUnreadCount?.();
       markAllNotificationsRead?.();
       markAllAsSeen?.();
-    }, [fetchUnreadCount, markAllNotificationsRead, markAllAsSeen])
+    }, [])
   );
 
   const onRefresh = useCallback(() => {

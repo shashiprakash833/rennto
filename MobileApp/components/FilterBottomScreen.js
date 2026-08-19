@@ -19,6 +19,7 @@ import {
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -148,6 +149,7 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectorType, setSelectorType] = useState(''); // 'state', 'city', 'area', 'minPrice', 'maxPrice', 'sortBy'
   const [selectorSearch, setSelectorSearch] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   // Extract Dynamic Locations from active properties to merge with static values
   const dynamicLocations = useMemo(() => {
@@ -286,6 +288,7 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
   const openSelector = (type) => {
     setSelectorType(type);
     setSelectorSearch('');
+    setIsSearchFocused(false);
     setSelectorVisible(true);
   };
 
@@ -316,6 +319,7 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
     } else if (selectorType === 'sortBy') {
       setSortBy(item);
     }
+    setIsSearchFocused(false);
     setSelectorVisible(false);
   };
 
@@ -704,15 +708,23 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
         transparent
         animationType="slide"
         statusBarTranslucent
-        onRequestClose={() => setSelectorVisible(false)}
+        onRequestClose={() => {
+          setIsSearchFocused(false);
+          setSelectorVisible(false);
+        }}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, isSearchFocused && styles.modalOverlayTop]}>
+          {!isSearchFocused && (
+            <Pressable
+              style={styles.backdropSpacer}
+              onPress={() => {
+                setIsSearchFocused(false);
+                setSelectorVisible(false);
+              }}
+            />
+          )}
           <Pressable
-            style={styles.backdropSpacer}
-            onPress={() => setSelectorVisible(false)}
-          />
-          <Pressable
-            style={styles.selectorContainer}
+            style={[styles.selectorContainer, isSearchFocused && styles.selectorContainerTop]}
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.selectorHeader}>
@@ -722,7 +734,10 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
                  selectorType === 'area' ? (t('select_area') || 'Select Area') : (t('sort_by') || 'Sort By')}
               </Text>
               <TouchableOpacity
-                onPress={() => setSelectorVisible(false)}
+                onPress={() => {
+                  setIsSearchFocused(false);
+                  setSelectorVisible(false);
+                }}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons name="close-circle" size={24} color="#ccc" />
@@ -739,6 +754,7 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
                   placeholderTextColor="#999"
                   value={selectorSearch}
                   onChangeText={setSelectorSearch}
+                  onFocus={() => setIsSearchFocused(true)}
                   autoCorrect={false}
                   autoCapitalize="none"
                 />
@@ -1160,6 +1176,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
+  modalOverlayTop: {
+    justifyContent: 'flex-start',
+    backgroundColor: '#fff',
+  },
   backdropSpacer: {
     flex: 1,
   },
@@ -1171,6 +1191,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     width: '100%',
+  },
+  selectorContainerTop: {
+    height: '100%',
+    flex: 1,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 24) + 12,
   },
   selectorList: {
     flex: 1,

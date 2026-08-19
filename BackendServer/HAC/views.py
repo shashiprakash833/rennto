@@ -2398,3 +2398,108 @@ def vacate_request_decline(request, pk):
         return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# =====================================================================
+# HOSTEL CHANGE REQUEST ENDPOINTS
+# =====================================================================
+from HAC.services.hostel_change_service import HostelChangeService
+
+@api_view(['POST'])
+@jwt_required()
+def create_hostel_change_request(request):
+    """Tenant submits a request to change/book another hostel"""
+    try:
+        role = request.jwt_payload.get('role')
+        if role != 'tenant':
+            return Response({"error": "Only tenants can submit hostel change requests"}, status=status.HTTP_403_FORBIDDEN)
+        
+        result = HostelChangeService.create_change_request(request.data)
+        if result.get('success'):
+            return Response(result, status=status.HTTP_201_CREATED)
+        else:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@jwt_required()
+def check_hostel_booking_status(request, tenant_phone, target_hostel_id):
+    """Check if tenant can book or switch to target hostel"""
+    try:
+        result = HostelChangeService.check_can_book_hostel(tenant_phone, target_hostel_id)
+        return Response(result, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@jwt_required()
+def get_pending_hostel_change_requests(request, owner_id):
+    """Get all pending hostel change requests for an owner"""
+    try:
+        role = request.jwt_payload.get('role')
+        if role != 'owner':
+            return Response({"error": "Only owners can view pending change requests"}, status=status.HTTP_403_FORBIDDEN)
+        
+        requests_list = HostelChangeService.get_pending_requests_for_owner(owner_id)
+        from HAC.serializers import HostelChangeRequestSerializer
+        serializer = HostelChangeRequestSerializer(requests_list, many=True)
+        return Response({"requests": serializer.data}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@jwt_required()
+def approve_hostel_change_request(request, request_id):
+    """Owner approves a hostel change request"""
+    try:
+        role = request.jwt_payload.get('role')
+        if role != 'owner':
+            return Response({"error": "Only owners can approve requests"}, status=status.HTTP_403_FORBIDDEN)
+        
+        result = HostelChangeService.approve_change_request(request_id)
+        if result.get('success'):
+            return Response(result, status=status.HTTP_200_OK)
+        else:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@jwt_required()
+def reject_hostel_change_request(request, request_id):
+    """Owner rejects a hostel change request"""
+    try:
+        role = request.jwt_payload.get('role')
+        if role != 'owner':
+            return Response({"error": "Only owners can reject requests"}, status=status.HTTP_403_FORBIDDEN)
+        
+        rejection_reason = request.data.get('rejection_reason', '')
+        result = HostelChangeService.reject_change_request(request_id, rejection_reason)
+        if result.get('success'):
+            return Response(result, status=status.HTTP_200_OK)
+        else:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@jwt_required()
+def get_tenant_hostel_change_requests(request, tenant_phone):
+    """Get all hostel change requests for a tenant"""
+    try:
+        role = request.jwt_payload.get('role')
+        if role != 'tenant':
+            return Response({"error": "Only tenants can view their requests"}, status=status.HTTP_403_FORBIDDEN)
+        
+        requests_list = HostelChangeService.get_tenant_change_requests(tenant_phone)
+        from HAC.serializers import HostelChangeRequestSerializer
+        serializer = HostelChangeRequestSerializer(requests_list, many=True)
+        return Response({"requests": serializer.data}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -15,6 +15,7 @@ from .models import (
     BlockedTenant,
     Property,
     ExistingTenantRequest,
+    HostelChangeRequest,
 )
 
 # ----------------------------
@@ -330,6 +331,55 @@ class ExistingTenantRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExistingTenantRequest
         fields = '__all__'
+
+
+class HostelChangeRequestSerializer(serializers.ModelSerializer):
+    """Serializer for hostel change requests"""
+    tenant_name = serializers.ReadOnlyField(source='tenant.name')
+    tenant_phone = serializers.ReadOnlyField(source='tenant.phone')
+    tenant_email = serializers.SerializerMethodField()
+    current_hostel_name = serializers.ReadOnlyField(source='current_hostel.hostelName')
+    requested_room_preference = serializers.ReadOnlyField()
+    additional_details = serializers.ReadOnlyField()
+    target_hostel_name = serializers.ReadOnlyField(source='target_hostel.hostelName')
+    target_owner_name = serializers.ReadOnlyField(source='target_owner.name')
+    target_owner_phone = serializers.ReadOnlyField(source='target_owner.phone')
+    days_until_joining = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HostelChangeRequest
+        fields = [
+            'id',
+            'tenant',
+            'tenant_name',
+            'tenant_phone',
+            'tenant_email',
+            'current_hostel',
+            'current_hostel_name',
+            'target_hostel',
+            'target_hostel_name',
+            'target_owner',
+            'target_owner_name',
+            'target_owner_phone',
+            'expected_joining_date',
+            'days_remaining_in_current_hostel',
+            'days_until_joining',
+            'requested_room_preference',
+            'additional_details',
+            'message_to_owner',
+            'status',
+            'created_at',
+            'updated_at'
+        ]
+
+    def get_tenant_email(self, obj):
+        return obj.tenant_email or getattr(obj.tenant, 'email', None)
+
+    def get_days_until_joining(self, obj):
+        from datetime import date
+        today = date.today()
+        delta = obj.expected_joining_date - today
+        return delta.days
 
 
 class IssueSerializer(serializers.ModelSerializer):

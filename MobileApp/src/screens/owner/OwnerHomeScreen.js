@@ -97,7 +97,7 @@ export default function BuildingScreen({ route }) {
   useFocusEffect(
     useCallback(() => {
       fetchUnreadCount?.();
-    }, [fetchUnreadCount])
+    }, [])
   );
 
   const ownerUnreadCount = unreadNotificationCount || 0;
