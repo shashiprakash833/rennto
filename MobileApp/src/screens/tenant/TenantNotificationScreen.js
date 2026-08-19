@@ -436,37 +436,44 @@ const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
  
   const renderCard = (item) => {
     const data = getData(item);
+    const timeFormatted = formatDate(item.createdAt || item.created_at);
+
     return (
-<TouchableOpacity
+      <TouchableOpacity
         key={item.id}
         activeOpacity={0.7}
         style={styles.cardContainer}
         onPress={() => handleNotificationNavigation(item)}
->
-<View style={styles. Card}>
+      >
+        <View style={styles.card}>
           <View style={[styles.statusIndicator, { backgroundColor: data.color }]} />
 
           <View style={[styles.iconContainer, { backgroundColor: data.lightColor }]}>
-            <Ionicons name={data.icon} size={24} color={data.color} />
+            <Ionicons name={data.icon} size={22} color={data.color} />
           </View>
 
           <View style={styles.content}>
-            <View style={styles.row}>
-              <Text style={styles.cardTitle}>{data.title}</Text>
-              <Text style={styles.timeText}>
-                {formatDate(item.createdAt || item.created_at)}
+            <Text style={styles.cardTitle}>{data.title}</Text>
+
+            {data.message ? (
+              <Text style={styles.cardMessage}>
+                {data.message}
               </Text>
-            </View>
-            <Text style={styles.cardMessage} numberOfLines={2}>
-              {data.message}
-            </Text>
+            ) : null}
+
             {(item.propertyName || item.property_name) ? (
-              <View style={styles.footer}>
-                <Ionicons name="business-outline" size={14} color={COLORS.TEXT_PRIMARY} />
-                <Text style={[styles.propertyName, { fontWeight: "bold", color: COLORS.TEXT_PRIMARY }]}>
+              <View style={styles.propertyRow}>
+                <Ionicons name="business-outline" size={13} color="#64748B" />
+                <Text style={styles.propertyName} numberOfLines={1}>
                   {item.propertyName || item.property_name}
                 </Text>
               </View>
+            ) : null}
+
+            {timeFormatted ? (
+              <Text style={styles.timeText}>
+                {timeFormatted}
+              </Text>
             ) : null}
 
             {((item.status || "").toLowerCase() === "accepted" || (item.status || "").toLowerCase() === "allotted") && !(item.id && item.id.toString().startsWith("exreq_")) && (
@@ -507,7 +514,9 @@ const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
             )}
           </View>
 
-          <Ionicons name="chevron-forward" size={20} color={COLORS.BORDER} />
+          <View style={styles.chevronContainer}>
+            <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -522,15 +531,23 @@ const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 12, padding: 4 }}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.TEXT_PRIMARY} />
-          </TouchableOpacity>
-          <View>
-            <Text style={styles.headerTitle}>{t("notifications") || "Notifications"}</Text>
-            <Text style={styles.headerSubtitle}>{t("stay_updated_booking_status") || "Stay updated on your booking status"}</Text>
-          </View>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="arrow-back" size={24} color="#0F172A" />
+        </TouchableOpacity>
+
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {t("notifications") || "Notifications"}
+          </Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
+            {t("stay_updated_booking_status") || "Stay updated on your booking status"}
+          </Text>
         </View>
+
         <View style={styles.headerActions}>
           {visibleRequests.length > 0 && (
             <TouchableOpacity
@@ -551,8 +568,12 @@ const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
               <Text style={styles.clearBtnText}>{t("clear_all") || "Clear All"}</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => setRefreshTrigger((prev) => prev + 1)} style={styles.refreshIcon}>
-            <Ionicons name="refresh" size={22} color={COLORS.PRIMARY} />
+          <TouchableOpacity
+            onPress={() => setRefreshTrigger((prev) => prev + 1)}
+            style={styles.refreshIcon}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="refresh-outline" size={20} color={COLORS.PRIMARY} />
           </TouchableOpacity>
         </View>
       </View>
@@ -567,10 +588,10 @@ const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
         {visibleRequests.length === 0 ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconBg}>
-              <Ionicons name="notifications-done" size={80} color={COLORS.PRIMARY_LIGHT} />
+              <Ionicons name="notifications-off-outline" size={44} color="#7C3AED" />
             </View>
-            <Text style={styles.emptyTitle}>{t("all_cleared") || "All cleared!"}</Text>
-            <Text style={styles.emptyText}>{t("all_caught_up_notifications") || "You're all caught up with your notifications."}</Text>
+            <Text style={styles.emptyTitle}>{t("no_notifications") || "No notifications yet"}</Text>
+            <Text style={styles.emptyText}>{t("all_caught_up") || "You're all caught up."}</Text>
           </View>
         ) : (
           Object.entries(grouped).map(([title, items]) => (
@@ -745,63 +766,83 @@ const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FBFBFF",
+    backgroundColor: "#F8FAFC",
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     backgroundColor: COLORS.WHITE,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "#E2E8F0",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+  },
+  backBtn: {
+    padding: 6,
+    marginRight: 8,
+    borderRadius: 8,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    marginRight: 10,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: COLORS.TEXT_PRIMARY,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#0F172A",
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: COLORS.TEXT_LIGHT,
+    fontSize: 12,
+    color: "#64748B",
     marginTop: 2,
+    fontWeight: "400",
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
   },
   clearBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: "#F5F3FF",
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
   },
   clearBtnText: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.ERROR,
+    color: "#EF4444",
   },
   refreshIcon: {
-    padding: 8,
-    backgroundColor: "#F5F3FF",
-    borderRadius: 12,
+    padding: 6,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 10,
   },
   scrollContent: {
+    paddingVertical: 12,
     paddingBottom: 40,
   },
   section: {
-    marginTop: 20,
+    marginTop: 12,
+    marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
-    color: COLORS.TEXT_LIGHT,
-    marginHorizontal: 20,
-    marginBottom: 10,
+    color: "#64748B",
+    marginHorizontal: 16,
+    marginBottom: 8,
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   cardContainer: {
     marginHorizontal: 16,
@@ -809,101 +850,104 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     backgroundColor: COLORS.WHITE,
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    position: "relative",
+    overflow: "hidden",
   },
   statusIndicator: {
     position: "absolute",
     left: 0,
-    top: 20,
-    bottom: 20,
+    top: 0,
+    bottom: 0,
     width: 4,
-    borderTopRightRadius: 4,
-    borderBottomRightRadius: 4,
   },
   iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 15,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 16,
+    marginRight: 12,
+    marginTop: 2,
   },
   content: {
     flex: 1,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    paddingRight: 4,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
-    color: COLORS.TEXT_PRIMARY,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.PRIMARY,
+    color: "#0F172A",
+    lineHeight: 20,
+    marginBottom: 4,
   },
   cardMessage: {
-    fontSize: 14,
-    color: COLORS.TEXT_SECONDARY,
-    marginTop: 2,
+    fontSize: 13,
+    color: "#475569",
     lineHeight: 18,
+    marginBottom: 6,
   },
-  timeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.PRIMARY,
-  },
-  footer: {
+  propertyRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 8,
+    marginBottom: 6,
+    gap: 4,
   },
   propertyName: {
     fontSize: 12,
     fontWeight: "600",
-    color: COLORS.TEXT_LIGHT,
-    marginLeft: 4,
+    color: "#64748B",
+  },
+  timeText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#7C3AED",
+    marginTop: 2,
+  },
+  chevronContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
+    paddingLeft: 4,
   },
   emptyState: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 100,
-    paddingHorizontal: 40,
+    paddingTop: 80,
+    paddingHorizontal: 32,
   },
   emptyIconBg: {
-    width: 150,
-    height: 150,
-    backgroundColor: "#F5F3FF",
-    borderRadius: 75,
+    width: 90,
+    height: 90,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 45,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: COLORS.TEXT_PRIMARY,
-    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 6,
+    textAlign: "center",
   },
   emptyText: {
-    fontSize: 16,
-    color: COLORS.TEXT_LIGHT,
+    fontSize: 14,
+    color: "#64748B",
     textAlign: "center",
-    lineHeight: 24,
+    lineHeight: 20,
   },
   actionRow: {
     flexDirection: "row",
