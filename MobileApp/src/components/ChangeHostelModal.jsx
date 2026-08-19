@@ -34,7 +34,7 @@ const HostelSearchField = ({
   return (
     <View style={styles.formSection}>
       <Text style={styles.label}>
-        <MaterialCommunityIcons name={iconName} size={13} color={COLORS.primary} /> {label}
+        <MaterialCommunityIcons name={iconName} size={13} color={COLORS.PRIMARY} /> {label}
       </Text>
       
       {selectedHostel ? (
@@ -50,16 +50,16 @@ const HostelSearchField = ({
             <Text style={styles.readOnlyText}>{selectedHostel.name}</Text>
             <Text style={styles.hostelLocationText}>{selectedHostel.location}</Text>
           </View>
-          {!hidePencil && <MaterialCommunityIcons name="pencil" size={16} color={COLORS.primary} />}
+          {!hidePencil && <MaterialCommunityIcons name="pencil" size={16} color={COLORS.PRIMARY} />}
         </TouchableOpacity>
       ) : (
         <TouchableOpacity
           style={styles.readOnlyField}
           onPress={() => setShowSearch(!showSearch)}
         >
-          <MaterialCommunityIcons name="magnify" size={18} color={COLORS.primary} />
+          <MaterialCommunityIcons name="magnify" size={18} color={COLORS.PRIMARY} />
           <Text style={styles.placeholderText}>{placeholder}</Text>
-          <MaterialCommunityIcons name="chevron-down" size={18} color={COLORS.primary} />
+          <MaterialCommunityIcons name="chevron-down" size={18} color={COLORS.PRIMARY} />
         </TouchableOpacity>
       )}
 
@@ -95,7 +95,7 @@ const HostelSearchField = ({
                 style={styles.searchResultItem}
                 onPress={() => onSelectHostel(item)}
               >
-                <MaterialCommunityIcons name="home-city" size={16} color={COLORS.primary} />
+                <MaterialCommunityIcons name="home-city" size={16} color={COLORS.PRIMARY} />
                 <View style={styles.resultItemContent}>
                   <Text style={styles.resultItemName}>{item.name}</Text>
                   <Text style={styles.resultItemLocation}>{item.location}</Text>
@@ -142,7 +142,7 @@ export const BookNowModal = ({
               <MaterialCommunityIcons
                 name="alert-circle"
                 size={24}
-                color={COLORS.warning}
+                color={COLORS.WARNING}
               />
               <Text style={styles.messageText}>
                 You are already staying in a property. Please vacate or contact
@@ -177,7 +177,7 @@ export const BookNowModal = ({
               <MaterialCommunityIcons
                 name="lightbulb-on"
                 size={20}
-                color={COLORS.primary}
+                color={COLORS.PRIMARY}
               />
               <Text style={styles.helpText}>
                 Click "Book Now" to send a request to the hostel owner. They will
@@ -369,7 +369,7 @@ export const ChangeHostelRequestForm = ({
             {/* Expected Joining Date with Auto-save */}
             <View style={styles.formSection}>
               <Text style={styles.label}>
-                <MaterialCommunityIcons name="calendar" size={13} color={COLORS.primary} /> Expected Joining Date *
+                <MaterialCommunityIcons name="calendar" size={13} color={COLORS.PRIMARY} /> Expected Joining Date *
               </Text>
               <TouchableOpacity
                 style={styles.dateInput}
@@ -378,7 +378,7 @@ export const ChangeHostelRequestForm = ({
                 <Ionicons
                   name="calendar-outline"
                   size={20}
-                  color={formData.expectedJoiningDate ? "#10b981" : COLORS.primary}
+                  color={formData.expectedJoiningDate ? "#10b981" : COLORS.PRIMARY}
                 />
                 <Text
                   style={[
@@ -425,7 +425,7 @@ export const ChangeHostelRequestForm = ({
             {/* Bed Sharing Input */}
             <View style={styles.formSection}>
               <Text style={styles.label}>
-                <MaterialCommunityIcons name="bed" size={13} color={COLORS.primary} /> Bed Sharing *
+                <MaterialCommunityIcons name="bed" size={13} color={COLORS.PRIMARY} /> Bed Sharing *
               </Text>
               <TextInput
                 style={styles.textInput}
@@ -439,7 +439,7 @@ export const ChangeHostelRequestForm = ({
             {/* Message to Owner with Auto-save */}
             <View style={styles.formSection}>
               <Text style={styles.label}>
-                <MaterialCommunityIcons name="message-text" size={13} color={COLORS.primary} /> Message to Owner (Optional)
+                <MaterialCommunityIcons name="message-text" size={13} color={COLORS.PRIMARY} /> Message to Owner (Optional)
               </Text>
               <TextInput
                 style={[styles.textInput, styles.messageInput]}
@@ -458,7 +458,7 @@ export const ChangeHostelRequestForm = ({
               <MaterialCommunityIcons
                 name="information"
                 size={20}
-                color={COLORS.primary}
+                color={COLORS.PRIMARY}
               />
               <Text style={styles.infoBoxText}>
                 Your request will be sent directly to the target hostel owner. They will review and respond to your request.
@@ -599,9 +599,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
+    borderLeftColor: COLORS.PRIMARY,
     elevation: 2,
-    shadowColor: COLORS.primary,
+    shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -628,16 +628,16 @@ const styles = StyleSheet.create({
     marginTop: 18,
     alignItems: "flex-start",
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
+    borderLeftColor: COLORS.PRIMARY,
     elevation: 1,
-    shadowColor: COLORS.primary,
+    shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
   },
   helpText: {
     fontSize: 12,
-    color: COLORS.primary,
+    color: COLORS.PRIMARY,
     marginLeft: 12,
     flex: 1,
     lineHeight: 17,
@@ -712,9 +712,9 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   bookNowButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.PRIMARY,
     elevation: 4,
-    shadowColor: COLORS.primary,
+    shadowColor: COLORS.PRIMARY,
     shadowOpacity: 0.4,
     shadowRadius: 6,
   },
@@ -725,9 +725,9 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   submitButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.PRIMARY,
     elevation: 6,
-    shadowColor: COLORS.primary,
+    shadowColor: COLORS.PRIMARY,
     shadowOpacity: 0.5,
     shadowRadius: 10,
     paddingVertical: 18,
@@ -759,11 +759,11 @@ const styles = StyleSheet.create({
     marginTop: 0,
     marginBottom: -1,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.PRIMARY,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     elevation: 4,
-    shadowColor: COLORS.primary,
+    shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
@@ -785,12 +785,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 2,
     borderTopWidth: 0,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.PRIMARY,
     borderBottomLeftRadius: 14,
     borderBottomRightRadius: 14,
     overflow: "hidden",
     elevation: 4,
-    shadowColor: COLORS.primary,
+    shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
@@ -883,7 +883,7 @@ const styles = StyleSheet.create({
   },
   datePickerInput: {
     borderWidth: 1.5,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.PRIMARY,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -947,9 +947,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 15,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.PRIMARY,
     elevation: 3,
-    shadowColor: COLORS.primary,
+    shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -975,7 +975,7 @@ const styles = StyleSheet.create({
     borderColor: "#cbd5e0",
     gap: 12,
     elevation: 3,
-    shadowColor: COLORS.primary,
+    shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -998,7 +998,7 @@ const styles = StyleSheet.create({
     color: "#1a202c",
     fontWeight: "500",
     elevation: 3,
-    shadowColor: COLORS.primary,
+    shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -1016,16 +1016,16 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginTop: 20,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
+    borderLeftColor: COLORS.PRIMARY,
     elevation: 2,
-    shadowColor: COLORS.primary,
+    shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
   infoBoxText: {
     fontSize: 13,
-    color: COLORS.primary,
+    color: COLORS.PRIMARY,
     marginLeft: 12,
     flex: 1,
     lineHeight: 19,
@@ -1063,10 +1063,10 @@ const styles = StyleSheet.create({
 
   // Input focus state (can be applied conditionally)
   inputFocused: {
-    borderColor: COLORS.primary,
+    borderColor: COLORS.PRIMARY,
     borderWidth: 2,
     elevation: 5,
-    shadowColor: COLORS.primary,
+    shadowColor: COLORS.PRIMARY,
     shadowOpacity: 0.2,
   },
 });
