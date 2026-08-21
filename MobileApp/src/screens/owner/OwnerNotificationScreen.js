@@ -648,6 +648,34 @@ const OwnerNotificationScreen = ({ route }) => {
       );
     }
 
+    if (item.type === "VERIFICATION" || item.type === "MESSAGE" || item.id?.toString().startsWith("notif_")) {
+      return (
+        <View key={`notif-${item.id}`} style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.userInfo}>
+              <View style={[styles.avatar, { backgroundColor: "#EDE9FE" }]}>
+                <Ionicons name="document-text-outline" size={20} color={COLORS.PRIMARY} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.userName}>{item.title || "Notification"}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                  <Text style={styles.timeText}>{formatDate(item.created_at || item.createdAt)}</Text>
+                </View>
+              </View>
+            </View>
+            <View style={[styles.statusTag, { backgroundColor: item.is_read ? "#F3F4F6" : "#EDE9FE" }]}>
+              <Text style={[styles.statusTagText, { color: item.is_read ? "#6B7280" : COLORS.PRIMARY }]}>
+                {item.is_read ? "Read" : "New"}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.cardMessage, { marginTop: 10, color: COLORS.TEXT_PRIMARY }]} numberOfLines={4}>
+            {item.message}
+          </Text>
+        </View>
+      );
+    }
+
     return (
       <View key={`${item.type}-${item.id}`} style={styles.card}>
         <View style={styles.cardHeader}>

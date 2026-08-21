@@ -161,18 +161,6 @@ class RequestService:
             tenant.owner = owner
             tenant.save(update_fields=['owner'])
 
-        # Create Notification record for Owner
-        from HAC.models import Notification
-        Notification.objects.create(
-            owner_account=owner,
-            recipient_phone=owner.phone or owner.owner_id or "",
-            title="New Join Request 📩",
-            message=f"{tenant.name} wants to stay in your PG/Hostel ({property_name}).",
-            type="JOIN_REQUEST",
-            related_id=join_req.id,
-            is_read=False,
-        )
-
         if owner.push_token:
             NotificationService.send_push_notification(owner.push_token, "New Join Request 📩", f"{tenant.name} wants to stay in your PG/Hostel ({property_name}).")
 
@@ -294,7 +282,7 @@ class RequestService:
 
         owner_notifications = Notification.objects.filter(
             Q(owner_account=owner) | Q(recipient_phone__in=owner_phone_variants)
-        ).order_by('-created_at')
+        ).exclude(type__in=["JOIN_REQUEST", "VACATE_REQUEST"]).order_by('-created_at')
         for n in owner_notifications:
             data.append({
                 "id": f"notif_{n.id}",
@@ -353,18 +341,24 @@ class RequestService:
                 "ownerPhone": r.owner.phone if r.owner else None,
                 "created_at": r.created_at,
             })
-
-        for r in vacate_requests:
+        vacate_requests = VacateRequest.objects.filter(tenant=tenant).order_by('-created_at')
+        for v in vacate_requests:
             data.append({
-                "id": f"vacate_{r.id}",
-                "db_id": r.id,
-                "type": "VACATE_REQUEST",
+                "id": f"vacate_{v.id}",
+                "db_id": v.id,
+                "type": "vacate_request",
                 "notification_type": "vacate_request",
-                "title": f"Vacate Request - {r.status}",
-                "message": f"Your vacate request for {r.property_name} is {r.status}.",
-                "propertyName": r.property_name,
-                "status": r.status,
-                "created_at": r.created_at,
+                "title": "Vacate Request",
+                "message": (
+                    "Your vacate request has been approved. You have been removed from the property."
+                    if (v.status or "").lower() == "approved"
+                    else "Your vacate request has been declined. You remain in the property."
+                    if (v.status or "").lower() == "declined"
+                    else f"Your vacate request for {v.property_name} is waiting for owner approval."
+                ),
+                "status": (v.status or "Pending").lower(),
+                "propertyName": v.property_name,
+                "created_at": v.created_at,
             })
 
         # Also include owner-sent TenantNotification records (reminders, messages, etc.)
@@ -407,24 +401,6 @@ class RequestService:
                 "is_read": n.is_read,
                 "created_at": n.created_at,
                 "related_id": n.related_id,
-            })
-
-        vacate_requests = VacateRequest.objects.filter(tenant=tenant).order_by('-created_at')
-        for v in vacate_requests:
-            data.append({
-                "id": f"vacate_{v.id}",
-                "type": "vacate_request",
-                "title": "Vacate Request",
-                "message": (
-                    "Your vacate request has been approved. You have been removed from the property."
-                    if (v.status or "").lower() == "approved"
-                    else "Your vacate request has been declined. You remain in the property."
-                    if (v.status or "").lower() == "declined"
-                    else f"Your vacate request for {v.property_name} is waiting for owner approval."
-                ),
-                "status": (v.status or "Pending").lower(),
-                "propertyName": v.property_name,
-                "created_at": v.created_at,
             })
 
         hostel_changes = HostelChangeRequest.objects.filter(tenant=tenant).select_related(

@@ -1153,7 +1153,7 @@ class TenantService:
                 recipient_phone=owner.phone or owner.owner_id or "",
                 title="Verification Completed 📄",
                 message=notif_msg,
-                type="JOIN_REQUEST",
+                type="VERIFICATION",
                 related_id=join_req.id if join_req else None,
                 is_read=False,
             )
