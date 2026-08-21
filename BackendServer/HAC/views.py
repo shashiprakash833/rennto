@@ -1129,6 +1129,7 @@ def send_tenant_notification(request):
     notification = TenantNotification.objects.create(
         tenant_phone=tenant_phone,
         title=title,
+        message=message or "",
     )
     print(f"BACKEND: CREATE NOTIFICATION: Tenant ({tenant_phone}) => '{title}'")
 

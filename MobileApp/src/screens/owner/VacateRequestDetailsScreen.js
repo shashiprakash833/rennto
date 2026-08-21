@@ -49,7 +49,7 @@ export default function VacateRequestDetailsScreen() {
   };
 
   useEffect(() => {
-    if (requestId && !requestParam?.tenant) {
+    if (requestId) {
       loadDetails();
     }
   }, [requestId]);
@@ -119,7 +119,11 @@ export default function VacateRequestDetailsScreen() {
 
       setRefreshTrigger((prev) => prev + 1);
       setRequestData((prev) => ({ ...prev, status: "Approved" }));
-      Alert.alert("Tenant Removed 🚀", `${tenant.name} has been removed from the property.`);
+      Alert.alert(
+        "Tenant Removed 🚀",
+        `${tenant.name} has been removed from the property.`,
+        [{ text: "OK", onPress: () => navigation.goBack() }]
+      );
     } catch (e) {
       Alert.alert("Error", "Could not process tenant removal.");
     } finally {
@@ -158,7 +162,11 @@ export default function VacateRequestDetailsScreen() {
 
       setRefreshTrigger((prev) => prev + 1);
       setRequestData((prev) => ({ ...prev, status: "Declined" }));
-      Alert.alert("Request Declined ❌", "Vacate request has been declined. Tenant remains in property.");
+      Alert.alert(
+        "Request Declined ❌",
+        "Vacate request has been declined. Tenant remains in property.",
+        [{ text: "OK", onPress: () => navigation.goBack() }]
+      );
     } catch (e) {
       Alert.alert("Error", "Could not decline request.");
     } finally {

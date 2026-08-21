@@ -36,30 +36,86 @@ export const BookingProvider = ({ children }) => {
   const [tenantStatus, setTenantStatus] = useState("");
   const [joinedProperty, setJoinedProperty] = useState(null);
 
+  // 1.5. Fetch Initial Requests & Sync
+  const fetchRequests = useCallback(async () => {
+    const role = userRole || (await AsyncStorage.getItem("userRole"));
+    const isOwner = role === 'owner';
+    const tenant = await AsyncStorage.getItem("tenantPhone");
+    const owner = await AsyncStorage.getItem("ownerPhone");
+    const selectedAccountId = await AsyncStorage.getItem("selectedAccountId");
+    const phoneToUse = userPhone || (isOwner ? (selectedAccountId || owner) : tenant);
+    if (!phoneToUse) return;
+
+    try {
+      const endpoint = isOwner ? "owner_requests" : "tenant_notifications";
+
+      const response = await fetchWithAuth(
+        `${BASE_URL}/api/${endpoint}/${encodeURIComponent(phoneToUse)}/`
+      );
+
+      const data = await response.json();
+
+      if (Array.isArray(data)) {
+        setRequests(data);
+      }
+
+      if (!isOwner) {
+        const detailsRes = await fetchWithAuth(
+          `${BASE_URL}/api/tenantdetails/${encodeURIComponent(phoneToUse)}/`
+        );
+        if (detailsRes.ok) {
+          const detailsData = await detailsRes.json();
+          const isVac = Boolean(
+            detailsData && (detailsData.status === "Vacated" || detailsData.property_name === "N/A" || !detailsData.property_name)
+          );
+          setIsTenantVacated(isVac);
+          setTenantStatus(detailsData?.status || "");
+          if (isVac) {
+            setJoinedProperty(null);
+          } else {
+            setJoinedProperty(detailsData);
+          }
+        }
+      } else {
+        setIsTenantVacated(false);
+        setTenantStatus("");
+        setJoinedProperty(null);
+      }
+    } catch (error) {
+      console.log("Fetch Requests Error:", error);
+    }
+  }, [userPhone, userRole]);
+
   // Dedicated Unread Notification Count Fetcher
   const fetchUnreadCount = useCallback(async () => {
-    if (!userPhone) {
+    const role = userRole || (await AsyncStorage.getItem("userRole"));
+    const tenant = await AsyncStorage.getItem("tenantPhone");
+    const owner = await AsyncStorage.getItem("ownerPhone");
+    const selectedAccountId = await AsyncStorage.getItem("selectedAccountId");
+    const phoneToUse = userPhone || (role === 'owner' ? (selectedAccountId || owner) : tenant);
+    if (!phoneToUse) {
       setUnreadNotificationCount((prev) => (prev !== 0 ? 0 : prev));
       return;
     }
+    fetchRequests();
     try {
       const res = await fetchWithAuth(
-        `${BASE_URL}/api/notifications/unread-count/?phone=${encodeURIComponent(userPhone)}`
+        `${BASE_URL}/api/notifications/unread-count/?phone=${encodeURIComponent(phoneToUse)}`
       );
       if (res.ok) {
         const data = await res.json();
         const count = typeof data.unread_count === "number" ? data.unread_count : 0;
         setUnreadNotificationCount((prev) => (prev !== count ? count : prev));
-        if (userRole === "tenant") {
+        if (role === "tenant") {
           console.log(`[TENANT] NOTIFICATION COUNT: ${count}`);
-        } else if (userRole === "owner") {
+        } else if (role === "owner") {
           console.log(`[OWNER] NOTIFICATION COUNT: ${count}`);
         }
       }
     } catch (e) {
       console.log("Error fetching unread notification count:", e);
     }
-  }, [userPhone, userRole]);
+  }, [userPhone, userRole, fetchRequests]);
 
   const markNotificationRead = useCallback(async (notificationId) => {
     if (!notificationId) return;
@@ -105,11 +161,17 @@ export const BookingProvider = ({ children }) => {
       try {
         const tenant = await AsyncStorage.getItem("tenantPhone");
         const owner = await AsyncStorage.getItem("ownerPhone");
-        const role = await AsyncStorage.getItem("userRole");
+        let role = await AsyncStorage.getItem("userRole");
+        const selectedAccountId = await AsyncStorage.getItem("selectedAccountId");
         const storedSeen = await AsyncStorage.getItem("notificationSeenIds");
         const storedCleared = await AsyncStorage.getItem("notificationClearedIds");
 
-        const activePhone = tenant || owner;
+        if (!role) {
+          if (selectedAccountId || owner) role = 'owner';
+          else if (tenant) role = 'tenant';
+        }
+
+        const activePhone = role === 'owner' ? (selectedAccountId || owner) : (role === 'tenant' ? tenant : (tenant || owner));
         if (activePhone !== userPhone) {
           setuserPhone(activePhone);
         }
@@ -129,8 +191,15 @@ export const BookingProvider = ({ children }) => {
       try {
         const tenant = await AsyncStorage.getItem("tenantPhone");
         const owner = await AsyncStorage.getItem("ownerPhone");
-        const role = await AsyncStorage.getItem("userRole");
-        const activePhone = tenant || owner;
+        let role = await AsyncStorage.getItem("userRole");
+        const selectedAccountId = await AsyncStorage.getItem("selectedAccountId");
+        
+        if (!role) {
+          if (selectedAccountId || owner) role = 'owner';
+          else if (tenant) role = 'tenant';
+        }
+
+        const activePhone = role === 'owner' ? (selectedAccountId || owner) : (role === 'tenant' ? tenant : (tenant || owner));
         if (activePhone !== userPhone || role !== userRole) {
           console.log("BookingContext user switched:", userPhone, "->", activePhone, "role:", role);
           setuserPhone(activePhone);
@@ -151,51 +220,6 @@ export const BookingProvider = ({ children }) => {
 
     return () => clearInterval(interval);
   }, [userPhone, userRole]);
-
-  // 1.5. Fetch Initial Requests & Sync
-  const fetchRequests = async () => {
-    if (!userPhone) return;
-
-    try {
-      const isOwner = userRole === 'owner';
-      const endpoint = isOwner ? "owner_requests" : "tenant_notifications";
-
-      const response = await fetchWithAuth(
-        `${BASE_URL}/api/${endpoint}/${encodeURIComponent(userPhone)}/`
-      );
-
-      const data = await response.json();
-
-      if (Array.isArray(data)) {
-        setRequests(data);
-      }
-
-      if (!isOwner) {
-        const detailsRes = await fetchWithAuth(
-          `${BASE_URL}/api/tenantdetails/${encodeURIComponent(userPhone)}/`
-        );
-        if (detailsRes.ok) {
-          const detailsData = await detailsRes.json();
-          const isVac = Boolean(
-            detailsData && (detailsData.status === "Vacated" || detailsData.property_name === "N/A" || !detailsData.property_name)
-          );
-          setIsTenantVacated(isVac);
-          setTenantStatus(detailsData?.status || "");
-          if (isVac) {
-            setJoinedProperty(null);
-          } else {
-            setJoinedProperty(detailsData);
-          }
-        }
-      } else {
-        setIsTenantVacated(false);
-        setTenantStatus("");
-        setJoinedProperty(null);
-      }
-    } catch (error) {
-      console.log("Fetch Requests Error:", error);
-    }
-  };
 
   useEffect(() => {
     if (isTenantVacated || (joinedProperty && (joinedProperty.property_name === "N/A" || !joinedProperty.property_name))) {
@@ -336,7 +360,7 @@ export const BookingProvider = ({ children }) => {
     // 1. Join Request Logic
     if (r.type === "join_request" || r.type === "JOIN_REQUEST" || !r.type) {
       const isOwnerTask = ["pending", "allotted"].includes(status);
-      const isTenantAlert = ["accepted", "rejected"].includes(status);
+      const isTenantAlert = ["accepted", "allotted", "pending_confirmation", "completed", "joined", "rejected"].includes(status);
       
       if (userRole === "owner") {
         return isUnseen && isOwnerTask;
@@ -355,9 +379,22 @@ export const BookingProvider = ({ children }) => {
     }
 
     // 3. Payment Logic
-    if (r.type === "payment") {
+    if (r.type === "payment" || r.type === "PAYMENT") {
       // Owner sees pending payments
       // Tenant sees successful/failed payments
+      return isUnseen;
+    }
+
+    // 4. Vacate Request Logic
+    if (r.type === "vacate_request" || r.type === "VACATE_REQUEST") {
+      const isOwnerTask = status === "pending";
+      const isTenantAlert = ["approved", "accepted", "declined", "rejected"].includes(status);
+      if (userRole === "owner") {
+        return isUnseen && isOwnerTask;
+      }
+      if (userRole === "tenant") {
+        return isUnseen && isTenantAlert;
+      }
       return isUnseen;
     }
 
@@ -388,13 +425,15 @@ export const BookingProvider = ({ children }) => {
     return [...requests, ...mockRequests];
   }, [requests, mockRequests]);
 
+  const totalUnreadCount = Math.max(unreadNotificationCount, pendingCount);
+
   const contextValue = useMemo(() => ({
     requests: combinedRequests,
     setRequests,
     isJoined,
     joinedProperty,
     pendingCount,
-    unreadNotificationCount,
+    unreadNotificationCount: totalUnreadCount,
     fetchUnreadCount,
     markNotificationRead,
     markAllNotificationsRead,
@@ -414,7 +453,7 @@ export const BookingProvider = ({ children }) => {
     isJoined,
     joinedProperty,
     pendingCount,
-    unreadNotificationCount,
+    totalUnreadCount,
     fetchUnreadCount,
     markNotificationRead,
     markAllNotificationsRead,

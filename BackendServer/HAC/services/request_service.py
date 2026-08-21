@@ -2,7 +2,7 @@ from django.db import transaction
 from django.db.models import Q
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from HAC.models import JoinRequest, Tenent, Owners, BlockedTenant, TenantBeds, ApartmentTenantBeds, CommercialTenantBeds, ExistingTenantRequest, TenantNotification
+from HAC.models import JoinRequest, Tenent, Owners, BlockedTenant, TenantBeds, ApartmentTenantBeds, CommercialTenantBeds, ExistingTenantRequest, TenantNotification, VacateRequest
 from .common_service import CommonService
 from .notification_service import NotificationService
 
@@ -37,11 +37,17 @@ class RequestService:
 
             if status_value in ['accepted', 'rejected', 'allotted', 'pending_confirmation']:
                 sanitized_phone = req.tenant.phone.replace("+", "").replace("@", "_").replace(".", "_")
-                message = f"Your request for {req.property_name} has been {status_value}."
+                message = f"Your room has been allotted in {req.property_name}." if status_value in ["allotted", "pending_confirmation"] else f"Your request for {req.property_name} has been {status_value}."
 
                 tenant = req.tenant
-                
 
+                from HAC.models import TenantNotification
+                TenantNotification.objects.create(
+                    tenant_phone=tenant.phone,
+                    title="Room Allotted 🎉" if status_value in ["allotted", "pending_confirmation"] else f"Booking {status_value.capitalize()}",
+                    message=message,
+                    is_read=False,
+                )
 
                 if tenant.push_token:
                     if status_value == "accepted":
@@ -55,17 +61,18 @@ class RequestService:
 
                 try:
                     channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        f"user_notifications_{sanitized_phone}",
-                        {
-                            "type": "send_notification",
-                            "content": {
-                                "type": "status_update",
-                                "message": message,
-                                "status": status_value
+                    for group in [f"tenant_notifications_{sanitized_phone}", f"user_notifications_{sanitized_phone}"]:
+                        async_to_sync(channel_layer.group_send)(
+                            group,
+                            {
+                                "type": "send_notification",
+                                "content": {
+                                    "type": "status_update",
+                                    "message": message,
+                                    "status": status_value
+                                }
                             }
-                        }
-                    )
+                        )
                 except Exception:
                     pass
 
@@ -111,17 +118,6 @@ class RequestService:
         if is_blocked:
             raise ValueError("You are blocked by an owner and cannot book new properties until unblocked.")
 
-        # A tenant is truly active only after they've clicked Join (is_vacant=False
-        # AND have a joined/completed request). A pending_confirmation tenant has not
-        # yet joined so they are NOT considered active.
-        if not tenant.is_vacant:
-            has_active_join = JoinRequest.objects.filter(
-                tenant=tenant,
-                status__in=['joined', 'completed']
-            ).exists()
-            if has_active_join:
-                raise ValueError("You already have an active stay. You must vacate your current property before booking another one.")
-
         owner = CommonService.get_owner(lookup_id)
         if not owner:
             raise Exception("Owner not found")
@@ -135,7 +131,7 @@ class RequestService:
         if existing:
             return {"message": "You already have an active request for this property", "existing": True}
 
-        JoinRequest.objects.create(
+        join_req = JoinRequest.objects.create(
             tenant=tenant,
             owner=owner,
             property_name=property_name,
@@ -147,19 +143,30 @@ class RequestService:
             status="pending"
         )
 
-        tenant.owner = owner
-        tenant.save()
+        if tenant.is_vacant or not tenant.owner:
+            tenant.owner = owner
+            tenant.save(update_fields=['owner'])
+
+        # Create Notification record for Owner
+        from HAC.models import Notification
+        Notification.objects.create(
+            owner_account=owner,
+            recipient_phone=owner.phone or owner.owner_id or "",
+            title="New Join Request 📩",
+            message=f"{tenant.name} wants to stay in your PG/Hostel ({property_name}).",
+            type="JOIN_REQUEST",
+            related_id=join_req.id,
+            is_read=False,
+        )
 
         if owner.push_token:
-            NotificationService.send_push_notification(owner.push_token, "New Join Request 📩", f"{tenant.name} requested to join your property")
+            NotificationService.send_push_notification(owner.push_token, "New Join Request 📩", f"{tenant.name} wants to stay in your PG/Hostel ({property_name}).")
 
         try:
             channel_layer = get_channel_layer()
             sanitized_phone = owner.owner_id if owner.owner_id else (owner.phone.replace("+", "") if owner else "")
-            
 
-
-            for group in [f"owner_status_{sanitized_phone}", f"user_notifications_{sanitized_phone}"]:
+            for group in [f"owner_status_{sanitized_phone}", f"user_notifications_{sanitized_phone}", f"notifications_{sanitized_phone}"]:
                 async_to_sync(channel_layer.group_send)(
                     group,
                     {
@@ -167,7 +174,7 @@ class RequestService:
                         "content": {
                             "type": "incoming_request",
                             "message": f"New join request from {tenant.name}",
-                            "id": tenant.id,
+                            "id": join_req.id,
                             "status": "pending"
                         }
                     }
@@ -229,6 +236,63 @@ class RequestService:
                 "is_existing_tenant": True,
             })
 
+        # ── Vacate Requests ──
+        vacate_requests = VacateRequest.objects.filter(owner=owner).order_by('-created_at')
+        for r in vacate_requests:
+            data.append({
+                "id": r.id,
+                "db_id": r.id,
+                "name": r.tenant.name,
+                "phone": r.tenant.phone,
+                "status": r.status,
+                "propertyName": r.property_name,
+                "propertyType": r.property_type,
+                "requested_floor": r.requested_floor,
+                "requested_room": r.requested_room,
+                "requested_bed": r.requested_bed,
+                "requested_flat": r.requested_flat,
+                "floor": r.requested_floor,
+                "room": r.requested_room,
+                "bed": r.requested_bed,
+                "flat": r.requested_flat,
+                "type": "vacate_request",
+                "request_type": "VACATE_REQUEST",
+                "title": "Vacate Request",
+                "message": f"{r.tenant.name} has requested to vacate the property.",
+                "remarks": r.remarks or "",
+                "created_at": r.created_at,
+                "is_vacate_request": True,
+                "is_existing_tenant": False,
+            })
+
+        # ── Notifications (Issues, payments, general alerts) ──
+        from HAC.models import Notification
+        owner_phone_variants = [owner.phone, owner.phone.lstrip('+')] if owner.phone else []
+        if owner.owner_id and owner.owner_id not in owner_phone_variants:
+            owner_phone_variants.append(owner.owner_id)
+        if owner.phone:
+            if not owner.phone.startswith('+'):
+                owner_phone_variants.extend(['+' + owner.phone, '+91' + owner.phone, '91' + owner.phone])
+            elif owner.phone.startswith('+91'):
+                owner_phone_variants.append(owner.phone.replace('+91', ''))
+            elif owner.phone.startswith('91'):
+                owner_phone_variants.append(owner.phone[2:])
+
+        owner_notifications = Notification.objects.filter(
+            Q(owner_account=owner) | Q(recipient_phone__in=owner_phone_variants)
+        ).order_by('-created_at')
+        for n in owner_notifications:
+            data.append({
+                "id": f"notif_{n.id}",
+                "db_id": n.id,
+                "type": n.type or "MESSAGE",
+                "title": n.title,
+                "message": n.message,
+                "is_read": n.is_read,
+                "created_at": n.created_at,
+                "related_id": n.related_id,
+            })
+
         # Sort combined list by created_at descending
         data.sort(key=lambda x: x['created_at'], reverse=True)
         return data
@@ -241,6 +305,7 @@ class RequestService:
 
         join_requests = JoinRequest.objects.filter(tenant=tenant).order_by('-created_at')
         existing_requests = ExistingTenantRequest.objects.filter(tenant=tenant).order_by('-created_at')
+        vacate_requests = VacateRequest.objects.filter(tenant=tenant).order_by('-created_at')
         data = []
         
         for r in join_requests:
@@ -275,6 +340,19 @@ class RequestService:
                 "created_at": r.created_at,
             })
 
+        for r in vacate_requests:
+            data.append({
+                "id": f"vacate_{r.id}",
+                "db_id": r.id,
+                "type": "VACATE_REQUEST",
+                "notification_type": "vacate_request",
+                "title": f"Vacate Request - {r.status}",
+                "message": f"Your vacate request for {r.property_name} is {r.status}.",
+                "propertyName": r.property_name,
+                "status": r.status,
+                "created_at": r.created_at,
+            })
+
         # Also include owner-sent TenantNotification records (reminders, messages, etc.)
         tenant_phone_variants = [tenant.phone, tenant.phone.lstrip('+')]
         if not tenant.phone.startswith('+'):
@@ -296,6 +374,22 @@ class RequestService:
                 "message": n.message,
                 "is_read": n.is_read,
                 "created_at": n.created_at,
+            })
+
+        # Also include general Notification records sent to the tenant (payments, issues, etc.)
+        from HAC.models import Notification
+        general_notifications = Notification.objects.filter(
+            recipient_phone__in=tenant_phone_variants
+        ).order_by('-created_at')
+        for n in general_notifications:
+            data.append({
+                "id": f"gen_notif_{n.id}",
+                "type": n.type or "MESSAGE",
+                "title": n.title,
+                "message": n.message,
+                "is_read": n.is_read,
+                "created_at": n.created_at,
+                "related_id": n.related_id,
             })
 
         data.sort(key=lambda x: x['created_at'], reverse=True)

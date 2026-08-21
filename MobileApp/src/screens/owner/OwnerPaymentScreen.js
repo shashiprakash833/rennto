@@ -1698,6 +1698,7 @@ const OwnerPaymentScreen = () => {
               <TextInput
                 style={styles.rejectInput}
                 placeholder={t("e.g. Screenshot blurry, Amount incorrect") || "e.g. Screenshot blurry, Amount incorrect"}
+                placeholderTextColor={COLORS.TEXT_LIGHT || "#6B7280"}
                 value={rejectionReason}
                 onChangeText={setRejectionReason}
                 multiline

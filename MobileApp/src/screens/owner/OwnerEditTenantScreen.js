@@ -43,7 +43,7 @@ export default function OwnerEditTenantScreen({ route, navigation }) {
 
   // Validation functions
   const isValidName = (text) => /^[A-Za-z\s]+$/.test(text.trim());
-  const isValidPhone = (text) => /^\d{10,11}$/.test(text.trim());
+  const isValidPhone = (text) => /^\d{10}$/.test(text.trim());
   const isValidEmail = (text) => text.trim().length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text.trim());
   const isValidDate = (text) => /^\d{4}-\d{2}-\d{2}$/.test(text.trim());
 
@@ -238,6 +238,7 @@ export default function OwnerEditTenantScreen({ route, navigation }) {
                 <TextInput
                   style={styles.textInput}
                   placeholder="Tenant Full Name"
+                  placeholderTextColor={COLORS.TEXT_LIGHT}
                   value={name}
                   onChangeText={setName}
                 />
@@ -253,6 +254,7 @@ export default function OwnerEditTenantScreen({ route, navigation }) {
                 <TextInput
                   style={styles.textInput}
                   placeholder="e.g. 8500"
+                  placeholderTextColor={COLORS.TEXT_LIGHT}
                   keyboardType="numeric"
                   value={rent}
                   onChangeText={setRent}
@@ -273,6 +275,7 @@ export default function OwnerEditTenantScreen({ route, navigation }) {
                 <TextInput
                   style={styles.textInput}
                   placeholder="YYYY-MM-DD"
+                  placeholderTextColor={COLORS.TEXT_LIGHT}
                   value={checkIn}
                   onChangeText={setCheckIn}
                 />

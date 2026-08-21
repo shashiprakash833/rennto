@@ -1,5 +1,17 @@
-const BASE_URL = "http://192.168.88.42:8000";
+const getBaseUrl = () => {
+    if (typeof window !== "undefined" && window.location) {
+        const hostname = window.location.hostname;
+        if (hostname === "localhost" || hostname === "127.0.0.1") {
+            return "http://localhost:8000";
+        }
+        return `http://${hostname}:8000`;
+    }
+    return "http://localhost:8000";
+};
+
+const BASE_URL = getBaseUrl();
 // const BASE_URL = "https://api.rennto.in";
+
 // WebSocket base URL (safe conversion)
 export const WS_BASE_URL = BASE_URL.replace("http://", "ws://").replace("https://", "wss://");
 
@@ -10,8 +22,7 @@ export const WS_BASE_URL = BASE_URL.replace("http://", "ws://").replace("https:/
  * - Graceful 401 handling
  */
 export const fetchWithAuth = async (url, options = {}) => {
-    //const token = localStorage.getItem("adminToken");
-    const token = localStorage.getItem("adminToken");
+    const token = localStorage.getItem("adminToken") || localStorage.getItem("token");
 
     if (!token) {
         console.warn("[AUTH] No token found - skipping Authorization header");
@@ -23,9 +34,6 @@ export const fetchWithAuth = async (url, options = {}) => {
     };
 
     // Attach token if available
-    //if (token) {
-    //  headers["Authorization"] = `Bearer ${token}`;
-    //}
     if (token && token !== "null" && token !== "undefined") {
         headers["Authorization"] = `Bearer ${token}`;
     }
@@ -43,10 +51,8 @@ export const fetchWithAuth = async (url, options = {}) => {
 
             // Clear invalid session
             localStorage.removeItem("adminToken");
+            localStorage.removeItem("token");
             localStorage.removeItem("isLoggedIn");
-
-            // ❌ DO NOT redirect or reload (this was causing infinite loop)
-            // window.location.href = "/login";  <-- REMOVED
 
             return response;
         }
@@ -59,3 +65,4 @@ export const fetchWithAuth = async (url, options = {}) => {
 };
 
 export default BASE_URL;
+

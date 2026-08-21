@@ -16,7 +16,7 @@ import "./App.css";
 
 function App() {
     const [isAuthenticated, setIsAuthenticated] = useState(
-        !!localStorage.getItem("token")
+        !!localStorage.getItem("adminToken") || !!localStorage.getItem("token")
     );
 
     const handleLogin = () => {

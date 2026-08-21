@@ -62,7 +62,28 @@ class VacateService:
             owner = tenant.owner
 
         if not owner:
+            # Fallback 1: check TenantBeds / ApartmentTenantBeds / CommercialTenantBeds
+            bed = TenantBeds.objects.filter(phone=tenant.phone).first() or \
+                  ApartmentTenantBeds.objects.filter(phone=tenant.phone).first() or \
+                  CommercialTenantBeds.objects.filter(phone=tenant.phone).first()
+            if bed and bed.owner:
+                owner = bed.owner
+            elif bed and bed.owner_phone:
+                owner = CommonService.get_owner(bed.owner_phone)
+
+        if not owner:
+            # Fallback 2: check latest JoinRequest
+            from HAC.models import JoinRequest
+            jr = JoinRequest.objects.filter(tenant=tenant, status__in=['completed', 'joined', 'active', 'accepted', 'allotted']).order_by('-created_at').first()
+            if jr and jr.owner:
+                owner = jr.owner
+
+        if not owner:
             raise Exception("Owner not found for this tenant.")
+
+        if not tenant.owner:
+            tenant.owner = owner
+            tenant.save(update_fields=['owner'])
 
         # Check existing pending vacate request
         existing_pending = VacateRequest.objects.filter(
@@ -119,7 +140,7 @@ class VacateService:
             recipient_phone=owner.phone or owner.owner_id or "",
             title="Vacate Request",
             message=f"{tenant.name} has requested to vacate the property.",
-            type="ISSUE",
+            type="VACATE_REQUEST",
             related_id=vacate_req.id,
             is_read=False,
         )
@@ -297,11 +318,15 @@ class VacateService:
         vacate_req.status = "Approved"
         vacate_req.save()
 
-        # Resolve open issue
+        # Resolve open issue & mark owner notifications as read
         Issue.objects.filter(
             tenant=tenant,
             title__icontains="Vacate Request",
         ).update(status="Completed")
+        Notification.objects.filter(
+            related_id=request_id,
+            type__in=["VACATE_REQUEST", "ISSUE"]
+        ).update(is_read=True)
 
         # Create Tenant Notification
         TenantNotification.objects.create(
@@ -320,7 +345,7 @@ class VacateService:
 
         sanitized_tenant = ExistingTenantService._sanitize_phone(tenant.phone)
         ExistingTenantService._send_ws_notification(
-            [f"user_notifications_{sanitized_tenant}"],
+            [f"tenant_notifications_{sanitized_tenant}", f"user_notifications_{sanitized_tenant}"],
             {
                 "type": "tenant_removed",
                 "message": "Your vacate request has been approved.",
@@ -357,6 +382,10 @@ class VacateService:
             tenant=tenant,
             title__icontains="Vacate Request",
         ).update(status="Completed")
+        Notification.objects.filter(
+            related_id=request_id,
+            type__in=["VACATE_REQUEST", "ISSUE"]
+        ).update(is_read=True)
 
         TenantNotification.objects.create(
             tenant_phone=tenant.phone,
@@ -374,7 +403,7 @@ class VacateService:
 
         sanitized_tenant = ExistingTenantService._sanitize_phone(tenant.phone)
         ExistingTenantService._send_ws_notification(
-            [f"user_notifications_{sanitized_tenant}"],
+            [f"tenant_notifications_{sanitized_tenant}", f"user_notifications_{sanitized_tenant}"],
             {
                 "type": "status_update",
                 "message": "Your vacate request has been declined.",

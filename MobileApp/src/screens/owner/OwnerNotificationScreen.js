@@ -57,10 +57,8 @@ const OwnerNotificationScreen = ({ route }) => {
   };
 
   const navigation = useNavigation();
-  const phone = route?.params?.phone;
-  const ownerPropertyType = (route?.params?.propertyType || "").toLowerCase();
-
   const {
+    userPhone,
     setRequests: setGlobalRequests,
     refreshTrigger,
     setRefreshTrigger,
@@ -71,6 +69,9 @@ const OwnerNotificationScreen = ({ route }) => {
     markNotificationRead,
     markAllNotificationsRead
   } = useContext(BookingContext);
+
+  const phone = route?.params?.phone || userPhone;
+  const ownerPropertyType = (route?.params?.propertyType || "").toLowerCase();
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +93,15 @@ const OwnerNotificationScreen = ({ route }) => {
             floor: item.requested_floor || item.floor,
             room: item.requested_room || item.room,
             bed: item.requested_bed || item.bed,
+          };
+        }
+        if (item.is_vacate_request || item.type === "vacate_request" || item.type === "VACATE_REQUEST") {
+          return {
+            ...item,
+            type: "vacate_request",
+            title: "Vacate Request",
+            tenant_name: item.name || item.tenant_name || "Tenant",
+            message: `${item.name || item.tenant_name || "Tenant"} has requested to vacate the property.`,
           };
         }
         return item;
@@ -132,7 +142,15 @@ const OwnerNotificationScreen = ({ route }) => {
         console.log("Could not fetch hostel change requests:", hcErr);
       }
 
-      const combinedData = [...hostelChangeData, ...vacateData, ...mappedData];
+      const rawCombined = [...hostelChangeData, ...vacateData, ...mappedData];
+      const seenMap = new Map();
+      rawCombined.forEach(item => {
+        const key = `${item.type || 'req'}_${item.id}`;
+        if (!seenMap.has(key)) {
+          seenMap.set(key, item);
+        }
+      });
+      const combinedData = Array.from(seenMap.values());
 
       const filteredData = combinedData.filter(item => {
         if (!ownerPropertyType) return true; // If no type passed, show all

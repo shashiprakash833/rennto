@@ -257,21 +257,7 @@ export default function TenantHomeScreen({ route }) {
         throw new Error(errData.error || errData.message || "Could not submit vacate request.");
       }
 
-      const requestPayload = {
-        type: "vacate_request",
-        request_type: "VACATE_REQUEST",
-        title: "Vacate Request",
-        message: `${joinedProperty?.tenant_name || tenantPhoneNum || "Tenant"} has requested to vacate the property.`,
-        status: "pending",
-        tenant_name: joinedProperty?.tenant_name || "Tenant",
-        tenant_phone: tenantPhoneNum,
-        property_name: joinedProperty?.property_name || "Property",
-      };
-
-      if (submitOwnerRequest) {
-        submitOwnerRequest(requestPayload);
-      }
-
+      bookingCtx?.setRefreshTrigger?.(prev => prev + 1);
       Alert.alert("Vacate Request Submitted 🚀", successMsg);
     } catch (e) {
       Alert.alert("Error", e.message || "Could not submit vacate request.");
@@ -577,7 +563,7 @@ export default function TenantHomeScreen({ route }) {
     }
   };
 
-  const unreadCount = bookingContext?.unreadNotificationCount || 0;
+  const unreadCount = bookingContext?.unreadNotificationCount || bookingContext?.pendingCount || 0;
   const badgeText = unreadCount > 99 ? "99+" : `${unreadCount}`;
 
   useFocusEffect(

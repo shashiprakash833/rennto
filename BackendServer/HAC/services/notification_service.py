@@ -121,17 +121,34 @@ class NotificationService:
         if role == 'owner':
             owner = CommonService.get_owner(clean_phone)
             if owner:
-                count = Notification.objects.filter(
-                    Q(owner_account=owner) | Q(recipient_phone__iexact=clean_phone),
+                owner_phone_variants = [owner.phone, owner.phone.lstrip('+')] if owner.phone else []
+                if owner.owner_id and owner.owner_id not in owner_phone_variants:
+                    owner_phone_variants.append(owner.owner_id)
+                if owner.phone:
+                    if not owner.phone.startswith('+'):
+                        owner_phone_variants.extend(['+' + owner.phone, '+91' + owner.phone, '91' + owner.phone])
+                    elif owner.phone.startswith('+91'):
+                        owner_phone_variants.append(owner.phone.replace('+91', ''))
+                    elif owner.phone.startswith('91'):
+                        owner_phone_variants.append(owner.phone[2:])
+
+                n_count = Notification.objects.filter(
+                    Q(owner_account=owner) | Q(recipient_phone__in=owner_phone_variants),
                     is_read=False
                 ).count()
+
+                from HAC.models import JoinRequest, ExistingTenantRequest, VacateRequest
+                jr_count = JoinRequest.objects.filter(owner=owner, status='pending').count()
+                ex_count = ExistingTenantRequest.objects.filter(owner=owner, status='pending').count()
+                vr_count = VacateRequest.objects.filter(owner=owner, status__iexact='pending').count()
+                count = n_count + jr_count + ex_count + vr_count
             else:
                 count = Notification.objects.filter(recipient_phone__iexact=clean_phone, is_read=False).count()
             print(f"BACKEND: UNREAD COUNT: Owner ({clean_phone}) => {count}")
             return {"unread_count": count}
         else:
             # Tenant or general user
-            from HAC.models import TenantNotification
+            from HAC.models import TenantNotification, Tenent, JoinRequest
             phone_variants = [clean_phone, clean_phone.lstrip('+')]
             if not clean_phone.startswith('+'):
                 phone_variants.extend(['+' + clean_phone, '+91' + clean_phone, '91' + clean_phone])
@@ -142,7 +159,16 @@ class NotificationService:
             
             t_count = TenantNotification.objects.filter(tenant_phone__in=phone_variants, is_read=False).count()
             n_count = Notification.objects.filter(recipient_phone__in=phone_variants, is_read=False).count()
-            total_unread = t_count + n_count
+
+            tenant = Tenent.objects.filter(phone__in=phone_variants).first()
+            jr_count = 0
+            if tenant:
+                jr_count = JoinRequest.objects.filter(
+                    tenant=tenant,
+                    status__in=['accepted', 'allotted', 'pending_confirmation']
+                ).count()
+
+            total_unread = t_count + n_count + jr_count
             print(f"BACKEND: UNREAD COUNT: Tenant ({clean_phone}) => {total_unread}")
             return {"unread_count": total_unread}
 

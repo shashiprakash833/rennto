@@ -16,9 +16,12 @@ const COLORS = {
   // Text Colors
   TEXT_PRIMARY: "#212121",
   TEXT_SECONDARY: "#757575",
-  TEXT_LIGHT: "#9E9E9E",
+  TEXT_LIGHT: "#6B7280", // Clear, visible contrast on light & dark surfaces
   text: "#212121",
   textSecondary: "#757575",
+  textLight: "#6B7280",
+  placeholder: "#6B7280",
+  PLACEHOLDER: "#6B7280",
 
   // Status Colors
   SUCCESS: "#16A34A",

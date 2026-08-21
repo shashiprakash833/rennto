@@ -299,7 +299,7 @@ const TenantNotificationScreen = () => {
       };
     }
 
-    if (item.type === "MESSAGE") {
+    if (item.type === "MESSAGE" || item.id?.toString().startsWith("notif_") || item.id?.toString().startsWith("gen_notif_")) {
       const isRemoval = (item.title || "").toLowerCase().includes("removed");
       return {
         title: item.title || "Notification",
@@ -311,7 +311,16 @@ const TenantNotificationScreen = () => {
     }
 
     const status = (item.status || "pending").toLowerCase();
-    if (status === "accepted" || status === "allotted" || status === "pending_confirmation") {
+    if (status === "allotted" || status === "pending_confirmation") {
+      return {
+        title: "Room Allotted 🎉",
+        message: item.message || "Your room has been allotted.",
+        icon: "bed-outline",
+        color: COLORS.PRIMARY,
+        lightColor: "#EDE9FE",
+      };
+    }
+    if (status === "accepted") {
       if (item.id && item.id.toString().startsWith("exreq_")) {
         return {
           title: t("booking_completed") || "Booking Completed",

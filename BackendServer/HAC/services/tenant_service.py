@@ -216,8 +216,11 @@ class TenantService:
             "room_number": room_no,
             "floor_number": floor_no,
             "check_in": check_in,
-            "rent": rent,
- 
+            # OWNER
+            "owner_id": tenant.owner.owner_id if tenant.owner else "",
+            "owner_phone": tenant.owner.phone if tenant.owner else "",
+            "owner_name": tenant.owner.name if tenant.owner else "",
+
             "status": final_status,
         }
 
@@ -1116,6 +1119,42 @@ class TenantService:
         if join_req:
             join_req.status = 'joined'
             join_req.save()
+
+        # ── Notify Owner of document submission ──
+        owner = (join_req.owner if join_req else None) or tenant.owner
+        if owner:
+            from HAC.models import Notification
+            notif_msg = f"{tenant.name} has completed verification and submitted the required documents."
+            Notification.objects.create(
+                owner_account=owner,
+                recipient_phone=owner.phone or owner.owner_id or "",
+                title="Verification Completed 📄",
+                message=notif_msg,
+                type="JOIN_REQUEST",
+                related_id=join_req.id if join_req else None,
+                is_read=False,
+            )
+            if owner.push_token:
+                NotificationService.send_push_notification(owner.push_token, "Verification Completed 📄", notif_msg)
+
+            try:
+                channel_layer = get_channel_layer()
+                sanitized_owner = owner.owner_id if owner.owner_id else (owner.phone.replace("+", "") if owner else "")
+                for group in [f"owner_status_{sanitized_owner}", f"user_notifications_{sanitized_owner}", f"notifications_{sanitized_owner}"]:
+                    async_to_sync(channel_layer.group_send)(
+                        group,
+                        {
+                            "type": "send_notification",
+                            "content": {
+                                "type": "verification_completed",
+                                "message": notif_msg,
+                                "id": join_req.id if join_req else None,
+                                "status": "joined"
+                            }
+                        }
+                    )
+            except Exception:
+                pass
 
         return {"message": "Verification submitted successfully!"}
 

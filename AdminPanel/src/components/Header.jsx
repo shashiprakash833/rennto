@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     FaBell, FaUserCircle, FaChevronDown, FaUser, FaCog,
-    FaInfoCircle, FaSearch, FaBuilding, FaHome
+    FaInfoCircle, FaSearch, FaBuilding, FaHome, FaSignOutAlt
 } from "react-icons/fa";
 
 import Profile from "../pages/Profile";
@@ -411,6 +411,20 @@ function Header() {
                             style={{ display: "flex", alignItems: "center", cursor: "pointer" }}
                         >
                             <FaCog style={{ marginRight: "8px" }} /> Settings
+                        </p>
+
+                        {/* Logout */}
+                        <p
+                            onClick={() => {
+                                setOpen(false);
+                                localStorage.removeItem("adminToken");
+                                localStorage.removeItem("token");
+                                localStorage.removeItem("isLoggedIn");
+                                window.location.href = "/login";
+                            }}
+                            style={{ display: "flex", alignItems: "center", cursor: "pointer", color: "#ef4444", borderTop: "1px solid #f3f4f6", paddingTop: "8px", marginTop: "4px" }}
+                        >
+                            <FaSignOutAlt style={{ marginRight: "8px" }} /> Logout
                         </p>
 
                     </div>

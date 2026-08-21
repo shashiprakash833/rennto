@@ -131,14 +131,13 @@ const Login = ({ onLogin }) => {
                 const data = await response.json();
 
                 if (response.ok) {
-                    localStorage.setItem(
-                        "adminToken",
-                        data.token
-                    );
+                    localStorage.setItem("adminToken", data.token);
+                    localStorage.setItem("token", data.token);
+                    localStorage.setItem("isLoggedIn", "true");
 
                     onLogin();
                 } else {
-                    setError(data.error);
+                    setError(data.error || "Login failed. Please check your credentials.");
                 }
             }
 

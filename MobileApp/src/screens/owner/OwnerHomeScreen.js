@@ -100,7 +100,7 @@ export default function BuildingScreen({ route }) {
     }, [])
   );
 
-  const ownerUnreadCount = unreadNotificationCount || 0;
+  const ownerUnreadCount = unreadNotificationCount || pendingCount || 0;
   const ownerBadgeText = ownerUnreadCount > 99 ? "99+" : `${ownerUnreadCount}`;
   const { selectedAccount } = useContext(OwnerAccountContext);
   const phone = selectedAccount ? selectedAccount.id : (route?.params?.phone || "");
@@ -841,8 +841,8 @@ const filteredFloors = editMode
   };
   const isValidName = (name) => name.trim().length > 0;
   const isValidPhone = (phone) => {
-    const digits = phone.replace(/\D/g, "");
-    return digits.length >= 10 && digits.length <= 15;
+    const digits = (phone || "").replace(/\D/g, "");
+    return digits.length === 10;
   };
   const isValidEmail = (mail) =>
     mail.trim().length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail.trim());
@@ -2417,12 +2417,13 @@ try {
                         <Ionicons name="call-outline" size={20} color={COLORS.PRIMARY} style={styles.inputIcon} />
                         <TextInput
                           value={contactNumber}
-                          onChangeText={(t) => setContactNumber(t.replace(/[^0-9]/g, "").slice(0, 11))}
+                          onChangeText={(t) => setContactNumber(t.replace(/[^0-9]/g, "").slice(0, 10))}
                           onBlur={() => setTouchedPhone(true)}
                           style={styles.modernInput}
                           placeholder="Phone No"
-                          keyboardType="numeric"
-                          maxLength={11}
+                          placeholderTextColor={COLORS.TEXT_LIGHT}
+                          keyboardType="phone-pad"
+                          maxLength={10}
                         />
                       </View>
                     </View>
@@ -2527,6 +2528,7 @@ try {
                         onBlur={() => setTouchedRent(true)}
                         style={styles.modernInput}
                         placeholder="Expected Rent Amount"
+                        placeholderTextColor={COLORS.TEXT_LIGHT}
                         keyboardType="numeric"
                       />
                     </View>
@@ -2542,6 +2544,7 @@ try {
                           onChangeText={(t) => setCheckIn(t.replace(/[^\d/-]/g, ""))}
                           style={styles.modernInput}
                           placeholder="YYYY-MM-DD"
+                          placeholderTextColor={COLORS.TEXT_LIGHT}
                         />
                       </View>
                     </View>
@@ -2559,6 +2562,7 @@ try {
                             onBlur={() => setTouchedAadharId(true)}
                             style={styles.modernInput}
                             placeholder="Enter Aadhaar No"
+                            placeholderTextColor={COLORS.TEXT_LIGHT}
                             keyboardType="numeric"
                             maxLength={12}
                           />
@@ -2613,7 +2617,7 @@ try {
                     if (!isFormValid()) {
                       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
                       if (!isValidName(tenantName)) return Alert.alert("Validation Error", "Please enter a valid Full Name.");
-                      if (!isValidPhone(contactNumber)) return Alert.alert("Validation Error", "Please enter a valid Contact Number (at least 10 digits).");
+                      if (!isValidPhone(contactNumber)) return Alert.alert("Validation Error", "Please enter a valid 10-digit Contact Number.");
                       if (monthlyRent.trim().length === 0) return Alert.alert("Validation Error", "Please enter the Monthly Rent.");
                       if (stayType === "hostel" && bedNumber < 1) return Alert.alert("Validation Error", "Please select a bed.");
                       if (!dateRegex.test(checkIn.trim())) return Alert.alert("Validation Error", "Please enter a valid Check-in Date (YYYY-MM-DD).");
@@ -3467,6 +3471,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
     borderColor: "#6C2BD9",
+  },
+  badgeText: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "800",
   },
   greetingsRow: {
     flexDirection: "row",
