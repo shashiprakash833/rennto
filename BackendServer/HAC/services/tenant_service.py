@@ -1,9 +1,22 @@
-from BackendServer.HAC.models import VacateRequest
 from django.db import transaction
 from django.db.models import Q
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from HAC.models import Tenent, Owners, TenantBeds, ApartmentTenantBeds, CommercialTenantBeds, BlockedTenant, JoinRequest, ExistingTenantRequest, TenantNotification, StayHostelDetails, ApartmentStayDetails, CommericialDetails
+from HAC.models import (
+    VacateRequest,
+    Tenent,
+    Owners,
+    TenantBeds,
+    ApartmentTenantBeds,
+    CommercialTenantBeds,
+    BlockedTenant,
+    JoinRequest,
+    ExistingTenantRequest,
+    TenantNotification,
+    StayHostelDetails,
+    ApartmentStayDetails,
+    CommericialDetails,
+)
 from HAC.serializers import TenentSerializer
 from .common_service import CommonService
 from .notification_service import NotificationService
