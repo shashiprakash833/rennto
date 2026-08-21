@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     FaBell, FaUserCircle, FaChevronDown, FaUser, FaCog,
-    FaInfoCircle, FaSearch, FaBuilding, FaHome
+    FaInfoCircle, FaSearch, FaBuilding, FaHome, FaSignOutAlt
 } from "react-icons/fa";
 
 import Profile from "../pages/Profile";
@@ -11,7 +11,7 @@ import BASE_URL, { fetchWithAuth } from "../config/Api";
 
 function Header() {
     const navigate = useNavigate();
-    const { notifications, toast, clearNotifications, markAsRead, removeNotification } = useNotifications();
+    const { notifications, toast, clearNotifications, markAsRead } = useNotifications();
 
     // ── Profile / notification state ──────────────────────────────────────
     const [open, setOpen] = useState(false);
@@ -39,7 +39,6 @@ function Header() {
                     const data = await ownersRes.value.json();
                     const owners = (data?.data || []).map(item => ({
                         id: item.id,
-                        phone: item.phone || "",
                         name: item.owner_name || "Unknown Owner",
                         phone: item.phone || "",
                         status: item.status || "pending",
@@ -411,6 +410,20 @@ function Header() {
                             style={{ display: "flex", alignItems: "center", cursor: "pointer" }}
                         >
                             <FaCog style={{ marginRight: "8px" }} /> Settings
+                        </p>
+
+                        {/* Logout */}
+                        <p
+                            onClick={() => {
+                                setOpen(false);
+                                localStorage.removeItem("adminToken");
+                                localStorage.removeItem("token");
+                                localStorage.removeItem("isLoggedIn");
+                                window.location.href = "/login";
+                            }}
+                            style={{ display: "flex", alignItems: "center", cursor: "pointer", color: "#ef4444", borderTop: "1px solid #f3f4f6", paddingTop: "8px", marginTop: "4px" }}
+                        >
+                            <FaSignOutAlt style={{ marginRight: "8px" }} /> Logout
                         </p>
 
                     </div>

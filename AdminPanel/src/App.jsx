@@ -14,18 +14,18 @@ import { NotificationProvider } from "./context/NotificationContext";
 
 import "./App.css";
 
+const AuthenticatedLayout = ({ children }) => (
+    <NotificationProvider>{children}</NotificationProvider>
+);
+
 function App() {
     const [isAuthenticated, setIsAuthenticated] = useState(
-        !!localStorage.getItem("token")
+        !!(localStorage.getItem("adminToken") || localStorage.getItem("token"))
     );
 
     const handleLogin = () => {
         setIsAuthenticated(true);
     };
-
-    const AuthenticatedLayout = ({ children }) => (
-        <NotificationProvider>{children}</NotificationProvider>
-    );
 
     return (
         <Router>

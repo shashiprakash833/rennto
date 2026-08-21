@@ -877,6 +877,12 @@ export default function OwnerProfile({ navigation }) {
           <Text style={styles.sectionTitle}>{t("account_settings") || "Account Settings"}</Text>
           <View style={styles.settingsCard}>
             <SettingsRow
+              icon="exit-outline"
+              label={t("vacate_requests") || "Vacate Requests"}
+              color="#F59E0B"
+              onPress={() => navigation.navigate('OwnerVacateRequests')}
+            />
+            <SettingsRow
               icon="receipt-outline"
               label={t("expenses") || "Expenses"}
               color="#DC2626"

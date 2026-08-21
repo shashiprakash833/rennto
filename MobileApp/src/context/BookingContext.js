@@ -5,6 +5,7 @@ import { useLanguage } from '../utils/LanguageContext';
 import BASE_URL, { fetchWithAuth } from "../config/Api";
 import { useAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
+import { showOnceAlert } from "../utils/alertOnce";
 
 export const BookingContext = createContext();
 
@@ -36,30 +37,87 @@ export const BookingProvider = ({ children }) => {
   const [tenantStatus, setTenantStatus] = useState("");
   const [joinedProperty, setJoinedProperty] = useState(null);
 
+  // 1.5. Fetch Initial Requests & Sync
+  const fetchRequests = useCallback(async () => {
+    const role = userRole || (await AsyncStorage.getItem("userRole"));
+    const isOwner = role === 'owner';
+    const tenant = await AsyncStorage.getItem("tenantPhone");
+    const owner = await AsyncStorage.getItem("ownerPhone");
+    const selectedAccountId = await AsyncStorage.getItem("selectedAccountId");
+    const phoneToUse = userPhone || (isOwner ? (selectedAccountId || owner) : tenant);
+    if (!phoneToUse) return;
+
+    try {
+      const endpoint = isOwner ? "owner_requests" : "tenant_notifications";
+
+      const response = await fetchWithAuth(
+        `${BASE_URL}/api/${endpoint}/${encodeURIComponent(phoneToUse)}/`
+      );
+
+      const data = await response.json();
+
+      if (Array.isArray(data)) {
+        setRequests(data);
+      }
+
+      if (!isOwner) {
+        const detailsRes = await fetchWithAuth(
+          `${BASE_URL}/api/tenantdetails/${encodeURIComponent(phoneToUse)}/`
+        );
+        if (detailsRes.ok) {
+          const detailsData = await detailsRes.json();
+          const isVac = Boolean(
+            detailsData && (detailsData.status === "Vacated" || detailsData.property_name === "N/A" || !detailsData.property_name)
+          );
+          setIsTenantVacated(isVac);
+          setTenantStatus(detailsData?.status || "");
+          if (isVac) {
+            setJoinedProperty(null);
+          } else {
+            setJoinedProperty(detailsData);
+          }
+        }
+      } else {
+        setIsTenantVacated(false);
+        setTenantStatus("");
+        setJoinedProperty(null);
+      }
+    } catch (error) {
+      console.log("Fetch Requests Error:", error);
+    }
+  }, [userPhone, userRole]);
+
   // Dedicated Unread Notification Count Fetcher
   const fetchUnreadCount = useCallback(async () => {
-    if (!userPhone) {
+    const role = userRole || (await AsyncStorage.getItem("userRole"));
+    const tenant = await AsyncStorage.getItem("tenantPhone");
+    const owner = await AsyncStorage.getItem("ownerPhone");
+    const selectedAccountId = await AsyncStorage.getItem("selectedAccountId");
+    const phoneToUse = userPhone || (role === 'owner' ? (selectedAccountId || owner) : tenant);
+    if (!phoneToUse) {
       setUnreadNotificationCount((prev) => (prev !== 0 ? 0 : prev));
       return;
     }
+    fetchRequests();
     try {
+      const roleParam = (role || userRole) ? `&role=${encodeURIComponent(role || userRole)}` : "";
       const res = await fetchWithAuth(
-        `${BASE_URL}/api/notifications/unread-count/?phone=${encodeURIComponent(userPhone)}`
+        `${BASE_URL}/api/notifications/unread-count/?phone=${encodeURIComponent(phoneToUse)}${roleParam}`
       );
       if (res.ok) {
         const data = await res.json();
         const count = typeof data.unread_count === "number" ? data.unread_count : 0;
         setUnreadNotificationCount((prev) => (prev !== count ? count : prev));
-        if (userRole === "tenant") {
+        if (role === "tenant") {
           console.log(`[TENANT] NOTIFICATION COUNT: ${count}`);
-        } else if (userRole === "owner") {
+        } else if (role === "owner") {
           console.log(`[OWNER] NOTIFICATION COUNT: ${count}`);
         }
       }
     } catch (e) {
       console.log("Error fetching unread notification count:", e);
     }
-  }, [userPhone, userRole]);
+  }, [userPhone, userRole, fetchRequests]);
 
   const markNotificationRead = useCallback(async (notificationId) => {
     if (!notificationId) return;
@@ -105,11 +163,17 @@ export const BookingProvider = ({ children }) => {
       try {
         const tenant = await AsyncStorage.getItem("tenantPhone");
         const owner = await AsyncStorage.getItem("ownerPhone");
-        const role = await AsyncStorage.getItem("userRole");
+        let role = await AsyncStorage.getItem("userRole");
+        const selectedAccountId = await AsyncStorage.getItem("selectedAccountId");
         const storedSeen = await AsyncStorage.getItem("notificationSeenIds");
         const storedCleared = await AsyncStorage.getItem("notificationClearedIds");
 
-        const activePhone = tenant || owner;
+        if (!role) {
+          if (selectedAccountId || owner) role = 'owner';
+          else if (tenant) role = 'tenant';
+        }
+
+        const activePhone = role === 'owner' ? (selectedAccountId || owner) : (role === 'tenant' ? tenant : (tenant || owner));
         if (activePhone !== userPhone) {
           setuserPhone(activePhone);
         }
@@ -129,8 +193,15 @@ export const BookingProvider = ({ children }) => {
       try {
         const tenant = await AsyncStorage.getItem("tenantPhone");
         const owner = await AsyncStorage.getItem("ownerPhone");
-        const role = await AsyncStorage.getItem("userRole");
-        const activePhone = tenant || owner;
+        let role = await AsyncStorage.getItem("userRole");
+        const selectedAccountId = await AsyncStorage.getItem("selectedAccountId");
+        
+        if (!role) {
+          if (selectedAccountId || owner) role = 'owner';
+          else if (tenant) role = 'tenant';
+        }
+
+        const activePhone = role === 'owner' ? (selectedAccountId || owner) : (role === 'tenant' ? tenant : (tenant || owner));
         if (activePhone !== userPhone || role !== userRole) {
           console.log("BookingContext user switched:", userPhone, "->", activePhone, "role:", role);
           setuserPhone(activePhone);
@@ -152,99 +223,27 @@ export const BookingProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [userPhone, userRole]);
 
-  // 1.5. Fetch Initial Requests & Sync
-  const fetchRequests = async () => {
-    if (!userPhone) return;
-
-    try {
-      const isOwner = userRole === 'owner';
-      const endpoint = isOwner ? "owner_requests" : "tenant_notifications";
-
-      const response = await fetchWithAuth(
-        `${BASE_URL}/api/${endpoint}/${encodeURIComponent(userPhone)}/`
-      );
-
-      const data = await response.json();
-
-      if (Array.isArray(data)) {
-        setRequests(data);
-      }
-
-      if (!isOwner) {
-        const detailsRes = await fetchWithAuth(
-          `${BASE_URL}/api/tenantdetails/${encodeURIComponent(userPhone)}/`
-        );
-        if (detailsRes.ok) {
-          const detailsData = await detailsRes.json();
-          const isVac = Boolean(
-            detailsData && (detailsData.status === "Vacated" || detailsData.property_name === "N/A" || !detailsData.property_name)
-          );
-          setIsTenantVacated(isVac);
-          setTenantStatus(detailsData?.status || "");
-          if (isVac) {
-            setJoinedProperty(null);
-          } else {
-            setJoinedProperty(detailsData);
-          }
-        }
-      } else {
-        setIsTenantVacated(false);
-        setTenantStatus("");
-        setJoinedProperty(null);
-      }
-    } catch (error) {
-      console.log("Fetch Requests Error:", error);
-    }
-  };
-
   useEffect(() => {
-    if (isTenantVacated || (joinedProperty && (joinedProperty.property_name === "N/A" || !joinedProperty.property_name))) {
+    if (isTenantVacated || !joinedProperty || joinedProperty.property_name === "N/A" || !joinedProperty.property_name || joinedProperty.is_vacant) {
       setIsJoined(false);
-      return;
-    }
-
-    if (tenantStatus === "Active") {
+    } else if (tenantStatus === "Active" || !joinedProperty.is_vacant) {
       setIsJoined(true);
-      return;
-    }
-
-    const joined = requests.some((item) => {
-      const status = (item.status || "").toLowerCase();
-      return ["completed", "joined", "active", "occupied"].includes(status);
-    });
-
-    if (joined) {
-      setIsJoined(true);
-      return;
-    }
-
-    const hasPendingJoinRequest = requests.some((item) => {
-      const type = (item.type || item.notification_type || item.request_type || "").toLowerCase();
-      const status = (item.status || "").toLowerCase();
-      if (type.includes("vacate")) return false;
-      return ["pending", "allotted", "pending_confirmation"].includes(status);
-    });
-
-    if (hasPendingJoinRequest) {
+    } else {
       setIsJoined(false);
-      return;
     }
-
-    setIsJoined(false);
-  }, [requests, isTenantVacated, tenantStatus, joinedProperty]);
+  }, [isTenantVacated, tenantStatus, joinedProperty]);
 
   useEffect(() => {
     fetchRequests();
     fetchUnreadCount();
   }, [userPhone, refreshTrigger, fetchUnreadCount]);
 
-  // Backup polling interval for unread count & UI updates
+  // Poll unread count only — do not bump refreshTrigger on a timer (that re-renders the whole app).
   useEffect(() => {
     if (!userPhone) return;
     const interval = setInterval(() => {
       fetchUnreadCount();
-      setRefreshTrigger((prev) => prev + 1);
-    }, 10000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [userPhone, fetchUnreadCount]);
 
@@ -262,14 +261,20 @@ export const BookingProvider = ({ children }) => {
       ? `${BASE_URL.replace(/^http/, "ws")}/ws/tenant-notifications/${sanitizedPhone}/`
       : `${BASE_URL.replace(/^http/, "ws")}/ws/notifications/${sanitizedPhone}/`;
 
+    let cancelled = false;
+    let reconnectTimer = null;
+
     const connectWS = () => {
+      if (cancelled) return;
+      try {
+        ws.current?.close();
+      } catch (e) {}
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data);
           const msgText = data.content?.message || data.message;
-          const msgType = data.content?.type || data.type;
 
           if (userRole === "tenant") {
             console.log("[TENANT] NEW NOTIFICATION:", msgText || data);
@@ -277,29 +282,32 @@ export const BookingProvider = ({ children }) => {
             console.log("[OWNER] NEW NOTIFICATION:", msgText || data);
           }
 
-          // Immediately update unread count & refresh trigger
           fetchUnreadCount();
           setRefreshTrigger((prev) => prev + 1);
 
           if (msgText) {
             playSound();
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert("New Notification 🔔", msgText);
+            showOnceAlert("New Notification 🔔", msgText);
           }
-
         } catch (err) {
           console.log("WS Message Error:", err);
         }
       };
 
       ws.current.onclose = () => {
-        if (userPhone) {
-          setTimeout(connectWS, 3000);
-        }
+        if (cancelled) return;
+        reconnectTimer = setTimeout(connectWS, 4000);
       };
     };
     connectWS();
-    return () => ws.current?.close();
+    return () => {
+      cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      try {
+        ws.current?.close();
+      } catch (e) {}
+    };
   }, [userPhone, userRole, fetchUnreadCount]);
 
   // Handle Marking As Seen
@@ -314,13 +322,18 @@ export const BookingProvider = ({ children }) => {
     }
   };
 
-  // NEW: Handle Clearing (Hiding) All Notifications
-  const clearAllNotifications = async () => {
-    const newIds = requests.map((r) => r.id);
+  // Handle Clearing All Notifications
+  const clearAllNotifications = async (items = []) => {
+    const targetItems = Array.isArray(items) && items.length > 0 ? items : requests;
+    const newIds = targetItems.map((r) => r.id);
     const uniqueIds = Array.from(new Set([...clearedIds, ...newIds]));
     setClearedIds(uniqueIds);
+    setUnreadNotificationCount(0);
     try {
       await AsyncStorage.setItem("notificationClearedIds", JSON.stringify(uniqueIds));
+      if (userPhone) {
+        await markAllNotificationsRead();
+      }
     } catch (e) {
       console.log("Error clearing notifications:", e);
     }
@@ -336,7 +349,7 @@ export const BookingProvider = ({ children }) => {
     // 1. Join Request Logic
     if (r.type === "join_request" || r.type === "JOIN_REQUEST" || !r.type) {
       const isOwnerTask = ["pending", "allotted"].includes(status);
-      const isTenantAlert = ["accepted", "rejected"].includes(status);
+      const isTenantAlert = ["accepted", "allotted", "pending_confirmation", "completed", "joined", "rejected"].includes(status);
       
       if (userRole === "owner") {
         return isUnseen && isOwnerTask;
@@ -355,9 +368,22 @@ export const BookingProvider = ({ children }) => {
     }
 
     // 3. Payment Logic
-    if (r.type === "payment") {
+    if (r.type === "payment" || r.type === "PAYMENT") {
       // Owner sees pending payments
       // Tenant sees successful/failed payments
+      return isUnseen;
+    }
+
+    // 4. Vacate Request Logic
+    if (r.type === "vacate_request" || r.type === "VACATE_REQUEST") {
+      const isOwnerTask = status === "pending";
+      const isTenantAlert = ["approved", "accepted", "declined", "rejected"].includes(status);
+      if (userRole === "owner") {
+        return isUnseen && isOwnerTask;
+      }
+      if (userRole === "tenant") {
+        return isUnseen && isTenantAlert;
+      }
       return isUnseen;
     }
 
@@ -393,8 +419,8 @@ export const BookingProvider = ({ children }) => {
     setRequests,
     isJoined,
     joinedProperty,
-    pendingCount,
-    unreadNotificationCount,
+    pendingCount: unreadNotificationCount || 0,
+    unreadNotificationCount: unreadNotificationCount || 0,
     fetchUnreadCount,
     markNotificationRead,
     markAllNotificationsRead,

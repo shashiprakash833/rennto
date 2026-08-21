@@ -130,6 +130,36 @@ class BedService:
                 allotted_owner_phone=owner.owner_id if owner else owner_phone,
             )
 
+        # Notify tenant for room allotment
+        if data.get('is_offline') != 'true' and data.get('has_app') != 'false':
+            prop_name = data.get('property_name') or (join_req.property_name if join_req else "the property")
+            TenantNotification.objects.create(
+                tenant_phone=tenant_obj.phone,
+                title="Room Allotted 🎉",
+                message=f"Your room has been allotted in {prop_name}.",
+                is_read=False,
+            )
+            if tenant_obj.push_token:
+                NotificationService.send_push_notification(tenant_obj.push_token, "Room Allotted 🎉", f"Your room has been allotted in {prop_name}.")
+
+            try:
+                channel_layer = get_channel_layer()
+                sanitized_tenant = tenant_obj.phone.replace("+", "").replace("@", "_").replace(".", "_")
+                for group in [f"tenant_notifications_{sanitized_tenant}", f"user_notifications_{sanitized_tenant}"]:
+                    async_to_sync(channel_layer.group_send)(
+                        group,
+                        {
+                            "type": "send_notification",
+                            "content": {
+                                "type": "status_update",
+                                "message": f"Your room has been allotted in {prop_name}.",
+                                "status": "allotted"
+                            }
+                        }
+                    )
+            except Exception:
+                pass
+
         return {
             "message": "Tenant Added Successfully",
             "data": serializer.data
@@ -204,6 +234,35 @@ class BedService:
                 allotted_owner_phone=owner.owner_id if owner else owner_phone,
             )
 
+        if data.get('is_offline') != 'true' and data.get('has_app') != 'false':
+            prop_name = data.get('property_name') or (join_req.property_name if join_req else "the property")
+            TenantNotification.objects.create(
+                tenant_phone=tenant_obj.phone,
+                title="Room Allotted 🎉",
+                message=f"Your flat/room has been allotted in {prop_name}.",
+                is_read=False,
+            )
+            if tenant_obj.push_token:
+                NotificationService.send_push_notification(tenant_obj.push_token, "Room Allotted 🎉", f"Your flat/room has been allotted in {prop_name}.")
+
+            try:
+                channel_layer = get_channel_layer()
+                sanitized_tenant = tenant_obj.phone.replace("+", "").replace("@", "_").replace(".", "_")
+                for group in [f"tenant_notifications_{sanitized_tenant}", f"user_notifications_{sanitized_tenant}"]:
+                    async_to_sync(channel_layer.group_send)(
+                        group,
+                        {
+                            "type": "send_notification",
+                            "content": {
+                                "type": "status_update",
+                                "message": f"Your flat/room has been allotted in {prop_name}.",
+                                "status": "allotted"
+                            }
+                        }
+                    )
+            except Exception:
+                pass
+
         return {
             "message": "Tenant Added Successfully",
             "data": serializer.data
@@ -277,6 +336,35 @@ class BedService:
                 allotted_check_out=check_out,
                 allotted_owner_phone=owner.owner_id if owner else owner_phone,
             )
+
+        if data.get('is_offline') != 'true' and data.get('has_app') != 'false':
+            prop_name = data.get('property_name') or (join_req.property_name if join_req else "the property")
+            TenantNotification.objects.create(
+                tenant_phone=tenant_obj.phone,
+                title="Room Allotted 🎉",
+                message=f"Your space has been allotted in {prop_name}.",
+                is_read=False,
+            )
+            if tenant_obj.push_token:
+                NotificationService.send_push_notification(tenant_obj.push_token, "Room Allotted 🎉", f"Your space has been allotted in {prop_name}.")
+
+            try:
+                channel_layer = get_channel_layer()
+                sanitized_tenant = tenant_obj.phone.replace("+", "").replace("@", "_").replace(".", "_")
+                for group in [f"tenant_notifications_{sanitized_tenant}", f"user_notifications_{sanitized_tenant}"]:
+                    async_to_sync(channel_layer.group_send)(
+                        group,
+                        {
+                            "type": "send_notification",
+                            "content": {
+                                "type": "status_update",
+                                "message": f"Your space has been allotted in {prop_name}.",
+                                "status": "allotted"
+                            }
+                        }
+                    )
+            except Exception:
+                pass
 
         return {
             "message": "Tenant Added Successfully",

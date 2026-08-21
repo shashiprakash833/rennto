@@ -424,6 +424,7 @@ export default function OwnerIssues() {
 
         <TextInput
           placeholder={t('search by name')}
+          placeholderTextColor={COLORS.TEXT_LIGHT}
           style={styles.search}
           value={search}
           onChangeText={handleSearch}
@@ -580,6 +581,7 @@ export default function OwnerIssues() {
 
                   <TextInput
                     placeholder="Write a comment for tenant..."
+                    placeholderTextColor={COLORS.TEXT_LIGHT}
                     multiline
                     value={ownerComment}
                     onChangeText={setOwnerComment}
