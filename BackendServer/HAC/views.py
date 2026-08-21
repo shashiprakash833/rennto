@@ -1181,11 +1181,11 @@ def send_tenant_notification(request):
 @jwt_required()
 def get_unread_notification_count(request):
     try:
-        role = request.jwt_payload.get('role')
+        role = request.query_params.get('role') or request.jwt_payload.get('role')
         phone = request.query_params.get('phone') or request.jwt_payload.get('phone')
         if role == 'owner':
             owner_obj = getattr(request, 'owner_account', None) or request.custom_user
-            if owner_obj:
+            if owner_obj and getattr(owner_obj, 'owner_id', None):
                 phone = owner_obj.owner_id
         result = NotificationService.get_unread_count(phone, role=role)
         return Response(result, status=status.HTTP_200_OK)
@@ -1197,10 +1197,10 @@ def get_unread_notification_count(request):
 @jwt_required()
 def get_notifications(request, phone):
     try:
-        role = request.jwt_payload.get('role')
+        role = request.query_params.get('role') or request.jwt_payload.get('role')
         if role == 'owner':
             owner_obj = getattr(request, 'owner_account', None) or request.custom_user
-            if owner_obj:
+            if owner_obj and getattr(owner_obj, 'owner_id', None):
                 phone = owner_obj.owner_id
         result = NotificationService.get_notifications(phone, role=role)
         return Response(result, status=status.HTTP_200_OK)
@@ -1222,10 +1222,10 @@ def mark_notification_read(request, notification_id):
 @jwt_required()
 def mark_all_notifications_read(request, phone):
     try:
-        role = request.jwt_payload.get('role')
+        role = request.query_params.get('role') or (request.data.get('role') if hasattr(request.data, 'get') else None) or request.jwt_payload.get('role')
         if role == 'owner':
             owner_obj = getattr(request, 'owner_account', None) or request.custom_user
-            if owner_obj:
+            if owner_obj and getattr(owner_obj, 'owner_id', None):
                 phone = owner_obj.owner_id
         result = NotificationService.mark_all_notifications_read(phone, role=role)
         return Response(result, status=status.HTTP_200_OK)
@@ -2329,13 +2329,19 @@ def admin_tenants(request):
 # =====================================================================
 
 @api_view(['POST'])
+@jwt_required()
 def vacate_request_create(request):
     """
     POST /api/vacate/request/
     Tenant creates a vacate request.
     """
     try:
-        result = VacateService.create_request(request.data)
+        role = request.jwt_payload.get('role')
+        if role != 'tenant':
+            return Response({"error": "Only tenants can submit vacate requests"}, status=status.HTTP_403_FORBIDDEN)
+        payload = request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
+        payload["tenant_phone"] = request.jwt_payload.get("phone") or payload.get("tenant_phone")
+        result = VacateService.create_request(payload)
         return Response(result, status=status.HTTP_201_CREATED if not result.get("existing") else status.HTTP_200_OK)
     except ValueError as ve:
         return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
@@ -2344,6 +2350,7 @@ def vacate_request_create(request):
 
 
 @api_view(['GET'])
+@jwt_required()
 def vacate_request_list(request):
     """
     GET /api/vacate/requests/
@@ -2352,6 +2359,12 @@ def vacate_request_list(request):
     try:
         owner_identifier = request.query_params.get("owner_phone") or request.query_params.get("owner_id")
         tenant_phone = request.query_params.get("tenant_phone")
+        role = request.jwt_payload.get('role')
+        if role == 'tenant':
+            tenant_phone = request.jwt_payload.get('phone') or tenant_phone
+            owner_identifier = None
+        elif role == 'owner' and not owner_identifier:
+            owner_identifier = request.jwt_payload.get('phone')
         results = VacateService.get_requests(owner_identifier=owner_identifier, tenant_phone=tenant_phone)
         return Response(results, status=status.HTTP_200_OK)
     except Exception as e:
@@ -2359,6 +2372,7 @@ def vacate_request_list(request):
 
 
 @api_view(['GET'])
+@jwt_required()
 def vacate_request_detail(request, pk):
     """
     GET /api/vacate/request/<pk>/
@@ -2372,13 +2386,21 @@ def vacate_request_detail(request, pk):
 
 
 @api_view(['POST'])
+@jwt_required()
 def vacate_request_approve(request, pk):
     """
     POST /api/vacate/request/<pk>/approve/
     Owner approves vacate request.
     """
     try:
-        result = VacateService.approve_request(pk)
+        role = request.jwt_payload.get('role')
+        if role != 'owner':
+            return Response({"error": "Only owners can approve vacate requests"}, status=status.HTTP_403_FORBIDDEN)
+        acting_owner = getattr(request, 'custom_user', None)
+        if acting_owner is None or not getattr(acting_owner, 'owner_id', getattr(acting_owner, 'id', getattr(acting_owner, 'pk', None))):
+            from HAC.services.common_service import CommonService
+            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone'))
+        result = VacateService.approve_request(pk, acting_owner=acting_owner)
         return Response(result, status=status.HTTP_200_OK)
     except ValueError as ve:
         return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
@@ -2387,13 +2409,21 @@ def vacate_request_approve(request, pk):
 
 
 @api_view(['POST'])
+@jwt_required()
 def vacate_request_decline(request, pk):
     """
     POST /api/vacate/request/<pk>/decline/
     Owner declines vacate request.
     """
     try:
-        result = VacateService.decline_request(pk)
+        role = request.jwt_payload.get('role')
+        if role != 'owner':
+            return Response({"error": "Only owners can decline vacate requests"}, status=status.HTTP_403_FORBIDDEN)
+        acting_owner = getattr(request, 'custom_user', None)
+        if acting_owner is None or not getattr(acting_owner, 'owner_id', getattr(acting_owner, 'id', getattr(acting_owner, 'pk', None))):
+            from HAC.services.common_service import CommonService
+            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone'))
+        result = VacateService.decline_request(pk, acting_owner=acting_owner)
         return Response(result, status=status.HTTP_200_OK)
     except ValueError as ve:
         return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
@@ -2414,8 +2444,10 @@ def create_hostel_change_request(request):
         role = request.jwt_payload.get('role')
         if role != 'tenant':
             return Response({"error": "Only tenants can submit hostel change requests"}, status=status.HTTP_403_FORBIDDEN)
-        
-        result = HostelChangeService.create_change_request(request.data)
+
+        payload = request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
+        payload["tenant_phone"] = request.jwt_payload.get("phone") or payload.get("tenant_phone")
+        result = HostelChangeService.create_change_request(payload)
         if result.get('success'):
             return Response(result, status=status.HTTP_201_CREATED)
         else:
@@ -2461,7 +2493,13 @@ def approve_hostel_change_request(request, request_id):
         if role != 'owner':
             return Response({"error": "Only owners can approve requests"}, status=status.HTTP_403_FORBIDDEN)
         
-        result = HostelChangeService.approve_change_request(request_id)
+        acting_owner = getattr(request, 'custom_user', None)
+        if acting_owner is None or not getattr(acting_owner, 'owner_id', getattr(acting_owner, 'id', getattr(acting_owner, 'pk', None))):
+            from HAC.services.common_service import CommonService
+            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone'))
+        result = HostelChangeService.approve_change_request(
+            request_id, acting_owner=acting_owner
+        )
         if result.get('success'):
             return Response(result, status=status.HTTP_200_OK)
         else:
@@ -2480,7 +2518,13 @@ def reject_hostel_change_request(request, request_id):
             return Response({"error": "Only owners can reject requests"}, status=status.HTTP_403_FORBIDDEN)
         
         rejection_reason = request.data.get('rejection_reason', '')
-        result = HostelChangeService.reject_change_request(request_id, rejection_reason)
+        acting_owner = getattr(request, 'custom_user', None)
+        if acting_owner is None or not getattr(acting_owner, 'owner_id', getattr(acting_owner, 'id', getattr(acting_owner, 'pk', None))):
+            from HAC.services.common_service import CommonService
+            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone'))
+        result = HostelChangeService.reject_change_request(
+            request_id, rejection_reason, acting_owner=acting_owner
+        )
         if result.get('success'):
             return Response(result, status=status.HTTP_200_OK)
         else:

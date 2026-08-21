@@ -36,32 +36,16 @@ export default function OwnerVacateConfirmationModal({
 
               {/* Description */}
               <Text style={styles.message}>
-                Are you sure you want to remove{" "}
-                <Text style={{ fontWeight: "800" }}>{tenantName}</Text> from this property?
+                Are you sure you want to remove this tenant?
               </Text>
 
-              {/* Checklist Box */}
-              <View style={styles.checklistContainer}>
-                <Text style={styles.checklistHeader}>Please confirm:</Text>
-                
-                <View style={styles.checkItem}>
-                  <Ionicons name="checkmark-sharp" size={16} color="#10B981" />
-                  <Text style={styles.checkText}>Tenant has paid all pending rent.</Text>
-                </View>
-
-                <View style={styles.checkItem}>
-                  <Ionicons name="checkmark-sharp" size={16} color="#10B981" />
-                  <Text style={styles.checkText}>Tenant has cleared all dues.</Text>
-                </View>
-
-                <View style={styles.checkItem}>
-                  <Ionicons name="checkmark-sharp" size={16} color="#10B981" />
-                  <Text style={styles.checkText}>Tenant has vacated the property.</Text>
-                </View>
+              <View style={styles.tenantBox}>
+                <Text style={styles.tenantLabel}>Tenant:</Text>
+                <Text style={styles.tenantValue}>{tenantName}</Text>
               </View>
 
-              <Text style={styles.warningNote}>
-                This action cannot be undone.
+              <Text style={styles.settledNote}>
+                Please confirm that all pending rent, dues, and fees have been settled.
               </Text>
 
               {/* Action Buttons */}
@@ -82,7 +66,7 @@ export default function OwnerVacateConfirmationModal({
                   }}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.confirmBtnText}>Approve</Text>
+                  <Text style={styles.confirmBtnText}>Confirm</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -136,38 +120,32 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 16,
   },
-  checklistContainer: {
-    width: "100%",
-    backgroundColor: "#F9FAFB",
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginBottom: 14,
-  },
-  checklistHeader: {
-    fontSize: 12.5,
-    fontWeight: "700",
-    color: "#4B5563",
-    marginBottom: 10,
-  },
-  checkItem: {
+  tenantBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 6,
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginBottom: 12,
   },
-  checkText: {
-    fontSize: 12.5,
-    color: "#1F2937",
+  tenantLabel: {
+    fontSize: 13.5,
+    color: "#6B7280",
     fontWeight: "600",
+    marginRight: 6,
   },
-  warningNote: {
-    fontSize: 12,
-    color: "#EF4444",
-    fontWeight: "700",
-    marginBottom: 20,
+  tenantValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  settledNote: {
+    fontSize: 13,
+    color: "#6B7280",
     textAlign: "center",
+    lineHeight: 19,
+    marginBottom: 22,
   },
   btnRow: {
     flexDirection: "row",

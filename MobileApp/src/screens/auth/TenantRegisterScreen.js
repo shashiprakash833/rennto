@@ -654,7 +654,7 @@ console.log(
                   style={styles.resendBtn}
                 >
                   <Text style={styles.resendText}>
-                    Wrong number or didn't receive OTP?{" "}
+                    {"Wrong number or didn't receive OTP? "}
                     <Text style={styles.resendLink}>Resend</Text>
                   </Text>
                 </TouchableOpacity>

@@ -316,7 +316,6 @@ class TenantRequestSerializer(serializers.ModelSerializer):
 class JoinRequestSerializer(serializers.ModelSerializer):
     name = serializers.ReadOnlyField(source='tenant.name')
     phone = serializers.ReadOnlyField(source='tenant.phone')
-    phone = serializers.ReadOnlyField(source='tenant.phone')
     id_proof = serializers.ImageField(source='tenant.identityImage', read_only=True)
     
     class Meta:
@@ -368,6 +367,7 @@ class HostelChangeRequestSerializer(serializers.ModelSerializer):
             'additional_details',
             'message_to_owner',
             'status',
+            'rejection_reason',
             'created_at',
             'updated_at'
         ]

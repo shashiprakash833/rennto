@@ -11,7 +11,7 @@ import BASE_URL, { fetchWithAuth } from "../config/Api";
 
 function Header() {
     const navigate = useNavigate();
-    const { notifications, toast, clearNotifications, markAsRead, removeNotification } = useNotifications();
+    const { notifications, toast, clearNotifications, markAsRead } = useNotifications();
 
     // ── Profile / notification state ──────────────────────────────────────
     const [open, setOpen] = useState(false);
@@ -39,7 +39,6 @@ function Header() {
                     const data = await ownersRes.value.json();
                     const owners = (data?.data || []).map(item => ({
                         id: item.id,
-                        phone: item.phone || "",
                         name: item.owner_name || "Unknown Owner",
                         phone: item.phone || "",
                         status: item.status || "pending",

@@ -132,23 +132,17 @@ class NotificationService:
                     elif owner.phone.startswith('91'):
                         owner_phone_variants.append(owner.phone[2:])
 
-                n_count = Notification.objects.filter(
+                count = Notification.objects.filter(
                     Q(owner_account=owner) | Q(recipient_phone__in=owner_phone_variants),
                     is_read=False
                 ).count()
-
-                from HAC.models import JoinRequest, ExistingTenantRequest, VacateRequest
-                jr_count = JoinRequest.objects.filter(owner=owner, status='pending').count()
-                ex_count = ExistingTenantRequest.objects.filter(owner=owner, status='pending').count()
-                vr_count = VacateRequest.objects.filter(owner=owner, status__iexact='pending').count()
-                count = n_count + jr_count + ex_count + vr_count
             else:
                 count = Notification.objects.filter(recipient_phone__iexact=clean_phone, is_read=False).count()
             print(f"BACKEND: UNREAD COUNT: Owner ({clean_phone}) => {count}")
             return {"unread_count": count}
         else:
             # Tenant or general user
-            from HAC.models import TenantNotification, Tenent, JoinRequest
+            from HAC.models import TenantNotification
             phone_variants = [clean_phone, clean_phone.lstrip('+')]
             if not clean_phone.startswith('+'):
                 phone_variants.extend(['+' + clean_phone, '+91' + clean_phone, '91' + clean_phone])
@@ -160,15 +154,7 @@ class NotificationService:
             t_count = TenantNotification.objects.filter(tenant_phone__in=phone_variants, is_read=False).count()
             n_count = Notification.objects.filter(recipient_phone__in=phone_variants, is_read=False).count()
 
-            tenant = Tenent.objects.filter(phone__in=phone_variants).first()
-            jr_count = 0
-            if tenant:
-                jr_count = JoinRequest.objects.filter(
-                    tenant=tenant,
-                    status__in=['accepted', 'allotted', 'pending_confirmation']
-                ).count()
-
-            total_unread = t_count + n_count + jr_count
+            total_unread = t_count + n_count
             print(f"BACKEND: UNREAD COUNT: Tenant ({clean_phone}) => {total_unread}")
             return {"unread_count": total_unread}
 
@@ -189,8 +175,9 @@ class NotificationService:
             else:
                 notifications = Notification.objects.filter(recipient_phone__iexact=clean_phone).order_by('-created_at')
             
+            from HAC.models import VacateRequest, HostelChangeRequest
             for n in notifications:
-                data.append({
+                item_dict = {
                     "id": n.id,
                     "title": n.title,
                     "message": n.message,
@@ -198,7 +185,27 @@ class NotificationService:
                     "is_read": n.is_read,
                     "created_at": n.created_at,
                     "related_id": n.related_id
-                })
+                }
+                if n.type in ["VACATE_REQUEST", "VACATE"] and n.related_id:
+                    v_req = VacateRequest.objects.filter(id=n.related_id).select_related('tenant').first()
+                    if v_req:
+                        item_dict["tenant_name"] = v_req.tenant.name if v_req.tenant else "Tenant"
+                        item_dict["tenant_phone"] = v_req.tenant.phone if v_req.tenant else ""
+                        item_dict["property_name"] = v_req.property_name
+                        item_dict["status"] = v_req.status
+                        item_dict["request_id"] = v_req.id
+                        item_dict["request_type"] = "Vacate Property Request"
+                elif n.type in ["HOSTEL_CHANGE", "hostel_change_request"] and n.related_id:
+                    hc_req = HostelChangeRequest.objects.filter(id=n.related_id).select_related('tenant', 'target_hostel', 'current_hostel').first()
+                    if hc_req:
+                        item_dict["tenant_name"] = hc_req.tenant.name if hc_req.tenant else "Tenant"
+                        item_dict["tenant_phone"] = hc_req.tenant.phone if hc_req.tenant else ""
+                        item_dict["current_hostel_name"] = hc_req.current_hostel.hostelName if hc_req.current_hostel else ""
+                        item_dict["target_hostel_name"] = hc_req.target_hostel.hostelName if hc_req.target_hostel else ""
+                        item_dict["status"] = hc_req.status
+                        item_dict["request_id"] = hc_req.id
+                        item_dict["request_type"] = "Hostel Change Request"
+                data.append(item_dict)
             unread_count = notifications.filter(is_read=False).count()
             return {"notifications": data, "unread_count": unread_count}
         else:

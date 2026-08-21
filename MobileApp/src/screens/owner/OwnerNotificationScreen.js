@@ -330,12 +330,83 @@ const OwnerNotificationScreen = ({ route }) => {
       const iconColor = "#EF4444";
       const iconBg = "#FEF2F2";
       const tenantName = item.tenant?.name || item.tenant_name || item.name || "Tenant";
+      const propertyName = item.propertyName || item.property_name || item.property?.name || "Property";
+      const reqId = item.id || item.request_id;
+      const isPending = (item.status || "pending").toLowerCase() === "pending";
+
+      const handleApproveVacate = async (id) => {
+        Alert.alert(
+          "Remove Tenant",
+          `Are you sure you want to remove this tenant?\n\nTenant: ${tenantName}\n\nPlease confirm that all pending rent, dues, and fees have been settled.`,
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Confirm",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  const response = await fetchWithAuth(`${BASE_URL}/api/vacate/request/${id}/approve/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({}),
+                  });
+                  if (response.ok) {
+                    Alert.alert("Approved ✅", "Vacate request approved and tenant removed from property.");
+                    setRefreshTrigger((prev) => prev + 1);
+                    fetchRequests();
+                    fetchUnreadCount?.();
+                  } else {
+                    const errJson = await response.json().catch(() => ({}));
+                    Alert.alert("Error", errJson.error || errJson.message || "Failed to approve vacate request.");
+                  }
+                } catch (e) {
+                  Alert.alert("Error", e.message);
+                }
+              },
+            },
+          ]
+        );
+      };
+
+      const handleDeclineVacate = async (id) => {
+        Alert.alert(
+          "Decline Vacate Request",
+          `Are you sure you want to decline this vacate request? ${tenantName} will remain active in the property.`,
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Decline",
+              onPress: async () => {
+                try {
+                  const response = await fetchWithAuth(`${BASE_URL}/api/vacate/request/${id}/decline/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({}),
+                  });
+                  if (response.ok) {
+                    Alert.alert("Declined ❌", "Vacate request declined. Tenant remains in property.");
+                    setRefreshTrigger((prev) => prev + 1);
+                    fetchRequests();
+                    fetchUnreadCount?.();
+                  } else {
+                    const errJson = await response.json().catch(() => ({}));
+                    Alert.alert("Error", errJson.error || errJson.message || "Failed to decline vacate request.");
+                  }
+                } catch (e) {
+                  Alert.alert("Error", e.message);
+                }
+              },
+            },
+          ]
+        );
+      };
 
       return (
         <TouchableOpacity
           key={`vacate-${item.id}`}
           style={styles.card}
-          onPress={() => navigation.navigate("VacateRequestDetailsScreen", { requestId: item.id, request: item })}
+          activeOpacity={0.9}
+          onPress={() => navigation.navigate("VacateRequestDetailsScreen", { requestId: reqId, request: item })}
         >
           <View style={styles.cardHeader}>
             <View style={styles.userInfo}>
@@ -343,9 +414,11 @@ const OwnerNotificationScreen = ({ route }) => {
                 <Ionicons name={iconName} size={20} color={iconColor} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.userName}>Vacate Request</Text>
+                <Text style={styles.userName}>Vacate Property Request</Text>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
-                  <Text style={styles.userPhone} numberOfLines={2}>{tenantName} has requested to vacate the property.</Text>
+                  <Text style={styles.userPhone} numberOfLines={1}>{tenantName}</Text>
+                  <Text style={styles.timeDot}>•</Text>
+                  <Text style={styles.timeText}>{formatDate(item.created_at || item.createdAt)}</Text>
                 </View>
               </View>
             </View>
@@ -353,6 +426,35 @@ const OwnerNotificationScreen = ({ route }) => {
               <Text style={[styles.statusTagText, { color: config.color }]}>{config.label}</Text>
             </View>
           </View>
+
+          <View style={{ marginTop: 10, paddingHorizontal: 4 }}>
+            <Text style={{ fontSize: 13, color: COLORS.TEXT_SECONDARY, marginBottom: 4 }}>
+              Property: <Text style={{ fontWeight: "700", color: COLORS.TEXT_PRIMARY }}>{propertyName}</Text>
+            </Text>
+            {item.remarks ? (
+              <Text style={{ fontSize: 12, color: "#6B7280", fontStyle: "italic", marginTop: 4 }}>
+                {`"${item.remarks}"`}
+              </Text>
+            ) : null}
+          </View>
+
+          {isPending && (
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: "#F3F4F6", paddingVertical: 10, borderRadius: 8, alignItems: "center", borderWidth: 1, borderColor: "#E5E7EB" }}
+                onPress={() => handleDeclineVacate(reqId)}
+              >
+                <Text style={{ color: "#4B5563", fontWeight: "700", fontSize: 13 }}>Decline</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: "#EF4444", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
+                onPress={() => handleApproveVacate(reqId)}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Approve</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </TouchableOpacity>
       );
     }
@@ -454,7 +556,7 @@ const OwnerNotificationScreen = ({ route }) => {
             </Text>
             {item.message_to_owner ? (
               <Text style={{ fontSize: 12, color: "#6B7280", fontStyle: "italic", marginTop: 6 }}>
-                "{item.message_to_owner}"
+                {`"${item.message_to_owner}"`}
               </Text>
             ) : null}
           </View>

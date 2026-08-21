@@ -13,6 +13,7 @@ from HAC.models import (
     TenantBeds,
     ApartmentTenantBeds,
     CommercialTenantBeds,
+    JoinRequest,
 )
 from HAC.services.common_service import CommonService
 from HAC.services.notification_service import NotificationService
@@ -85,19 +86,47 @@ class VacateService:
             tenant.owner = owner
             tenant.save(update_fields=['owner'])
 
-        # Check existing pending vacate request
+        target_property_name = property_name or getattr(tenant, "property_name", None) or "Property"
+
+        # Determine when the current stay session started
+        current_stay_joined_at = None
+        last_join = JoinRequest.objects.filter(
+            tenant=tenant,
+            owner=owner,
+            status__in=['completed', 'joined']
+        ).order_by('-created_at').first()
+        if last_join:
+            current_stay_joined_at = last_join.created_at
+
+        # Check existing pending vacate request ONLY for CURRENT PROPERTY and CURRENT STAY
         existing_pending = VacateRequest.objects.filter(
             tenant=tenant,
+            owner=owner,
+            property_name__iexact=target_property_name,
             status="Pending",
-        ).first()
+        ).order_by("-created_at").first()
 
         if existing_pending:
-            return {
-                "message": "You already have a pending vacate request.",
-                "existing": True,
-                "request_id": existing_pending.id,
-                "status": "Pending",
-            }
+            if not current_stay_joined_at or existing_pending.created_at >= current_stay_joined_at:
+                return {
+                    "message": "You already have a pending vacate request for this property.",
+                    "existing": True,
+                    "request_id": existing_pending.id,
+                    "status": "Pending",
+                }
+            else:
+                # Old request from a previous stay in the same property
+                existing_pending.status = "Historical"
+                existing_pending.save()
+
+        # Any pending requests from OTHER properties or previous stays are converted to Historical
+        VacateRequest.objects.filter(
+            tenant=tenant,
+            status="Pending"
+        ).exclude(
+            owner=owner,
+            property_name__iexact=target_property_name
+        ).update(status="Historical")
 
         # Find tenant current allocation details
         requested_floor = None
@@ -121,10 +150,16 @@ class VacateService:
             requested_floor = getattr(comm_bed, "floor", None)
             requested_room = getattr(comm_bed, "sectionNo", None)
 
+        if not requested_room and not requested_flat:
+            jr = JoinRequest.objects.filter(tenant=tenant, status__in=['completed', 'joined']).order_by('-created_at').first()
+            if jr:
+                requested_room = jr.sharing or jr.flat or jr.section or ""
+                requested_floor = getattr(jr, "floor", "") or "1"
+
         vacate_req = VacateRequest.objects.create(
             tenant=tenant,
             owner=owner,
-            property_name=property_name or getattr(tenant, "property_name", "Property"),
+            property_name=target_property_name,
             property_type=property_type,
             requested_floor=requested_floor or "",
             requested_room=requested_room or "",
@@ -139,24 +174,13 @@ class VacateService:
             owner_account=owner,
             recipient_phone=owner.phone or owner.owner_id or "",
             title="Vacate Request",
-            message=f"{tenant.name} has requested to vacate the property.",
+            message=f"{tenant.name} has requested to vacate {vacate_req.property_name}.",
             type="VACATE_REQUEST",
             related_id=vacate_req.id,
             is_read=False,
         )
 
-        # 2. Create Issue for Owner
-        Issue.objects.create(
-            tenant=tenant,
-            owner=owner,
-            property_type=vacate_req.property_type,
-            title=f"Vacate Request - {tenant.name}",
-            description=f"{tenant.name} has requested to vacate the property. Remarks: {remarks or 'None'}",
-            severity="High",
-            status="Pending",
-        )
-
-        # 3. Create TenantNotification for Tenant
+        # 2. Create TenantNotification for Tenant
         TenantNotification.objects.create(
             tenant_phone=tenant.phone,
             title="Vacate Request Submitted",
@@ -190,12 +214,57 @@ class VacateService:
             "status": "Pending",
         }
 
+    @classmethod
+    def get_requests(cls, owner_identifier=None, tenant_phone=None):
+        return cls.list_requests(owner_identifier=owner_identifier, tenant_phone=tenant_phone)
+
     @staticmethod
-    def get_requests(owner_identifier=None, tenant_phone=None):
+    def get_tenant_vacate_status(tenant_phone, property_name=None):
         """
-        Returns list of formatted vacate requests.
+        Check if the tenant has a pending vacate request for their current stay/property.
         """
-        qs = VacateRequest.objects.all().order_by("-created_at")
+        tenant = CommonService.get_tenant(tenant_phone)
+        if not tenant or tenant.is_vacant or not tenant.owner:
+            return {"has_pending": False, "request_id": None, "status": None}
+
+        target_prop = property_name or getattr(tenant, "property_name", None)
+
+        current_stay_joined_at = None
+        last_join = JoinRequest.objects.filter(
+            tenant=tenant,
+            owner=tenant.owner,
+            status__in=['completed', 'joined']
+        ).order_by('-created_at').first()
+        if last_join:
+            current_stay_joined_at = last_join.created_at
+
+        qs = VacateRequest.objects.filter(
+            tenant=tenant,
+            owner=tenant.owner,
+            status="Pending"
+        )
+        if target_prop:
+            qs = qs.filter(property_name__iexact=target_prop)
+
+        pending_req = qs.order_by('-created_at').first()
+        if pending_req:
+            if not current_stay_joined_at or pending_req.created_at >= current_stay_joined_at:
+                return {
+                    "has_pending": True,
+                    "request_id": pending_req.id,
+                    "status": "Pending",
+                    "property_name": pending_req.property_name,
+                    "created_at": pending_req.created_at.isoformat() if pending_req.created_at else None,
+                }
+
+        return {"has_pending": False, "request_id": None, "status": None}
+
+    @staticmethod
+    def list_requests(owner_identifier=None, tenant_phone=None):
+        """
+        List VacateRequests for an owner or tenant.
+        """
+        qs = VacateRequest.objects.select_related("tenant", "owner").all().order_by("-created_at")
 
         if owner_identifier:
             owner = CommonService.get_owner(owner_identifier)
@@ -226,12 +295,21 @@ class VacateService:
                 "flat": r.requested_flat,
             }
 
+            room_display = r.requested_room or r.requested_flat or (f"Bed {r.requested_bed}" if r.requested_bed else "N/A")
+
             results.append({
                 "id": r.id,
                 "tenant": tenant_info,
                 "property": property_info,
+                "tenant_name": r.tenant.name,
+                "tenant_phone": r.tenant.phone,
                 "propertyName": r.property_name,
+                "property_name": r.property_name,
                 "propertyType": r.property_type,
+                "property_type": r.property_type,
+                "room_number": room_display,
+                "floor_number": r.requested_floor or "N/A",
+                "bed_number": r.requested_bed or "N/A",
                 "status": r.status,
                 "remarks": r.remarks or "",
                 "created_at": r.created_at.isoformat() if r.created_at else "",
@@ -246,9 +324,11 @@ class VacateService:
         Get details of single VacateRequest by ID.
         """
         try:
-            r = VacateRequest.objects.get(id=request_id)
+            r = VacateRequest.objects.select_related("tenant", "owner").get(id=request_id)
         except VacateRequest.DoesNotExist:
             raise Exception("Vacate request not found.")
+
+        room_display = r.requested_room or r.requested_flat or (f"Bed {r.requested_bed}" if r.requested_bed else "N/A")
 
         return {
             "id": r.id,
@@ -267,8 +347,15 @@ class VacateService:
                 "bed": r.requested_bed,
                 "flat": r.requested_flat,
             },
+            "tenant_name": r.tenant.name,
+            "tenant_phone": r.tenant.phone,
             "propertyName": r.property_name,
+            "property_name": r.property_name,
             "propertyType": r.property_type,
+            "property_type": r.property_type,
+            "room_number": room_display,
+            "floor_number": r.requested_floor or "N/A",
+            "bed_number": r.requested_bed or "N/A",
             "status": r.status,
             "remarks": r.remarks or "",
             "created_at": r.created_at.isoformat() if r.created_at else "",
@@ -277,7 +364,7 @@ class VacateService:
 
     @staticmethod
     @transaction.atomic
-    def approve_request(request_id):
+    def approve_request(request_id, acting_owner=None):
         """
         Atomically approves a vacate request:
         - Updates VacateRequest status = Approved
@@ -297,6 +384,11 @@ class VacateService:
 
         tenant = vacate_req.tenant
         owner = vacate_req.owner
+
+        acting_owner_pk = getattr(acting_owner, 'owner_id', getattr(acting_owner, 'pk', None))
+        owner_pk = getattr(owner, 'owner_id', getattr(owner, 'pk', None))
+        if acting_owner and owner and acting_owner_pk != owner_pk:
+            raise ValueError("You are not authorized to approve this vacate request.")
 
         # Locate property
         prop = ExistingTenantService.get_or_create_property(owner)
@@ -332,7 +424,7 @@ class VacateService:
         TenantNotification.objects.create(
             tenant_phone=tenant.phone,
             title="Vacate Request Approved",
-            message="Your vacate request has been approved.",
+            message=f"Your vacate request for {vacate_req.property_name} has been approved. You have been vacated from the property.",
             is_read=False,
         )
 
@@ -340,15 +432,15 @@ class VacateService:
             NotificationService.send_push_notification(
                 tenant.push_token,
                 "Vacate Request Approved ✅",
-                "Your vacate request has been approved. You have been vacated from the property.",
+                f"Your vacate request for {vacate_req.property_name} has been approved. You have been vacated from the property.",
             )
 
         sanitized_tenant = ExistingTenantService._sanitize_phone(tenant.phone)
         ExistingTenantService._send_ws_notification(
             [f"tenant_notifications_{sanitized_tenant}", f"user_notifications_{sanitized_tenant}"],
             {
-                "type": "tenant_removed",
-                "message": "Your vacate request has been approved.",
+                "type": "vacate_request_approved",
+                "message": f"Your vacate request for {vacate_req.property_name} has been approved. You have been removed from the property.",
                 "status": "Approved",
             },
         )
@@ -356,12 +448,11 @@ class VacateService:
         return {"message": "Vacate request approved and tenant removed from property."}
 
     @staticmethod
-    def decline_request(request_id):
+    def decline_request(request_id, acting_owner=None):
         """
         Declines a vacate request:
         - Updates VacateRequest status = Declined
         - Tenant remains in property
-        - Updates Issue status to rejected
         - Creates TenantNotification
         - Sends WS & push notifications
         """
@@ -374,6 +465,9 @@ class VacateService:
             raise ValueError(f"Vacate request is already {vacate_req.status}.")
 
         tenant = vacate_req.tenant
+        acting_owner_pk = getattr(acting_owner, 'owner_id', getattr(acting_owner, 'pk', None))
+        if acting_owner and vacate_req.owner_id and acting_owner_pk != vacate_req.owner_id:
+            raise ValueError("You are not authorized to decline this vacate request.")
 
         vacate_req.status = "Declined"
         vacate_req.save()
@@ -390,7 +484,7 @@ class VacateService:
         TenantNotification.objects.create(
             tenant_phone=tenant.phone,
             title="Vacate Request Declined",
-            message="Your vacate request has been declined.",
+            message=f"Your vacate request for {vacate_req.property_name} has been declined. You remain in the property.",
             is_read=False,
         )
 
@@ -398,15 +492,15 @@ class VacateService:
             NotificationService.send_push_notification(
                 tenant.push_token,
                 "Vacate Request Declined ❌",
-                "Your vacate request has been declined. You remain active in the property.",
+                f"Your vacate request for {vacate_req.property_name} has been declined. You remain active in the property.",
             )
 
         sanitized_tenant = ExistingTenantService._sanitize_phone(tenant.phone)
         ExistingTenantService._send_ws_notification(
             [f"tenant_notifications_{sanitized_tenant}", f"user_notifications_{sanitized_tenant}"],
             {
-                "type": "status_update",
-                "message": "Your vacate request has been declined.",
+                "type": "vacate_request_declined",
+                "message": "Your vacate request has been declined. You remain in the property.",
                 "status": "Declined",
             },
         )

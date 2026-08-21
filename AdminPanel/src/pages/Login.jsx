@@ -134,6 +134,7 @@ const Login = ({ onLogin }) => {
                     localStorage.setItem("adminToken", data.token);
                     localStorage.setItem("token", data.token);
                     localStorage.setItem("isLoggedIn", "true");
+                    localStorage.setItem("adminPhone", phone);
 
                     onLogin();
                 } else {
@@ -158,9 +159,9 @@ const Login = ({ onLogin }) => {
                     body: JSON.stringify({ phone }),
                 }
             );
- 
+
             const data = await response.json();
- 
+
             if (response.ok) {
                 setOtpSent(true);
                 setShowPasswordField(false);
@@ -309,10 +310,10 @@ const Login = ({ onLogin }) => {
                         {!otpSent && !showPasswordField
                             ? "Continue"
                             : otpSent && !showPasswordField
-                            ? "Verify OTP"
-                            : isCreatePassword
-                            ? "Create Password & Login"
-                            : "Login"}
+                                ? "Verify OTP"
+                                : isCreatePassword
+                                    ? "Create Password & Login"
+                                    : "Login"}
                     </button>
 
                     <div className="login-footer">

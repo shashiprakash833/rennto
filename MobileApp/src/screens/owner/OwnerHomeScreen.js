@@ -100,7 +100,7 @@ export default function BuildingScreen({ route }) {
     }, [])
   );
 
-  const ownerUnreadCount = unreadNotificationCount || pendingCount || 0;
+  const ownerUnreadCount = unreadNotificationCount || 0;
   const ownerBadgeText = ownerUnreadCount > 99 ? "99+" : `${ownerUnreadCount}`;
   const { selectedAccount } = useContext(OwnerAccountContext);
   const phone = selectedAccount ? selectedAccount.id : (route?.params?.phone || "");
@@ -1674,7 +1674,7 @@ try {
                   No Floors with Matching Filter
                 </Text>
                 <Text style={{ fontSize: 13, color: "#757575", marginTop: 6, textAlign: "center" }}>
-                  There are currently no rooms or apartments matching "{filterMode === "occupied" ? "Occupied" : "Vacant"}".
+                  {`There are currently no rooms or apartments matching "${filterMode === "occupied" ? "Occupied" : "Vacant"}".`}
                 </Text>
               </View>
             ) : (
@@ -2383,7 +2383,7 @@ try {
                       }}
                       onPress={() => setHasApp(false)}
                     >
-                      <Text style={{ color: !hasApp ? COLORS.WHITE : COLORS.TEXT_PRIMARY, fontWeight: "600", fontSize: 13 }}>Tenant Doesn't Have App</Text>
+                      <Text style={{ color: !hasApp ? COLORS.WHITE : COLORS.TEXT_PRIMARY, fontWeight: "600", fontSize: 13 }}>{"Tenant Doesn't Have App"}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

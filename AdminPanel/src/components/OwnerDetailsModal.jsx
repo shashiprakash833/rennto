@@ -436,15 +436,6 @@ const avatarBig = {
   fontSize: "24px",
 };
 
-const ownerImageStyle = {
-  width: "90px",
-  height: "90px",
-  borderRadius: "14px",
-  objectFit: "cover",
-  border: "2px solid #e5e7eb",
-  display: "block"
-};
-
 
 
 const gridStyle = {
@@ -508,12 +499,6 @@ const chipStyle = {
   padding: "6px 10px",
   borderRadius: "999px",
   fontSize: "12px",
-  fontWeight: "600",
-};
-
-const linkStyle = {
-  color: "#2563eb",
-  textDecoration: "none",
   fontWeight: "600",
 };
 

@@ -5,6 +5,7 @@ import { useLanguage } from '../utils/LanguageContext';
 import BASE_URL, { fetchWithAuth } from "../config/Api";
 import { useAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
+import { showOnceAlert } from "../utils/alertOnce";
 
 export const BookingContext = createContext();
 
@@ -99,8 +100,9 @@ export const BookingProvider = ({ children }) => {
     }
     fetchRequests();
     try {
+      const roleParam = (role || userRole) ? `&role=${encodeURIComponent(role || userRole)}` : "";
       const res = await fetchWithAuth(
-        `${BASE_URL}/api/notifications/unread-count/?phone=${encodeURIComponent(phoneToUse)}`
+        `${BASE_URL}/api/notifications/unread-count/?phone=${encodeURIComponent(phoneToUse)}${roleParam}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -222,53 +224,26 @@ export const BookingProvider = ({ children }) => {
   }, [userPhone, userRole]);
 
   useEffect(() => {
-    if (isTenantVacated || (joinedProperty && (joinedProperty.property_name === "N/A" || !joinedProperty.property_name))) {
+    if (isTenantVacated || !joinedProperty || joinedProperty.property_name === "N/A" || !joinedProperty.property_name || joinedProperty.is_vacant) {
       setIsJoined(false);
-      return;
-    }
-
-    if (tenantStatus === "Active") {
+    } else if (tenantStatus === "Active" || !joinedProperty.is_vacant) {
       setIsJoined(true);
-      return;
-    }
-
-    const joined = requests.some((item) => {
-      const status = (item.status || "").toLowerCase();
-      return ["completed", "joined", "active", "occupied"].includes(status);
-    });
-
-    if (joined) {
-      setIsJoined(true);
-      return;
-    }
-
-    const hasPendingJoinRequest = requests.some((item) => {
-      const type = (item.type || item.notification_type || item.request_type || "").toLowerCase();
-      const status = (item.status || "").toLowerCase();
-      if (type.includes("vacate")) return false;
-      return ["pending", "allotted", "pending_confirmation"].includes(status);
-    });
-
-    if (hasPendingJoinRequest) {
+    } else {
       setIsJoined(false);
-      return;
     }
-
-    setIsJoined(false);
-  }, [requests, isTenantVacated, tenantStatus, joinedProperty]);
+  }, [isTenantVacated, tenantStatus, joinedProperty]);
 
   useEffect(() => {
     fetchRequests();
     fetchUnreadCount();
   }, [userPhone, refreshTrigger, fetchUnreadCount]);
 
-  // Backup polling interval for unread count & UI updates
+  // Poll unread count only — do not bump refreshTrigger on a timer (that re-renders the whole app).
   useEffect(() => {
     if (!userPhone) return;
     const interval = setInterval(() => {
       fetchUnreadCount();
-      setRefreshTrigger((prev) => prev + 1);
-    }, 10000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [userPhone, fetchUnreadCount]);
 
@@ -286,14 +261,20 @@ export const BookingProvider = ({ children }) => {
       ? `${BASE_URL.replace(/^http/, "ws")}/ws/tenant-notifications/${sanitizedPhone}/`
       : `${BASE_URL.replace(/^http/, "ws")}/ws/notifications/${sanitizedPhone}/`;
 
+    let cancelled = false;
+    let reconnectTimer = null;
+
     const connectWS = () => {
+      if (cancelled) return;
+      try {
+        ws.current?.close();
+      } catch (e) {}
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data);
           const msgText = data.content?.message || data.message;
-          const msgType = data.content?.type || data.type;
 
           if (userRole === "tenant") {
             console.log("[TENANT] NEW NOTIFICATION:", msgText || data);
@@ -301,29 +282,32 @@ export const BookingProvider = ({ children }) => {
             console.log("[OWNER] NEW NOTIFICATION:", msgText || data);
           }
 
-          // Immediately update unread count & refresh trigger
           fetchUnreadCount();
           setRefreshTrigger((prev) => prev + 1);
 
           if (msgText) {
             playSound();
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert("New Notification 🔔", msgText);
+            showOnceAlert("New Notification 🔔", msgText);
           }
-
         } catch (err) {
           console.log("WS Message Error:", err);
         }
       };
 
       ws.current.onclose = () => {
-        if (userPhone) {
-          setTimeout(connectWS, 3000);
-        }
+        if (cancelled) return;
+        reconnectTimer = setTimeout(connectWS, 4000);
       };
     };
     connectWS();
-    return () => ws.current?.close();
+    return () => {
+      cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      try {
+        ws.current?.close();
+      } catch (e) {}
+    };
   }, [userPhone, userRole, fetchUnreadCount]);
 
   // Handle Marking As Seen
@@ -338,13 +322,18 @@ export const BookingProvider = ({ children }) => {
     }
   };
 
-  // NEW: Handle Clearing (Hiding) All Notifications
-  const clearAllNotifications = async () => {
-    const newIds = requests.map((r) => r.id);
+  // Handle Clearing All Notifications
+  const clearAllNotifications = async (items = []) => {
+    const targetItems = Array.isArray(items) && items.length > 0 ? items : requests;
+    const newIds = targetItems.map((r) => r.id);
     const uniqueIds = Array.from(new Set([...clearedIds, ...newIds]));
     setClearedIds(uniqueIds);
+    setUnreadNotificationCount(0);
     try {
       await AsyncStorage.setItem("notificationClearedIds", JSON.stringify(uniqueIds));
+      if (userPhone) {
+        await markAllNotificationsRead();
+      }
     } catch (e) {
       console.log("Error clearing notifications:", e);
     }
@@ -425,15 +414,13 @@ export const BookingProvider = ({ children }) => {
     return [...requests, ...mockRequests];
   }, [requests, mockRequests]);
 
-  const totalUnreadCount = Math.max(unreadNotificationCount, pendingCount);
-
   const contextValue = useMemo(() => ({
     requests: combinedRequests,
     setRequests,
     isJoined,
     joinedProperty,
-    pendingCount,
-    unreadNotificationCount: totalUnreadCount,
+    pendingCount: unreadNotificationCount || 0,
+    unreadNotificationCount: unreadNotificationCount || 0,
     fetchUnreadCount,
     markNotificationRead,
     markAllNotificationsRead,
@@ -453,7 +440,7 @@ export const BookingProvider = ({ children }) => {
     isJoined,
     joinedProperty,
     pendingCount,
-    totalUnreadCount,
+    unreadNotificationCount,
     fetchUnreadCount,
     markNotificationRead,
     markAllNotificationsRead,

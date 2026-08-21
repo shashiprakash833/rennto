@@ -1,17 +1,5 @@
-const getBaseUrl = () => {
-    if (typeof window !== "undefined" && window.location) {
-        const hostname = window.location.hostname;
-        if (hostname === "localhost" || hostname === "127.0.0.1") {
-            return "http://localhost:8000";
-        }
-        return `http://${hostname}:8000`;
-    }
-    return "http://localhost:8000";
-};
-
-const BASE_URL = getBaseUrl();
+const BASE_URL = "http://192.168.88.42:8000";
 // const BASE_URL = "https://api.rennto.in";
-
 // WebSocket base URL (safe conversion)
 export const WS_BASE_URL = BASE_URL.replace("http://", "ws://").replace("https://", "wss://");
 

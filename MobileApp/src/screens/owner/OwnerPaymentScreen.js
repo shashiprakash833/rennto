@@ -1605,8 +1605,8 @@ const OwnerPaymentScreen = () => {
                           <Text style={styles.cashNoticeSubtitle}>The tenant has requested to pay in cash.</Text>
                           {proof.description && (
                             <View style={styles.cashNoteContainer}>
-                              <Text style={styles.cashNoteLabel}>Tenant's Note:</Text>
-                              <Text style={styles.cashNoteText}>"{proof.description}"</Text>
+                              <Text style={styles.cashNoteLabel}>{"Tenant's Note:"}</Text>
+                              <Text style={styles.cashNoteText}>{`"${proof.description}"`}</Text>
                             </View>
                           )}
                         </View>
@@ -2786,12 +2786,6 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontWeight: '500',
   },
-  onboardingStepHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 12,
-  },
   onboardingStepNumber: {
     width: 24,
     height: 24,
@@ -3712,16 +3706,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   // Premium Verification Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   verificationModalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: '90%' },
   rejectModalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: '70%' },
   rejectLabel: { fontSize: 14, fontWeight: '600', color: '#64748B', marginBottom: 8 },
   rejectInput: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 16, fontSize: 16, color: '#1E293B', borderWidth: 1, borderColor: '#E2E8F0', minHeight: 120, textAlignVertical: 'top' },
   rejectConfirmBtn: { backgroundColor: '#EF4444', paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 20 },
   rejectConfirmText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontWeight: '700' },
-  headerActions: { flexDirection: 'row', alignItems: 'center' },
   editBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   dateSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, marginBottom: 20 },
@@ -3872,11 +3862,8 @@ const styles = StyleSheet.create({
   setReminderText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', marginLeft: 8 },
   partialModalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: '85%' },
   tenantSummary: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, marginBottom: 20 },
-  tenantAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.primaryBlue, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   tenantAvatarText: { fontSize: 20, fontWeight: '700', color: '#FFFFFF' },
   tenantInfo: { flex: 1 },
-  tenantName: { fontSize: 16, fontWeight: '700', color: COLORS.textPrimary },
-  tenantRoom: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
   totalAmount: { fontSize: 18, fontWeight: '800', color: COLORS.primaryBlue },
   noProofsContainer: { alignItems: 'center', paddingVertical: 60 },
   noProofsText: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary, marginTop: 16 },
