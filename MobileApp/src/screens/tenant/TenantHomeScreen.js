@@ -207,8 +207,10 @@ export default function TenantHomeScreen({ route }) {
   const submitOwnerRequest = bookingCtx?.submitOwnerRequest;
   const joinedProperty = bookingCtx?.joinedProperty;
   const isJoined = Boolean(
-    (bookingCtx?.isJoined || (joinedProperty && !joinedProperty.is_vacant && (joinedProperty.property_name || joinedProperty.name) && (joinedProperty.property_name || joinedProperty.name) !== "N/A" && joinedProperty.status !== "Vacated")) &&
+    bookingCtx?.isJoined &&
     joinedProperty &&
+    !joinedProperty.is_vacant &&
+    joinedProperty.status !== "Vacated" &&
     (joinedProperty.property_name || joinedProperty.name) &&
     (joinedProperty.property_name || joinedProperty.name) !== "N/A"
   );
@@ -1056,545 +1058,553 @@ export default function TenantHomeScreen({ route }) {
           }
         >
           {isJoined && joinedProperty && (joinedProperty.property_name || joinedProperty.name) !== "N/A" ? (
-            <ImageBackground
-              source={
-                joinedProperty.property_image
-                  ? { uri: joinedProperty.property_image }
-                  : require("../../../assets/images/tenantBackground.jpg")
-              }
-              style={homeStyles.joinedHeroSection}
-              imageStyle={homeStyles.joinedHeroBgImage}
-            >
-              {/* Overlay for readability */}
-              <View style={homeStyles.overlay} />
+            <>
+              <ImageBackground
+                source={
+                  joinedProperty.property_image
+                    ? { uri: joinedProperty.property_image }
+                    : require("../../../assets/images/tenantBackground.jpg")
+                }
+                style={homeStyles.joinedHeroSection}
+                imageStyle={homeStyles.joinedHeroBgImage}
+              >
+                {/* Overlay for readability */}
+                <View style={homeStyles.overlay} />
 
-              {/* TOP ROW WITH NOTIFICATION */}
-              <View style={homeStyles.topRow}>
-                <View style={homeStyles.joinedStatusBadge}>
-                  <Ionicons name="checkmark-circle" size={14} color="#FFF" />
-                  <Text style={homeStyles.joinedStatusText}>{t("joined_property") || "Joined Property"}</Text>
+                {/* TOP ROW WITH NOTIFICATION */}
+                <View style={homeStyles.topRow}>
+                  <View style={homeStyles.joinedStatusBadge}>
+                    <Ionicons name="checkmark-circle" size={14} color="#FFF" />
+                    <Text style={homeStyles.joinedStatusText}>{t("joined_property") || "Joined Property"}</Text>
+                  </View>
+
+                  <View style={homeStyles.heroIcons}>
+                    <TouchableOpacity
+                      style={homeStyles.heroIconBtn}
+                      onPress={() => navigation.navigate("TenantNotification")}
+                    >
+                      <Ionicons
+                        name="notifications-outline"
+                        size={22}
+                        color="#fff"
+                      />
+                      {unreadCount > 0 && (
+                        <View style={homeStyles.heroBadge}>
+                          <Text style={homeStyles.heroBadgeText}>
+                            {badgeText}
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
-                <View style={homeStyles.heroIcons}>
-                  <TouchableOpacity
-                    style={homeStyles.heroIconBtn}
-                    onPress={() => navigation.navigate("TenantNotification")}
-                  >
-                    <Ionicons
-                      name="notifications-outline"
-                      size={22}
-                      color="#fff"
-                    />
-                    {unreadCount > 0 && (
-                      <View style={homeStyles.heroBadge}>
-                        <Text style={homeStyles.heroBadgeText}>
-                          {badgeText}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* PROPERTY INFORMATION */}
-              <View style={homeStyles.joinedHeroContent}>
-                <Text style={homeStyles.joinedPropertyType}>
-                  {(joinedProperty.property_type ? (t(joinedProperty.property_type.toLowerCase()) || joinedProperty.property_type) : (t("joined") || "Joined")).toUpperCase()}
-                </Text>
-                <Text style={homeStyles.joinedPropertyName} numberOfLines={1}>
-                  {joinedProperty.property_name}
-                </Text>
-                <View style={homeStyles.joinedLocationWrapper}>
-                  <Ionicons name="location" size={16} color="#FFF" style={{ marginRight: 4 }} />
-                  <Text style={homeStyles.joinedLocationText} numberOfLines={2}>
-                    {joinedProperty.location || "No Address Available"}
+                {/* PROPERTY INFORMATION */}
+                <View style={homeStyles.joinedHeroContent}>
+                  <Text style={homeStyles.joinedPropertyType}>
+                    {(joinedProperty.property_type ? (t(joinedProperty.property_type.toLowerCase()) || joinedProperty.property_type) : (t("joined") || "Joined")).toUpperCase()}
                   </Text>
-                </View>
-              </View>
-
-              {/* SEARCH */}
-              <View style={homeStyles.newSearchBar}>
-                <Ionicons
-                  name="search"
-                  size={20}
-                  color="#999"
-                />
-                <TextInput
-                  style={homeStyles.newSearchInput}
-                  placeholder={t("search_location_property") || "Search location, property..."}
-                  placeholderTextColor="#999"
-                  value={mainSearch}
-                  onChangeText={(text) => setMainSearch(text)}
-                  returnKeyType="search"
-                  clearButtonMode="while-editing"
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity
-                  style={homeStyles.filterBtn}
-                  onPress={() => filterSheetRef.current?.present()}
-                >
-                  <Ionicons
-                    name="options-outline"
-                    size={20}
-                    color="#6C63FF"
-                  />
-                  <Text style={homeStyles.filterText}>
-                    {t("filters") || "Filters"}
-                    {activeFilterCount > 0
-                      ? ` (${activeFilterCount})`
-                      : ""}
+                  <Text style={homeStyles.joinedPropertyName} numberOfLines={1}>
+                    {joinedProperty.property_name}
                   </Text>
-                </TouchableOpacity>
-              </View>
-            </ImageBackground>
-          ) : (
-            <ImageBackground
-              source={require("../../../assets/images/tenantBackground.jpg")}
-              style={homeStyles.heroSection}
-              imageStyle={homeStyles.heroBgImage}
-            >
-              {/* TOP ROW */}
-              <View style={homeStyles.topRow}>
-                <View style={homeStyles.locationWrapper}>
-                  <Ionicons
-                    name="location-outline"
-                    size={14}
-                    color="#fff"
-                  />
-                  <Text
-                    numberOfLines={1}
-                    style={homeStyles.locationText}
-                  >
-                    {locationName}
-                  </Text>
-                </View>
-
-                <View style={homeStyles.heroIcons}>
-                  <TouchableOpacity
-                    style={homeStyles.heroIconBtn}
-                    onPress={() => navigation.navigate("TenantNotification")}
-                  >
-                    <Ionicons
-                      name="notifications-outline"
-                      size={22}
-                      color="#fff"
-                    />
-                    {unreadCount > 0 && (
-                      <View style={homeStyles.heroBadge}>
-                        <Text style={homeStyles.heroBadgeText}>
-                          {badgeText}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* TITLE */}
-              <View style={homeStyles.heroContent}>
-                <Text style={homeStyles.heroTitle}>
-                  {t("find_perfect_space") || "Find Your\nPerfect Space"}
-                </Text>
-                <Text style={homeStyles.heroSubtitle}>
-                  {t("perfect_space_subtitle") || "Hostels, Apartments & Commercial spaces near you"}
-                </Text>
-              </View>
-
-              {/* SEARCH */}
-              <View style={homeStyles.newSearchBar}>
-                <Ionicons
-                  name="search"
-                  size={20}
-                  color="#999"
-                />
-                <TextInput
-                  style={homeStyles.newSearchInput}
-                  placeholder={t("search_location_placeholder") || "Search location, property..."}
-                  placeholderTextColor="#999"
-                  value={mainSearch}
-                  onChangeText={(text) => setMainSearch(text)}
-                  returnKeyType="search"
-                  clearButtonMode="while-editing"
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity
-                  style={homeStyles.filterBtn}
-                  onPress={() => filterSheetRef.current?.present()}
-                >
-                  <Ionicons
-                    name="options-outline"
-                    size={20}
-                    color="#6C63FF"
-                  />
-                  <Text style={homeStyles.filterText}>
-                    {t("filter") || "Filters"}
-                    {activeFilterCount > 0
-                      ? ` (${activeFilterCount})`
-                      : ""}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ImageBackground>
-          )}
-
-          {/* JOINED TENANT MY STAY DASHBOARD */}
-          {isJoined && joinedProperty && (joinedProperty.property_name || joinedProperty.name) !== "N/A" ? (
-            <View style={homeStyles.myStayContainer}>
-              {/* ACTIVE STAY SUMMARY CARD */}
-              <View style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: 20,
-                padding: 18,
-                marginBottom: 16,
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.05,
-                shadowRadius: 8,
-                elevation: 3,
-              }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <View style={{ flex: 1, marginRight: 10 }}>
-                    <Text style={{ fontSize: 18, fontWeight: "800", color: "#1F2937" }} numberOfLines={1}>
-                      {joinedProperty.property_name || joinedProperty.name}
+                  <View style={homeStyles.joinedLocationWrapper}>
+                    <Ionicons name="location" size={16} color="#FFF" style={{ marginRight: 4 }} />
+                    <Text style={homeStyles.joinedLocationText} numberOfLines={2}>
+                      {joinedProperty.location || "No Address Available"}
                     </Text>
-                    <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-                      {joinedProperty.location || joinedProperty.address || "Active Residence"}
-                    </Text>
-                  </View>
-                  <View style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#166534" }}>Active Stay</Text>
                   </View>
                 </View>
+              </ImageBackground>
 
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F3F4F6" }}>
-                  <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                      Type: {joinedProperty.property_type || joinedProperty.type || "Hostel"}
-                    </Text>
-                  </View>
-                  <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                      Floor: {joinedProperty.floor || joinedProperty.floor_number || joinedProperty.floor_no || "1"}
-                    </Text>
-                  </View>
-                  <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                      Room: {joinedProperty.room || joinedProperty.room_number || joinedProperty.room_no || "101"}
-                    </Text>
-                  </View>
-                  {Boolean(joinedProperty.bed || joinedProperty.bed_number) && (
-                    <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                        Bed: {joinedProperty.bed || joinedProperty.bed_number}
+              {/* JOINED TENANT MY STAY DASHBOARD */}
+              <View style={homeStyles.myStayContainer}>
+                {/* ACTIVE STAY SUMMARY CARD */}
+                <View style={{
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: 20,
+                  padding: 18,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: "#E5E7EB",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 8,
+                  elevation: 3,
+                }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text style={{ fontSize: 18, fontWeight: "800", color: "#1F2937" }} numberOfLines={1}>
+                        {joinedProperty.property_name || joinedProperty.name}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
+                        {joinedProperty.location || joinedProperty.address || "Active Residence"}
                       </Text>
                     </View>
-                  )}
-                </View>
-              </View>
-
-              <View style={homeStyles.myStayHeaderRow}>
-                <Text style={homeStyles.myStayTitle}>
-                  {t("my_stay") || "My Stay"}
-                </Text>
-              </View>
-
-              <View style={homeStyles.myStayGrid}>
-                {/* 1. Vacate Property Card */}
-                <TouchableOpacity
-                  style={homeStyles.myStayCard}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    if ((vacateRequestStatus || "").toLowerCase() === "pending") {
-                      Alert.alert("Request Pending ⏳", "Your vacate request is waiting for the owner to accept or decline.");
-                      return;
-                    }
-                    setVacateModalVisible(true);
-                  }}
-                >
-                  <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FEF2F2" }]}>
-                    <Ionicons name="log-out-outline" size={24} color="#EF4444" />
+                    <View style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#166534" }}>Active Stay</Text>
+                    </View>
                   </View>
-                  <Text style={homeStyles.myStayCardTitle}>Vacate Property</Text>
-                  <Text style={homeStyles.myStayCardSub}>
-                    {(vacateRequestStatus || "").toLowerCase() === "pending"
-                      ? "Vacate request is pending owner approval."
-                      : (vacateRequestStatus || "").toLowerCase() === "declined"
-                        ? "Last vacate request was declined. You remain in this property."
-                        : "Request to vacate your current property."}
+
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F3F4F6" }}>
+                    <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                        Type: {joinedProperty.property_type || joinedProperty.type || "Hostel"}
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                        Floor: {joinedProperty.floor || joinedProperty.floor_number || joinedProperty.floor_no || "1"}
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                        Room: {joinedProperty.room || joinedProperty.room_number || joinedProperty.room_no || "101"}
+                      </Text>
+                    </View>
+                    {Boolean(joinedProperty.bed || joinedProperty.bed_number) && (
+                      <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                          Bed: {joinedProperty.bed || joinedProperty.bed_number}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                <View style={homeStyles.myStayHeaderRow}>
+                  <Text style={homeStyles.myStayTitle}>
+                    {t("my_stay") || "My Stay"}
                   </Text>
-                  <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FEF2F2" }]}>
-                    <Text style={[homeStyles.myStayRequestBtnText, { color: "#EF4444" }]}>
-                      {(vacateRequestStatus || "").toLowerCase() === "pending" ? "Pending Approval" : "Request"}
+                </View>
+
+                <View style={homeStyles.myStayGrid}>
+                  {/* 1. Vacate Property Card */}
+                  <TouchableOpacity
+                    style={homeStyles.myStayCard}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      if ((vacateRequestStatus || "").toLowerCase() === "pending") {
+                        Alert.alert("Request Pending ⏳", "Your vacate request is waiting for the owner to accept or decline.");
+                        return;
+                      }
+                      setVacateModalVisible(true);
+                    }}
+                  >
+                    <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FEF2F2" }]}>
+                      <Ionicons name="log-out-outline" size={24} color="#EF4444" />
+                    </View>
+                    <Text style={homeStyles.myStayCardTitle}>Vacate Property</Text>
+                    <Text style={homeStyles.myStayCardSub}>
+                      {(vacateRequestStatus || "").toLowerCase() === "pending"
+                        ? "Vacate request is pending owner approval."
+                        : (vacateRequestStatus || "").toLowerCase() === "declined"
+                          ? "Last vacate request was declined. You remain in this property."
+                          : "Request to vacate your current property."}
+                    </Text>
+                    <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FEF2F2" }]}>
+                      <Text style={[homeStyles.myStayRequestBtnText, { color: "#EF4444" }]}>
+                        {(vacateRequestStatus || "").toLowerCase() === "pending" ? "Pending Approval" : "Request"}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* 2. Change Floor Card (Hostel & Apartment) */}
+                  {((joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") ||
+                    (joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("apartment")) && (
+                    <TouchableOpacity
+                      style={homeStyles.myStayCard}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setAccommodationType("FLOOR");
+                        setAccommodationModalVisible(true);
+                      }}
+                    >
+                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#F3E8FF" }]}>
+                        <Ionicons name="layers-outline" size={24} color="#7C3AED" />
+                      </View>
+                      <Text style={homeStyles.myStayCardTitle}>Change Floor</Text>
+                      <Text style={homeStyles.myStayCardSub}>Request a floor change in this property.</Text>
+                      <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#F3E8FF" }]}>
+                        <Text style={[homeStyles.myStayRequestBtnText, { color: "#7C3AED" }]}>Request</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* 3. Change Room Card (Hostel Only) */}
+                  {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
+                    <TouchableOpacity
+                      style={homeStyles.myStayCard}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setAccommodationType("ROOM");
+                        setAccommodationModalVisible(true);
+                      }}
+                    >
+                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#DBEAFE" }]}>
+                        <Ionicons name="business-outline" size={24} color="#2563EB" />
+                      </View>
+                      <Text style={homeStyles.myStayCardTitle}>Change Room</Text>
+                      <Text style={homeStyles.myStayCardSub}>Request a room change in this property.</Text>
+                      <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#DBEAFE" }]}>
+                        <Text style={[homeStyles.myStayRequestBtnText, { color: "#2563EB" }]}>Request</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* 4. Change Bed Card (Hostel Only) */}
+                  {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
+                    <TouchableOpacity
+                      style={homeStyles.myStayCard}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setAccommodationType("BED");
+                        setAccommodationModalVisible(true);
+                      }}
+                    >
+                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FFEDD5" }]}>
+                        <Ionicons name="bed-outline" size={24} color="#D97706" />
+                      </View>
+                      <Text style={homeStyles.myStayCardTitle}>Change Bed</Text>
+                      <Text style={homeStyles.myStayCardSub}>Request a bed change in this property.</Text>
+                      <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FFEDD5" }]}>
+                        <Text style={[homeStyles.myStayRequestBtnText, { color: "#D97706" }]}>Request</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* 5. Check-in Date Card */}
+                  <View style={[homeStyles.myStayCard, homeStyles.checkInCard]}>
+                    <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#D1FAE5" }]}>
+                      <Ionicons name="calendar-outline" size={24} color="#059669" />
+                    </View>
+                    <Text style={homeStyles.dateCardLabel}>CHECK-IN DATE</Text>
+                    <Text style={homeStyles.checkInDateValue}>
+                      {formatCheckInDate(joinedProperty?.checkIn || joinedProperty?.check_in || joinedProperty?.check_in_date || joinedProperty?.joining_date)}
                     </Text>
                   </View>
-                </TouchableOpacity>
 
-                {/* 2. Change Floor Card (Hostel & Apartment) */}
-                {((joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") ||
-                  (joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("apartment")) && (
-                  <TouchableOpacity
-                    style={homeStyles.myStayCard}
-                    activeOpacity={0.85}
-                    onPress={() => {
-                      setAccommodationType("FLOOR");
-                      setAccommodationModalVisible(true);
-                    }}
-                  >
-                    <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#F3E8FF" }]}>
-                      <Ionicons name="layers-outline" size={24} color="#7C3AED" />
+                  {/* 6. Rent Due Card */}
+                  <View style={[homeStyles.myStayCard, homeStyles.rentDueCard]}>
+                    <View style={[homeStyles.myStayIconCircle, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
+                      <Ionicons name="cash-outline" size={24} color="#FFFFFF" />
                     </View>
-                    <Text style={homeStyles.myStayCardTitle}>Change Floor</Text>
-                    <Text style={homeStyles.myStayCardSub}>Request a floor change in this property.</Text>
-                    <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#F3E8FF" }]}>
-                      <Text style={[homeStyles.myStayRequestBtnText, { color: "#7C3AED" }]}>Request</Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-
-                {/* 3. Change Room Card (Hostel Only) */}
-                {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
-                  <TouchableOpacity
-                    style={homeStyles.myStayCard}
-                    activeOpacity={0.85}
-                    onPress={() => {
-                      setAccommodationType("ROOM");
-                      setAccommodationModalVisible(true);
-                    }}
-                  >
-                    <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#DBEAFE" }]}>
-                      <Ionicons name="business-outline" size={24} color="#2563EB" />
-                    </View>
-                    <Text style={homeStyles.myStayCardTitle}>Change Room</Text>
-                    <Text style={homeStyles.myStayCardSub}>Request a room change in this property.</Text>
-                    <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#DBEAFE" }]}>
-                      <Text style={[homeStyles.myStayRequestBtnText, { color: "#2563EB" }]}>Request</Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-
-                {/* 4. Change Bed Card (Hostel Only) */}
-                {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
-                  <TouchableOpacity
-                    style={homeStyles.myStayCard}
-                    activeOpacity={0.85}
-                    onPress={() => {
-                      setAccommodationType("BED");
-                      setAccommodationModalVisible(true);
-                    }}
-                  >
-                    <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FFEDD5" }]}>
-                      <Ionicons name="bed-outline" size={24} color="#D97706" />
-                    </View>
-                    <Text style={homeStyles.myStayCardTitle}>Change Bed</Text>
-                    <Text style={homeStyles.myStayCardSub}>Request a bed change in this property.</Text>
-                    <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FFEDD5" }]}>
-                      <Text style={[homeStyles.myStayRequestBtnText, { color: "#D97706" }]}>Request</Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-
-                {/* 5. Check-in Date Card */}
-                <View style={[homeStyles.myStayCard, homeStyles.checkInCard]}>
-                  <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#D1FAE5" }]}>
-                    <Ionicons name="calendar-outline" size={24} color="#059669" />
+                    <Text style={homeStyles.rentDueLabel}>RENT DUE</Text>
+                    <Text style={homeStyles.rentDueValue}>
+                      {formatDueDate(joinedProperty?.next_due_date || joinedProperty?.due_date || joinedProperty?.rent_due_date)}
+                    </Text>
                   </View>
-                  <Text style={homeStyles.dateCardLabel}>CHECK-IN DATE</Text>
-                  <Text style={homeStyles.checkInDateValue}>
-                    {formatCheckInDate(joinedProperty?.checkIn || joinedProperty?.check_in || joinedProperty?.check_in_date || joinedProperty?.joining_date)}
-                  </Text>
                 </View>
 
-                {/* 6. Rent Due Card */}
-                <View style={[homeStyles.myStayCard, homeStyles.rentDueCard]}>
-                  <View style={[homeStyles.myStayIconCircle, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
-                    <Ionicons name="cash-outline" size={24} color="#FFFFFF" />
+                {/* Invite Friends Banner */}
+                <LinearGradient
+                  colors={["#7C3AED", "#6D28D9", "#5B21B6"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={homeStyles.inviteFriendsBanner}
+                >
+                  <View style={homeStyles.inviteContent}>
+                    <Text style={homeStyles.inviteTitle}>Invite Friends</Text>
+                    <Text style={homeStyles.inviteSub}>
+                      Invite friends to Rennto and earn rewards for your next payment.
+                    </Text>
+                    <TouchableOpacity
+                      style={homeStyles.inviteBtn}
+                      activeOpacity={0.9}
+                      onPress={handleShareInvite}
+                    >
+                      <Text style={homeStyles.inviteBtnText}>Invite Now</Text>
+                    </TouchableOpacity>
                   </View>
-                  <Text style={homeStyles.rentDueLabel}>RENT DUE</Text>
-                  <Text style={homeStyles.rentDueValue}>
-                    {formatDueDate(joinedProperty?.next_due_date || joinedProperty?.due_date || joinedProperty?.rent_due_date)}
-                  </Text>
-                </View>
+                  <Ionicons name="people-outline" size={72} color="rgba(255, 255, 255, 0.2)" style={homeStyles.inviteBgIcon} />
+                </LinearGradient>
               </View>
-
-              {/* Invite Friends Banner */}
-              <LinearGradient
-                colors={["#7C3AED", "#6D28D9", "#5B21B6"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={homeStyles.inviteFriendsBanner}
+            </>
+          ) : (
+            <>
+              <ImageBackground
+                source={require("../../../assets/images/tenantBackground.jpg")}
+                style={homeStyles.heroSection}
+                imageStyle={homeStyles.heroBgImage}
               >
-                <View style={homeStyles.inviteContent}>
-                  <Text style={homeStyles.inviteTitle}>Invite Friends</Text>
-                  <Text style={homeStyles.inviteSub}>
-                    Invite friends to Rennto and earn rewards for your next payment.
+                {/* TOP ROW */}
+                <View style={homeStyles.topRow}>
+                  <View style={homeStyles.locationWrapper}>
+                    <Ionicons
+                      name="location-outline"
+                      size={14}
+                      color="#fff"
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={homeStyles.locationText}
+                    >
+                      {locationName}
+                    </Text>
+                  </View>
+
+                  <View style={homeStyles.heroIcons}>
+                    <TouchableOpacity
+                      style={homeStyles.heroIconBtn}
+                      onPress={() => navigation.navigate("TenantNotification")}
+                    >
+                      <Ionicons
+                        name="notifications-outline"
+                        size={22}
+                        color="#fff"
+                      />
+                      {unreadCount > 0 && (
+                        <View style={homeStyles.heroBadge}>
+                          <Text style={homeStyles.heroBadgeText}>
+                            {badgeText}
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* TITLE */}
+                <View style={homeStyles.heroContent}>
+                  <Text style={homeStyles.heroTitle}>
+                    {t("find_perfect_space") || "Find Your\nPerfect Space"}
                   </Text>
+                  <Text style={homeStyles.heroSubtitle}>
+                    {t("perfect_space_subtitle") || "Hostels, Apartments & Commercial spaces near you"}
+                  </Text>
+                </View>
+
+                {/* SEARCH */}
+                <View style={homeStyles.newSearchBar}>
+                  <Ionicons
+                    name="search"
+                    size={20}
+                    color="#999"
+                  />
+                  <TextInput
+                    style={homeStyles.newSearchInput}
+                    placeholder={t("search_location_placeholder") || "Search location, property..."}
+                    placeholderTextColor="#999"
+                    value={mainSearch}
+                    onChangeText={(text) => setMainSearch(text)}
+                    returnKeyType="search"
+                    clearButtonMode="while-editing"
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                  />
                   <TouchableOpacity
-                    style={homeStyles.inviteBtn}
-                    activeOpacity={0.9}
-                    onPress={handleShareInvite}
+                    style={homeStyles.filterBtn}
+                    onPress={() => filterSheetRef.current?.present()}
                   >
-                    <Text style={homeStyles.inviteBtnText}>Invite Now</Text>
+                    <Ionicons
+                      name="options-outline"
+                      size={20}
+                      color="#6C63FF"
+                    />
+                    <Text style={homeStyles.filterText}>
+                      {t("filter") || "Filters"}
+                      {activeFilterCount > 0
+                        ? ` (${activeFilterCount})`
+                        : ""}
+                    </Text>
                   </TouchableOpacity>
                 </View>
-                <Ionicons name="people-outline" size={72} color="rgba(255, 255, 255, 0.2)" style={homeStyles.inviteBgIcon} />
-              </LinearGradient>
-            </View>
-          ) : null}
+              </ImageBackground>
 
-          {/* EXPLORE CATEGORIES & PROPERTY LISTINGS (VISIBLE TO ALL / SCROLL DOWN FOR JOINED TENANTS) */}
-          <View>
-            <View style={{ backgroundColor: "#fff", paddingBottom: 5, marginTop: isJoined ? 12 : 0 }}>
-              <View style={homeStyles.categoryHeadingRow}>
-                <Text style={homeStyles.categoryHeading}>
-                  {isJoined
-                    ? (t("explore_other_properties") || "Explore Other Properties")
-                    : (t("explore_categories") || "Explore by Categories")}
-                </Text>
-              </View>
-              <View style={homeStyles.customCategoryWrapper}>
-                <TouchableOpacity
-                  style={[homeStyles.customCard, { backgroundColor: "#7c3aed" }]}
-                  onPress={() => navigation.navigate("HostelScreen")}
-                >
-                  <Image
-                    source={require("../../../assets/images/hostelLogo.png")}
-                    style={homeStyles.customCardImage}
-                    resizeMode="contain"
-                  />
-                  <Text style={homeStyles.customCardTitle}>
-                    {t("hostels") || "Hostels"}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[homeStyles.customCard, { backgroundColor: "#60a5fa" }]}
-                  onPress={() => navigation.navigate("ApartmentScreen")}
-                >
-                  <Image
-                    source={require("../../../assets/images/apartmentLogo.png")}
-                    style={homeStyles.customCardImage}
-                    resizeMode="contain"
-                  />
-                  <Text style={homeStyles.customCardTitle}>
-                    {t("apartments") || "Apartments"}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[homeStyles.customCard, { backgroundColor: "#fb923c" }]}
-                  onPress={() => navigation.navigate("CommercialScreen")}
-                >
-                  <Image
-                    source={require("../../../assets/images/commercialLogo.png")}
-                    style={homeStyles.customCardImage}
-                    resizeMode="contain"
-                  />
-                  <Text style={homeStyles.customCardTitle}>
-                    {t("commercial") || "Commercial"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={homeStyles.propertyGrid}>
-              {filteredProperties.map((item) => {
-                const normalize = (str) => (str || "").replace(/\s+/g, '').toLowerCase();
-                const latestReq = requests.find(r =>
-                  normalize(r.propertyName || r.property_name) === normalize(item.name)
-                );
-                const showBadge = latestReq && latestReq.status && latestReq.status !== 'none';
-
-                return (
-                  <TouchableOpacity
-                    key={`${item.id}-${item.type}`}
-                    activeOpacity={0.9}
-                    style={homeStyles.gridItem}
-                    onPress={() => handlePress(item)}
-                  >
-                    <View style={homeStyles.card}>
+              {/* EXPLORE CATEGORIES & PROPERTY LISTINGS (ONLY FOR UNJOINED / VACATED TENANTS) */}
+              <View>
+                <View style={{ backgroundColor: "#fff", paddingBottom: 5 }}>
+                  <View style={homeStyles.categoryHeadingRow}>
+                    <Text style={homeStyles.categoryHeading}>
+                      {t("explore_categories") || "Explore by Categories"}
+                    </Text>
+                  </View>
+                  <View style={homeStyles.customCategoryWrapper}>
+                    <TouchableOpacity
+                      style={[homeStyles.customCard, { backgroundColor: "#7c3aed" }]}
+                      onPress={() => navigation.navigate("HostelScreen")}
+                    >
                       <Image
-                        source={{ uri: item.image || item.galleryImages?.[0] }}
-                        style={homeStyles.cardImg}
-                        resizeMode="cover"
-                        onError={() => console.log("Card image failed:", item.image)}
+                        source={require("../../../assets/images/hostelLogo.png")}
+                        style={homeStyles.customCardImage}
+                        resizeMode="contain"
                       />
+                      <Text style={homeStyles.customCardTitle}>
+                        {t("hostels") || "Hostels"}
+                      </Text>
+                    </TouchableOpacity>
 
-                      <View style={homeStyles.cardBody}>
-                        <View style={homeStyles.row}>
-                          <Text style={homeStyles.cardName}>{item.name}</Text>
-                          {showBadge ? (
-                            <View style={[
-                              homeStyles.statusBadge,
-                              {
-                                backgroundColor:
-                                  latestReq.status?.toLowerCase() === "completed" ||
-                                    latestReq.status?.toLowerCase() === "joined" ||
-                                    latestReq.status?.toLowerCase() === "active"
-                                    ? "#27ae60"
-                                    : latestReq.status?.toLowerCase() === "accepted" ||
-                                      latestReq.status?.toLowerCase() === "allotted"
-                                      ? "#3498db"
-                                      : latestReq.status?.toLowerCase() === "rejected"
-                                        ? "#e74c3c"
-                                        : "#f39c12"
-                              }
-                            ]}>
-                              <Text style={homeStyles.statusText}>
-                                {
-                                  latestReq.status?.toLowerCase() === "completed" ||
-                                    latestReq.status?.toLowerCase() === "joined" ||
-                                    latestReq.status?.toLowerCase() === "active"
-                                    ? (t("joined") || "JOINED").toUpperCase()
-                                    : (t(latestReq.status?.toLowerCase()) || latestReq.status)?.toUpperCase()
-                                }
-                              </Text>
+                    <TouchableOpacity
+                      style={[homeStyles.customCard, { backgroundColor: "#60a5fa" }]}
+                      onPress={() => navigation.navigate("ApartmentScreen")}
+                    >
+                      <Image
+                        source={require("../../../assets/images/apartmentLogo.png")}
+                        style={homeStyles.customCardImage}
+                        resizeMode="contain"
+                      />
+                      <Text style={homeStyles.customCardTitle}>
+                        {t("apartments") || "Apartments"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[homeStyles.customCard, { backgroundColor: "#fb923c" }]}
+                      onPress={() => navigation.navigate("CommercialScreen")}
+                    >
+                      <Image
+                        source={require("../../../assets/images/commercialLogo.png")}
+                        style={homeStyles.customCardImage}
+                        resizeMode="contain"
+                      />
+                      <Text style={homeStyles.customCardTitle}>
+                        {t("commercial") || "Commercial"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* CATEGORY TABS & FILTER BAR */}
+                <View style={homeStyles.mainCategoryFilterWrapper}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={homeStyles.mainCategoryFilterScroll}
+                  >
+                    {categories.map((cat) => {
+                      const isActive = selectedType === cat.name;
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={[
+                            homeStyles.mainCategoryFilterTab,
+                            isActive && homeStyles.mainCategoryFilterTabActive,
+                          ]}
+                          onPress={() => {
+                            setSelectedType(cat.name);
+                            setSelectedHostelType("");
+                            setSelectedTenantType("");
+                            setSelectedCommercialFeature("");
+                          }}
+                        >
+                          <Ionicons
+                            name={cat.icon}
+                            size={16}
+                            color={isActive ? "#fff" : "#6B7280"}
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text
+                            style={[
+                              homeStyles.mainCategoryFilterText,
+                              isActive && homeStyles.mainCategoryFilterTextActive,
+                            ]}
+                          >
+                            {t(cat.name.toLowerCase()) || cat.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                {/* PROPERTY LISTINGS */}
+                <View style={homeStyles.propertyGrid}>
+                  {filteredProperties.map((item) => {
+                    const normalize = (str) => (str || "").replace(/\s+/g, '').toLowerCase();
+                    const latestReq = requests.find(r =>
+                      normalize(r.propertyName || r.property_name) === normalize(item.name)
+                    );
+                    const showBadge = latestReq && latestReq.status && latestReq.status !== 'none';
+
+                    return (
+                      <TouchableOpacity
+                        key={`${item.id}-${item.type}`}
+                        activeOpacity={0.9}
+                        style={homeStyles.gridItem}
+                        onPress={() => handlePress(item)}
+                      >
+                        <View style={homeStyles.card}>
+                          <Image
+                            source={{ uri: item.image || item.galleryImages?.[0] }}
+                            style={homeStyles.cardImg}
+                            resizeMode="cover"
+                            onError={() => console.log("Card image failed:", item.image)}
+                          />
+
+                          <View style={homeStyles.cardBody}>
+                            <View style={homeStyles.row}>
+                              <Text style={homeStyles.cardName}>{item.name}</Text>
+                              {showBadge ? (
+                                <View style={[
+                                  homeStyles.statusBadge,
+                                  {
+                                    backgroundColor:
+                                      latestReq.status?.toLowerCase() === "completed" ||
+                                        latestReq.status?.toLowerCase() === "joined" ||
+                                        latestReq.status?.toLowerCase() === "active"
+                                        ? "#27ae60"
+                                        : latestReq.status?.toLowerCase() === "accepted" ||
+                                          latestReq.status?.toLowerCase() === "allotted"
+                                          ? "#3498db"
+                                          : latestReq.status?.toLowerCase() === "rejected"
+                                            ? "#e74c3c"
+                                            : "#f39c12"
+                                  }
+                                ]}>
+                                  <Text style={homeStyles.statusText}>
+                                    {
+                                      latestReq.status?.toLowerCase() === "completed" ||
+                                        latestReq.status?.toLowerCase() === "joined" ||
+                                        latestReq.status?.toLowerCase() === "active"
+                                        ? (t("joined") || "JOINED").toUpperCase()
+                                        : (t(latestReq.status?.toLowerCase()) || latestReq.status)?.toUpperCase()
+                                    }
+                                  </Text>
+                                </View>
+                              ) : (
+                                item.isAvailable && (
+                                  <View style={[homeStyles.statusBadge, { backgroundColor: "#3498db" }]}>
+                                    <Text style={homeStyles.statusText}>{(t("vacant") || "VACANT").toUpperCase()}</Text>
+                                  </View>
+                                )
+                              )}
                             </View>
-                          ) : (
-                            item.isAvailable && (
-                              <View style={[homeStyles.statusBadge, { backgroundColor: "#3498db" }]}>
-                                <Text style={homeStyles.statusText}>{(t("vacant") || "VACANT").toUpperCase()}</Text>
-                              </View>
-                            )
-                          )}
+                            <Text style={homeStyles.cardSub} numberOfLines={2}>
+                              {t(item.type?.toLowerCase()) || item.type} • {item.address}
+                            </Text>
+                            {item.rent ? (
+                              <Text style={homeStyles.cardRent}>
+                                ₹{item.rent} / {t("month_suffix") || "month"}
+                              </Text>
+                            ) : null}
+                            {item.distance_km != null ? (
+                              <Text style={homeStyles.cardDistance}>
+                                {item.distance_km} {t("km_away") || "km away"}
+                              </Text>
+                            ) : item.distance != null ? (
+                              <Text style={homeStyles.cardDistance}>
+                                {item.distance} {t("km_away") || "km away"}
+                              </Text>
+                            ) : (
+                              <Text style={homeStyles.cardDistance}>
+                                0.0 {t("km_away") || "km away"}
+                              </Text>
+                            )}
+                          </View>
                         </View>
-                        <Text style={homeStyles.cardSub} numberOfLines={2}>
-                          {t(item.type?.toLowerCase()) || item.type} • {item.address}
-                        </Text>
-                        {item.rent ? (
-                          <Text style={homeStyles.cardRent}>
-                            ₹{item.rent} / {t("month_suffix") || "month"}
-                          </Text>
-                        ) : null}
-                        {item.distance_km != null ? (
-                          <Text style={homeStyles.cardDistance}>
-                            {item.distance_km} {t("km_away") || "km away"}
-                          </Text>
-                        ) : item.distance != null ? (
-                          <Text style={homeStyles.cardDistance}>
-                            {item.distance} {t("km_away") || "km away"}
-                          </Text>
-                        ) : (
-                          <Text style={homeStyles.cardDistance}>
-                            0.0 {t("km_away") || "km away"}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
-          {filteredProperties.length === 0 && (
-            <View style={{ alignItems: "center", marginTop: 50 }}>
-              <Ionicons name="search-outline" size={60} color="#ccc" />
-              <Text style={homeStyles.noResults}>No properties found.</Text>
-            </View>
+                {filteredProperties.length === 0 && (
+                  <View style={{ alignItems: "center", marginTop: 50 }}>
+                    <Ionicons name="search-outline" size={60} color="#ccc" />
+                    <Text style={homeStyles.noResults}>No properties found.</Text>
+                  </View>
+                )}
+              </View>
+            </>
           )}
         </ScrollView>
 

@@ -203,9 +203,9 @@ export const BookingProvider = ({ children }) => {
   }, [userPhone, userRole]);
 
   useEffect(() => {
-    if (isTenantVacated || !joinedProperty || joinedProperty.property_name === "N/A" || !joinedProperty.property_name || joinedProperty.is_vacant) {
+    if (isTenantVacated || !joinedProperty || joinedProperty.property_name === "N/A" || !joinedProperty.property_name || joinedProperty.is_vacant || joinedProperty.status === "Vacated") {
       setIsJoined(false);
-    } else if (tenantStatus === "Active" || !joinedProperty.is_vacant) {
+    } else if (tenantStatus === "Active" && !joinedProperty.is_vacant) {
       setIsJoined(true);
     } else {
       setIsJoined(false);

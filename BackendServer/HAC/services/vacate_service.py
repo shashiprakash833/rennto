@@ -375,6 +375,15 @@ class VacateService:
 
         # Clear tenant allocations
         ExistingTenantService._vacate_existing_allocations(tenant, building_layout)
+        TenantBeds.objects.filter(phone=tenant.phone).delete()
+        ApartmentTenantBeds.objects.filter(phone=tenant.phone).delete()
+        CommercialTenantBeds.objects.filter(phone=tenant.phone).delete()
+
+        # Update all join requests for this tenant to vacated
+        JoinRequest.objects.filter(
+            tenant=tenant,
+            status__in=['completed', 'joined', 'active', 'allotted', 'pending_confirmation']
+        ).update(status='vacated')
 
         if prop:
             prop.building_layout = building_layout
