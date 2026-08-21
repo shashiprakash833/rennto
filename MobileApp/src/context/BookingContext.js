@@ -158,7 +158,7 @@ export const BookingProvider = ({ children }) => {
   }, [userPhone, userRole]);
 
   // 1.5. Fetch Initial Requests & Sync
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
     if (!userPhone) return;
 
     try {
@@ -208,7 +208,7 @@ export const BookingProvider = ({ children }) => {
     } catch (error) {
       console.log("Fetch Requests Error:", error);
     }
-  };
+  }, [userPhone, userRole]);
 
   useEffect(() => {
     if (isTenantVacated || !joinedProperty || joinedProperty.property_name === "N/A" || !joinedProperty.property_name || joinedProperty.is_vacant) {
@@ -391,6 +391,7 @@ export const BookingProvider = ({ children }) => {
   const contextValue = useMemo(() => ({
     requests: combinedRequests,
     setRequests,
+    fetchRequests,
     isJoined,
     joinedProperty,
     pendingCount,
@@ -411,6 +412,7 @@ export const BookingProvider = ({ children }) => {
     updateOwnerRequestStatus
   }), [
     combinedRequests,
+    fetchRequests,
     isJoined,
     joinedProperty,
     pendingCount,
