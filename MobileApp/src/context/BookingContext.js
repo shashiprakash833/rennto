@@ -106,6 +106,7 @@ export const BookingProvider = ({ children }) => {
 
   // 1. Initial Data Load & User Phone Sync
   useEffect(() => {
+    let isMounted = true;
     const loadData = async () => {
       try {
         const tenant = await AsyncStorage.getItem("tenantPhone");
@@ -114,48 +115,27 @@ export const BookingProvider = ({ children }) => {
         const storedSeen = await AsyncStorage.getItem("notificationSeenIds");
         const storedCleared = await AsyncStorage.getItem("notificationClearedIds");
 
-        const activePhone = tenant || owner;
-        if (activePhone !== userPhone) {
-          setuserPhone(activePhone);
+        const activePhone = role === "owner" ? (owner || tenant) : (tenant || owner);
+        if (isMounted) {
+          if (activePhone && activePhone !== userPhone) {
+            setuserPhone(activePhone);
+          }
+          if (role && role !== userRole) {
+            setUserRole(role);
+          }
+          if (storedSeen) setSeenIds(JSON.parse(storedSeen));
+          if (storedCleared) setClearedIds(JSON.parse(storedCleared));
         }
-        if (role !== userRole) {
-          setUserRole(role);
-        }
-        if (storedSeen) setSeenIds(JSON.parse(storedSeen));
-        if (storedCleared) setClearedIds(JSON.parse(storedCleared));
       } catch (e) {
         console.log("Error loading context data:", e);
       }
     };
     loadData();
 
-    // Check periodically for user phone changes (login/logout/switch)
-    const interval = setInterval(async () => {
-      try {
-        const tenant = await AsyncStorage.getItem("tenantPhone");
-        const owner = await AsyncStorage.getItem("ownerPhone");
-        const role = await AsyncStorage.getItem("userRole");
-        const activePhone = tenant || owner;
-        if (activePhone !== userPhone || role !== userRole) {
-          console.log("BookingContext user switched:", userPhone, "->", activePhone, "role:", role);
-          setuserPhone(activePhone);
-          setUserRole(role);
-          if (!activePhone) {
-            setRequests([]);
-            setUnreadNotificationCount(0);
-            setIsTenantVacated(false);
-            setTenantStatus("");
-            setIsJoined(false);
-            setJoinedProperty(null);
-          }
-        }
-      } catch (e) {
-        console.log("Error checking user phone in interval:", e);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [userPhone, userRole]);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // 1.5. Fetch Initial Requests & Sync
   const fetchRequests = useCallback(async () => {

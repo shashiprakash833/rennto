@@ -214,18 +214,6 @@ export default function TenantHomeScreen({ route }) {
   const [accommodationModalVisible, setAccommodationModalVisible] = useState(false);
   const [accommodationType, setAccommodationType] = useState("FLOOR");
 
-  // Refresh tenant data and requests whenever TenantHomeScreen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      if (bookingCtx?.fetchRequests) {
-        bookingCtx.fetchRequests();
-      }
-      if (bookingCtx?.setRefreshTrigger) {
-        bookingCtx.setRefreshTrigger((prev) => prev + 1);
-      }
-    }, [bookingCtx?.fetchRequests, bookingCtx?.setRefreshTrigger])
-  );
-
   useEffect(() => {
     const fetchVacateStatus = async () => {
       const phone = bookingCtx?.userPhone || (await AsyncStorage.getItem("tenantPhone"));
@@ -696,44 +684,12 @@ export default function TenantHomeScreen({ route }) {
         };
       });
 
-      // AUTO GEOCODE MISSING LOCATIONS
-      const geocodedData = await Promise.all(
-        formattedData.map(async (p) => {
-
-          if (!p.latitude || !p.longitude) {
-            try {
-
-              console.log("Geocoding:", p.name);
-
-              const geo = await Location.geocodeAsync(p.address);
-
-              if (geo.length > 0) {
-                return {
-                  ...p,
-                  latitude: geo[0].latitude,
-                  longitude: geo[0].longitude,
-                };
-              }
-
-            } catch (e) {
-              console.log("Geocode Error:", e);
-            }
-          }
-
-          return p;
-        })
-      );
-
-      console.log("FINAL PROPERTIES:", geocodedData);
-
-      setAllProperties(geocodedData);
+      console.log("PROPERTIES LOADED:", formattedData.length);
+      setAllProperties(formattedData);
     } catch (error) {
       console.log("Fetch Properties Error:", error);
-    }
-    finally {
-
+    } finally {
       setLoading(false);
-
     }
   };
 
@@ -780,18 +736,18 @@ export default function TenantHomeScreen({ route }) {
 
   useFocusEffect(
     useCallback(() => {
-      const init = async () => {
-        fetchProperties();
-        if (!hasFetchedLocationRef.current) {
-          hasFetchedLocationRef.current = true;
-          const coords = await getLocation();
-          if (coords) {
-            fetchProperties(coords);
-          }
-        }
-      };
-      init();
-    }, [tenantEmail, refreshTrigger])
+      bookingCtx?.fetchRequests?.();
+      bookingCtx?.fetchUnreadCount?.();
+      fetchProperties();
+      if (!hasFetchedLocationRef.current) {
+        hasFetchedLocationRef.current = true;
+        getLocation()
+          .then((coords) => {
+            if (coords) fetchProperties(coords);
+          })
+          .catch(() => {});
+      }
+    }, [])
   );
 
   // Removed useEffect for fetchProperties to avoid continuous API calls on filter change

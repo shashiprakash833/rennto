@@ -186,6 +186,14 @@ export default function OwnerVacateRequestsScreen() {
           border: "#FCA5A5",
           icon: "close-circle",
         };
+      case "historical":
+        return {
+          label: "Historical",
+          color: "#6B7280",
+          bg: "#F3F4F6",
+          border: "#D1D5DB",
+          icon: "archive-outline",
+        };
       case "pending":
       default:
         return {
