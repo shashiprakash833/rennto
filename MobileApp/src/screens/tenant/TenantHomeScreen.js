@@ -1053,6 +1053,7 @@ export default function TenantHomeScreen({ route }) {
           showsVerticalScrollIndicator={false}
           stickyHeaderIndices={[1]}
           scrollEventThrottle={16}
+          contentContainerStyle={{ paddingBottom: 110 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={refreshLocation} />
           }
@@ -1179,9 +1180,9 @@ export default function TenantHomeScreen({ route }) {
                 </View>
 
                 <View style={homeStyles.myStayGrid}>
-                  {/* 1. Vacate Property Card */}
+                  {/* 1. Vacate Property Card: Light Red -> Light Pink */}
                   <TouchableOpacity
-                    style={homeStyles.myStayCard}
+                    style={homeStyles.myStayCardWrapper}
                     activeOpacity={0.85}
                     onPress={() => {
                       if ((vacateRequestStatus || "").toLowerCase() === "pending") {
@@ -1191,108 +1192,150 @@ export default function TenantHomeScreen({ route }) {
                       setVacateModalVisible(true);
                     }}
                   >
-                    <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FEF2F2" }]}>
-                      <Ionicons name="log-out-outline" size={24} color="#EF4444" />
-                    </View>
-                    <Text style={homeStyles.myStayCardTitle}>Vacate Property</Text>
-                    <Text style={homeStyles.myStayCardSub}>
-                      {(vacateRequestStatus || "").toLowerCase() === "pending"
-                        ? "Vacate request is pending owner approval."
-                        : (vacateRequestStatus || "").toLowerCase() === "declined"
-                          ? "Last vacate request was declined. You remain in this property."
-                          : "Request to vacate your current property."}
-                    </Text>
-                    <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FEF2F2" }]}>
-                      <Text style={[homeStyles.myStayRequestBtnText, { color: "#EF4444" }]}>
-                        {(vacateRequestStatus || "").toLowerCase() === "pending" ? "Pending Approval" : "Request"}
+                    <LinearGradient
+                      colors={["#FFF5F5", "#FFE4E6"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[homeStyles.myStayCard, { borderColor: "#FECDD3" }]}
+                    >
+                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FEE2E2" }]}>
+                        <Ionicons name="log-out-outline" size={24} color="#EF4444" />
+                      </View>
+                      <Text style={homeStyles.myStayCardTitle}>Vacate Property</Text>
+                      <Text style={homeStyles.myStayCardSub}>
+                        {(vacateRequestStatus || "").toLowerCase() === "pending"
+                          ? "Vacate request is pending owner approval."
+                          : (vacateRequestStatus || "").toLowerCase() === "declined"
+                            ? "Last vacate request was declined. You remain in this property."
+                            : "Request to vacate your current property."}
                       </Text>
-                    </View>
+                      <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FEE2E2" }]}>
+                        <Text style={[homeStyles.myStayRequestBtnText, { color: "#EF4444" }]}>
+                          {(vacateRequestStatus || "").toLowerCase() === "pending" ? "Pending Approval" : "Request"}
+                        </Text>
+                      </View>
+                    </LinearGradient>
                   </TouchableOpacity>
 
-                  {/* 2. Change Floor Card (Hostel & Apartment) */}
+                  {/* 2. Change Floor Card (Hostel & Apartment): Light Purple -> Lavender */}
                   {((joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") ||
                     (joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("apartment")) && (
                     <TouchableOpacity
-                      style={homeStyles.myStayCard}
+                      style={homeStyles.myStayCardWrapper}
                       activeOpacity={0.85}
                       onPress={() => {
                         setAccommodationType("FLOOR");
                         setAccommodationModalVisible(true);
                       }}
                     >
-                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#F3E8FF" }]}>
-                        <Ionicons name="layers-outline" size={24} color="#7C3AED" />
-                      </View>
-                      <Text style={homeStyles.myStayCardTitle}>Change Floor</Text>
-                      <Text style={homeStyles.myStayCardSub}>Request a floor change in this property.</Text>
-                      <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#F3E8FF" }]}>
-                        <Text style={[homeStyles.myStayRequestBtnText, { color: "#7C3AED" }]}>Request</Text>
-                      </View>
+                      <LinearGradient
+                        colors={["#F5F3FF", "#EDE9FE"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[homeStyles.myStayCard, { borderColor: "#DDD6FE" }]}
+                      >
+                        <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#EDE9FE" }]}>
+                          <Ionicons name="layers-outline" size={24} color="#7C3AED" />
+                        </View>
+                        <Text style={homeStyles.myStayCardTitle}>Change Floor</Text>
+                        <Text style={homeStyles.myStayCardSub}>Request a floor change in this property.</Text>
+                        <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#EDE9FE" }]}>
+                          <Text style={[homeStyles.myStayRequestBtnText, { color: "#7C3AED" }]}>Request</Text>
+                        </View>
+                      </LinearGradient>
                     </TouchableOpacity>
                   )}
 
-                  {/* 3. Change Room Card (Hostel Only) */}
+                  {/* 3. Change Room Card (Hostel Only): Light Blue -> Sky Blue */}
                   {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
                     <TouchableOpacity
-                      style={homeStyles.myStayCard}
+                      style={homeStyles.myStayCardWrapper}
                       activeOpacity={0.85}
                       onPress={() => {
                         setAccommodationType("ROOM");
                         setAccommodationModalVisible(true);
                       }}
                     >
-                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#DBEAFE" }]}>
-                        <Ionicons name="business-outline" size={24} color="#2563EB" />
-                      </View>
-                      <Text style={homeStyles.myStayCardTitle}>Change Room</Text>
-                      <Text style={homeStyles.myStayCardSub}>Request a room change in this property.</Text>
-                      <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#DBEAFE" }]}>
-                        <Text style={[homeStyles.myStayRequestBtnText, { color: "#2563EB" }]}>Request</Text>
-                      </View>
+                      <LinearGradient
+                        colors={["#EFF6FF", "#DBEAFE"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[homeStyles.myStayCard, { borderColor: "#BFDBFE" }]}
+                      >
+                        <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#DBEAFE" }]}>
+                          <Ionicons name="business-outline" size={24} color="#2563EB" />
+                        </View>
+                        <Text style={homeStyles.myStayCardTitle}>Change Room</Text>
+                        <Text style={homeStyles.myStayCardSub}>Request a room change in this property.</Text>
+                        <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#DBEAFE" }]}>
+                          <Text style={[homeStyles.myStayRequestBtnText, { color: "#2563EB" }]}>Request</Text>
+                        </View>
+                      </LinearGradient>
                     </TouchableOpacity>
                   )}
 
-                  {/* 4. Change Bed Card (Hostel Only) */}
+                  {/* 4. Change Bed Card (Hostel Only): Light Orange -> Light Peach */}
                   {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
                     <TouchableOpacity
-                      style={homeStyles.myStayCard}
+                      style={homeStyles.myStayCardWrapper}
                       activeOpacity={0.85}
                       onPress={() => {
                         setAccommodationType("BED");
                         setAccommodationModalVisible(true);
                       }}
                     >
-                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FFEDD5" }]}>
-                        <Ionicons name="bed-outline" size={24} color="#D97706" />
-                      </View>
-                      <Text style={homeStyles.myStayCardTitle}>Change Bed</Text>
-                      <Text style={homeStyles.myStayCardSub}>Request a bed change in this property.</Text>
-                      <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FFEDD5" }]}>
-                        <Text style={[homeStyles.myStayRequestBtnText, { color: "#D97706" }]}>Request</Text>
-                      </View>
+                      <LinearGradient
+                        colors={["#FFF7ED", "#FFEDD5"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[homeStyles.myStayCard, { borderColor: "#FED7AA" }]}
+                      >
+                        <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FFEDD5" }]}>
+                          <Ionicons name="bed-outline" size={24} color="#EA580C" />
+                        </View>
+                        <Text style={homeStyles.myStayCardTitle}>Change Bed</Text>
+                        <Text style={homeStyles.myStayCardSub}>Request a bed change in this property.</Text>
+                        <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FFEDD5" }]}>
+                          <Text style={[homeStyles.myStayRequestBtnText, { color: "#EA580C" }]}>Request</Text>
+                        </View>
+                      </LinearGradient>
                     </TouchableOpacity>
                   )}
 
                   {/* 5. Check-in Date Card */}
-                  <View style={[homeStyles.myStayCard, homeStyles.checkInCard]}>
-                    <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#D1FAE5" }]}>
-                      <Ionicons name="calendar-outline" size={24} color="#059669" />
-                    </View>
-                    <Text style={homeStyles.dateCardLabel}>CHECK-IN DATE</Text>
-                    <Text style={homeStyles.checkInDateValue}>
-                      {formatCheckInDate(joinedProperty?.checkIn || joinedProperty?.check_in || joinedProperty?.check_in_date || joinedProperty?.joining_date)}
-                    </Text>
+                  <View style={homeStyles.myStayCardWrapper}>
+                    <LinearGradient
+                      colors={["#F0FDF4", "#DCFCE7"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[homeStyles.myStayCard, homeStyles.checkInCard]}
+                    >
+                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#D1FAE5" }]}>
+                        <Ionicons name="calendar-outline" size={24} color="#059669" />
+                      </View>
+                      <Text style={homeStyles.dateCardLabel}>CHECK-IN DATE</Text>
+                      <Text style={homeStyles.checkInDateValue}>
+                        {formatCheckInDate(joinedProperty?.checkIn || joinedProperty?.check_in || joinedProperty?.check_in_date || joinedProperty?.joining_date)}
+                      </Text>
+                    </LinearGradient>
                   </View>
 
                   {/* 6. Rent Due Card */}
-                  <View style={[homeStyles.myStayCard, homeStyles.rentDueCard]}>
-                    <View style={[homeStyles.myStayIconCircle, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
-                      <Ionicons name="cash-outline" size={24} color="#FFFFFF" />
-                    </View>
-                    <Text style={homeStyles.rentDueLabel}>RENT DUE</Text>
-                    <Text style={homeStyles.rentDueValue}>
-                      {formatDueDate(joinedProperty?.next_due_date || joinedProperty?.due_date || joinedProperty?.rent_due_date)}
-                    </Text>
+                  <View style={homeStyles.myStayCardWrapper}>
+                    <LinearGradient
+                      colors={["#7C3AED", "#6D28D9"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[homeStyles.myStayCard, homeStyles.rentDueCard]}
+                    >
+                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
+                        <Ionicons name="cash-outline" size={24} color="#FFFFFF" />
+                      </View>
+                      <Text style={homeStyles.rentDueLabel}>RENT DUE</Text>
+                      <Text style={homeStyles.rentDueValue}>
+                        {formatDueDate(joinedProperty?.next_due_date || joinedProperty?.due_date || joinedProperty?.rent_due_date)}
+                      </Text>
+                    </LinearGradient>
                   </View>
                 </View>
 
@@ -1462,49 +1505,6 @@ export default function TenantHomeScreen({ route }) {
                       </Text>
                     </TouchableOpacity>
                   </View>
-                </View>
-
-                {/* CATEGORY TABS & FILTER BAR */}
-                <View style={homeStyles.mainCategoryFilterWrapper}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={homeStyles.mainCategoryFilterScroll}
-                  >
-                    {categories.map((cat) => {
-                      const isActive = selectedType === cat.name;
-                      return (
-                        <TouchableOpacity
-                          key={cat.id}
-                          style={[
-                            homeStyles.mainCategoryFilterTab,
-                            isActive && homeStyles.mainCategoryFilterTabActive,
-                          ]}
-                          onPress={() => {
-                            setSelectedType(cat.name);
-                            setSelectedHostelType("");
-                            setSelectedTenantType("");
-                            setSelectedCommercialFeature("");
-                          }}
-                        >
-                          <Ionicons
-                            name={cat.icon}
-                            size={16}
-                            color={isActive ? "#fff" : "#6B7280"}
-                            style={{ marginRight: 6 }}
-                          />
-                          <Text
-                            style={[
-                              homeStyles.mainCategoryFilterText,
-                              isActive && homeStyles.mainCategoryFilterTextActive,
-                            ]}
-                          >
-                            {t(cat.name.toLowerCase()) || cat.name}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
                 </View>
 
                 {/* PROPERTY LISTINGS */}
@@ -4093,12 +4093,14 @@ const homeStyles = StyleSheet.create({
     justifyContent: "space-between",
     width: "100%",
   },
-  myStayCard: {
+  myStayCardWrapper: {
     width: (width - 48) / 2,
-    backgroundColor: "#FFFFFF",
+    marginBottom: 14,
+  },
+  myStayCard: {
+    width: "100%",
     borderRadius: 22,
     padding: 16,
-    marginBottom: 14,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
@@ -4107,7 +4109,8 @@ const homeStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
     justifyContent: "space-between",
-    minHeight: 160,
+    minHeight: 165,
+    overflow: "hidden",
   },
   myStayIconCircle: {
     width: 44,
