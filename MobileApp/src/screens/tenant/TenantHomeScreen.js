@@ -206,7 +206,12 @@ export default function TenantHomeScreen({ route }) {
   const bookingCtx = useContext(BookingContext);
   const submitOwnerRequest = bookingCtx?.submitOwnerRequest;
   const joinedProperty = bookingCtx?.joinedProperty;
-  const isJoined = Boolean(bookingCtx?.isJoined && joinedProperty && joinedProperty.property_name !== "N/A");
+  const isJoined = Boolean(
+    (bookingCtx?.isJoined || (joinedProperty && !joinedProperty.is_vacant && (joinedProperty.property_name || joinedProperty.name) && (joinedProperty.property_name || joinedProperty.name) !== "N/A" && joinedProperty.status !== "Vacated")) &&
+    joinedProperty &&
+    (joinedProperty.property_name || joinedProperty.name) &&
+    (joinedProperty.property_name || joinedProperty.name) !== "N/A"
+  );
 
   const [vacateModalVisible, setVacateModalVisible] = useState(false);
   const [vacateSubmitting, setVacateSubmitting] = useState(false);
@@ -579,18 +584,18 @@ export default function TenantHomeScreen({ route }) {
     }
   };
 
-  const unreadCount = bookingContext?.unreadNotificationCount || 0;
+  const unreadCount = bookingCtx?.unreadNotificationCount || 0;
   const badgeText = unreadCount > 99 ? "99+" : `${unreadCount}`;
 
   useFocusEffect(
     useCallback(() => {
-      bookingContext?.fetchUnreadCount?.();
-    }, [])
+      bookingCtx?.fetchUnreadCount?.();
+    }, [bookingCtx?.fetchUnreadCount])
   );
 
   const fetchTenantRequests = () => {
     // Rely on BookingContext to fetch and sync state. Just trigger a refresh if needed.
-    bookingContext?.setRefreshTrigger?.(prev => prev + 1);
+    bookingCtx?.setRefreshTrigger?.(prev => prev + 1);
   };
 
   // Animation logic for pulsating notification
@@ -1050,7 +1055,7 @@ export default function TenantHomeScreen({ route }) {
             <RefreshControl refreshing={refreshing} onRefresh={refreshLocation} />
           }
         >
-          {bookingContext?.isJoined && joinedProperty && joinedProperty.property_name !== "N/A" ? (
+          {isJoined && joinedProperty && (joinedProperty.property_name || joinedProperty.name) !== "N/A" ? (
             <ImageBackground
               source={
                 joinedProperty.property_image
@@ -1235,7 +1240,7 @@ export default function TenantHomeScreen({ route }) {
           )}
 
           {/* JOINED TENANT MY STAY DASHBOARD */}
-          {isJoined && joinedProperty && joinedProperty.property_name !== "N/A" ? (
+          {isJoined && joinedProperty && (joinedProperty.property_name || joinedProperty.name) !== "N/A" ? (
             <View style={homeStyles.myStayContainer}>
               {/* ACTIVE STAY SUMMARY CARD */}
               <View style={{
@@ -1442,10 +1447,10 @@ export default function TenantHomeScreen({ route }) {
 
           {/* EXPLORE CATEGORIES & PROPERTY LISTINGS (VISIBLE TO ALL / SCROLL DOWN FOR JOINED TENANTS) */}
           <View>
-            <View style={{ backgroundColor: "#fff", paddingBottom: 5, marginTop: isJoined && joinedProperty && joinedProperty.property_name !== "N/A" ? 12 : 0 }}>
+            <View style={{ backgroundColor: "#fff", paddingBottom: 5, marginTop: isJoined ? 12 : 0 }}>
               <View style={homeStyles.categoryHeadingRow}>
                 <Text style={homeStyles.categoryHeading}>
-                  {isJoined && joinedProperty && joinedProperty.property_name !== "N/A"
+                  {isJoined
                     ? (t("explore_other_properties") || "Explore Other Properties")
                     : (t("explore_categories") || "Explore by Categories")}
                 </Text>

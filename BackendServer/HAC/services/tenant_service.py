@@ -31,11 +31,22 @@ class TenantService:
         active_bed = hostel_bed or apt_bed or comm_bed
 
         if active_bed:
-            if not tenant.owner and active_bed.owner:
-                tenant.owner = active_bed.owner
-            if tenant.is_vacant:
-                tenant.is_vacant = False
+            if not tenant.owner:
+                if active_bed.owner:
+                    tenant.owner = active_bed.owner
+                elif active_bed.owner_phone:
+                    tenant.owner = CommonService.get_owner(active_bed.owner_phone)
+            tenant.is_vacant = False
             tenant.save()
+        elif not tenant.owner:
+            jr_active = JoinRequest.objects.filter(
+                tenant=tenant,
+                status__in=['completed', 'joined', 'active']
+            ).order_by('-created_at').first()
+            if jr_active and jr_active.owner:
+                tenant.owner = jr_active.owner
+                tenant.is_vacant = False
+                tenant.save()
 
         # PROPERTY DETAILS
         property_name = "N/A"
@@ -171,7 +182,7 @@ class TenantService:
                 selfie_url = tenant.selfie.url
  
         # ── STATUS ENFORCEMENT ──
-        if tenant.is_vacant or not tenant.owner:
+        if (tenant.is_vacant or not tenant.owner) and not active_bed:
             property_name = "N/A"
             property_type = "N/A"
             location = "N/A"
@@ -184,6 +195,9 @@ class TenantService:
             final_status = "Vacated"
         else:
             final_status = "Active"
+            if tenant.is_vacant:
+                tenant.is_vacant = False
+                tenant.save()
 
         # ── PROPERTY-SPECIFIC VACATE STATUS ──
         has_pending_vacate = False

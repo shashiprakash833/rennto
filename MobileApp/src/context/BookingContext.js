@@ -139,14 +139,26 @@ export const BookingProvider = ({ children }) => {
 
   // 1.5. Fetch Initial Requests & Sync
   const fetchRequests = useCallback(async () => {
-    if (!userPhone) return;
+    let phone = userPhone;
+    let role = userRole;
+    if (!phone) {
+      const tenant = await AsyncStorage.getItem("tenantPhone");
+      const owner = await AsyncStorage.getItem("ownerPhone");
+      role = role || (await AsyncStorage.getItem("userRole"));
+      phone = role === "owner" ? (owner || tenant) : (tenant || owner);
+      if (phone) {
+        setuserPhone(phone);
+        if (role) setUserRole(role);
+      }
+    }
+    if (!phone) return;
 
     try {
-      const isOwner = userRole === 'owner';
+      const isOwner = role === 'owner';
       const endpoint = isOwner ? "owner_requests" : "tenant_notifications";
 
       const response = await fetchWithAuth(
-        `${BASE_URL}/api/${endpoint}/${encodeURIComponent(userPhone)}/`
+        `${BASE_URL}/api/${endpoint}/${encodeURIComponent(phone)}/`
       );
 
       const data = await response.json();
@@ -162,7 +174,7 @@ export const BookingProvider = ({ children }) => {
 
       if (!isOwner) {
         const detailsRes = await fetchWithAuth(
-          `${BASE_URL}/api/tenantdetails/${encodeURIComponent(userPhone)}/`
+          `${BASE_URL}/api/tenantdetails/${encodeURIComponent(phone)}/`
         );
         if (detailsRes.ok) {
           const detailsData = await detailsRes.json();
