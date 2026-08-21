@@ -38,7 +38,7 @@ export const apiFetch = async (url, options = {}, originalFetch) => {
       return makeMockResponse({ error: "No internet connection and no cached data available.", cache_miss: true }, 503);
     } else {
       // Mutation blocked when offline
-      showOfflineconsole.log();
+      showOfflineAlert();
       throw new Error("Internet connection is required for this action.");
     }
   }

@@ -103,7 +103,7 @@ export default function WelcomeScreen({ route, navigation }) {
           </Text>
  
           <Text style={styles.subtitle}>
-            Your request has been accepted. You're now a verified member of this premium community.
+            {"Your request has been accepted. You're now a verified member of this premium community."}
           </Text>
  
           <TouchableOpacity

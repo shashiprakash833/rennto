@@ -805,6 +805,8 @@ const FilterBottomSheet = forwardRef(({ onApply, onReset, allProperties = [], sc
   );
 });
 
+FilterBottomSheet.displayName = 'FilterBottomSheet';
+
 export default FilterBottomSheet;
 
 const styles = StyleSheet.create({
@@ -1179,9 +1181,6 @@ const styles = StyleSheet.create({
   modalOverlayTop: {
     justifyContent: 'flex-start',
     backgroundColor: '#fff',
-  },
-  backdropSpacer: {
-    flex: 1,
   },
   selectorContainer: {
     backgroundColor: '#fff',

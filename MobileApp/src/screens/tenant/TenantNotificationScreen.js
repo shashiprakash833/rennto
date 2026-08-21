@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Image,
   TextInput,
+  Alert,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,7 +25,7 @@ import COLORS from "../../theme/colors";
 import { useNetwork } from "../../hooks/useNetwork";
 import OfflineView from "../../components/OfflineView";
 import { useLanguage } from "../../utils/LanguageContext";
-import { CommonActions } from "@react-navigation/native";
+
 
 const TenantNotificationScreen = () => {
   const { t } = useLanguage();
@@ -85,37 +86,35 @@ const TenantNotificationScreen = () => {
 
 
   const handleReject = async (item) => {
-    import("react-native").then(({ Alert }) => {
-      Alert.alert(
-        "Reject Approval",
-        "Are you sure you want to reject this booking? This action cannot be undone.",
-        [
-          { text: "No", style: "cancel" },
-          {
-            text: "Yes, Reject",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                const res = await fetchWithAuth(`${BASE_URL}/api/withdraw_request/`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    tenant_phone: phone || tenantPhone,
-                    owner_phone: item.owner_phone || item.ownerEmail,
-                    property_name: item.propertyName || item.property_name,
-                  }),
-                });
-                if (res.ok) {
-                  setRefreshTrigger((prev) => prev + 1);
-                }
-              } catch (err) {
-                console.log("Reject error", err);
+    Alert.alert(
+      "Reject Approval",
+      "Are you sure you want to reject this booking? This action cannot be undone.",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes, Reject",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const res = await fetchWithAuth(`${BASE_URL}/api/withdraw_request/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  tenant_phone: phone || tenantPhone,
+                  owner_phone: item.owner_phone || item.ownerEmail,
+                  property_name: item.propertyName || item.property_name,
+                }),
+              });
+              if (res.ok) {
+                setRefreshTrigger((prev) => prev + 1);
               }
+            } catch (err) {
+              console.log("Reject error", err);
             }
           }
-        ]
-      );
-    });
+        }
+      ]
+    );
   };
 
   const handleJoinNow = (item) => {
@@ -150,23 +149,17 @@ const TenantNotificationScreen = () => {
   const submitIdentityProof = async () => {
     const activePhone = await AsyncStorage.getItem("tenantPhone");
     if (!activePhone) {
-      import("react-native").then(({ Alert }) => {
-        Alert.alert("Error", "Tenant details not found. Please log in again.");
-      });
+      Alert.alert("Error", "Tenant details not found. Please log in again.");
       return;
     }
 
     if (!selectedFile || !selectedBackFile || !selectedItem || !aadharId) {
-      import("react-native").then(({ Alert }) => {
-        Alert.alert("Error", "Please enter Aadhaar ID, and upload Aadhaar Front & Back images.");
-      });
+      Alert.alert("Error", "Please enter Aadhaar ID, and upload Aadhaar Front & Back images.");
       return;
     }
 
     if (aadharId.length !== 12) {
-      import("react-native").then(({ Alert }) => {
-        Alert.alert("Error", "Aadhaar ID must be exactly 12 numeric digits.");
-      });
+      Alert.alert("Error", "Aadhaar ID must be exactly 12 numeric digits.");
       return;
     }
 
@@ -214,16 +207,12 @@ const TenantNotificationScreen = () => {
         });
       } else {
         setUploading(false);
-        import("react-native").then(({ Alert }) => {
-          Alert.alert("Failed to Submit", resData.error || "An unexpected error occurred.");
-        });
+        Alert.alert("Failed to Submit", resData.error || "An unexpected error occurred.");
       }
     } catch (err) {
       setUploading(false);
       console.log("Error submitting identity proof:", err);
-      import("react-native").then(({ Alert }) => {
-        Alert.alert("Error", "Could not submit identity proof. Please check your network.");
-      });
+      Alert.alert("Error", "Could not submit identity proof. Please check your network.");
     }
   };
 
@@ -267,6 +256,35 @@ const TenantNotificationScreen = () => {
         icon: "time-outline",
         color: COLORS.WARNING,
         lightColor: "#FFF8E1",
+      };
+    }
+
+    if (item.type === "hostel_change_request") {
+      const hcStatus = (item.status || "pending").toLowerCase();
+      if (hcStatus === "approved") {
+        return {
+          title: "Hostel Change Approved",
+          message: item.message || "Your hostel change request was approved. Select floor, room, and bed.",
+          icon: "checkmark-circle",
+          color: "#10B981",
+          lightColor: "#DCFCE7",
+        };
+      }
+      if (hcStatus === "rejected") {
+        return {
+          title: "Hostel Change Rejected",
+          message: item.message || "Your hostel change request was rejected. You remain in your current hostel.",
+          icon: "close-circle",
+          color: "#EF4444",
+          lightColor: "#FEE2E2",
+        };
+      }
+      return {
+        title: "Hostel Change Request Submitted",
+        message: item.message || "Your hostel change request is waiting for owner approval.",
+        icon: "git-compare-outline",
+        color: "#4F46E5",
+        lightColor: "#EEF2FF",
       };
     }
 
@@ -424,14 +442,14 @@ const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
     const title = (item?.title || "").toLowerCase();
     const msg = (item?.message || "").toLowerCase();
     if (rawType.includes("payment") || title.includes("payment")||title.includes("due") || title.includes("rent") || msg.includes("payment")) {
-      navigation.dispatch(CommonActions.navigate({ name: "TenantNavigation", params: { screen: "Payment" } }));
+      navigation.navigate("TenantNavigation", { screen: "Payment" });
       return;
     }
     if (rawType.includes("issue") || title.includes("issue") || msg.includes("issue")) {
-      navigation.dispatch(CommonActions.navigate({ name: "TenantNavigation", params: { screen: "Issues" } }));
+      navigation.navigate("TenantNavigation", { screen: "Issues" });
       return;
     }
-    navigation.dispatch(CommonActions.navigate({ name: "TenantNavigation", params: { screen: "Home", params: { screen: "TenantHome" } } }));
+    navigation.navigate("TenantNavigation", { screen: "Home", params: { screen: "TenantHome" } });
   };
  
   const renderCard = (item) => {
@@ -552,16 +570,14 @@ const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
           {visibleRequests.length > 0 && (
             <TouchableOpacity
               onPress={() => {
-                import("react-native").then(({ Alert }) => {
-                  Alert.alert(
-                    t("clear_all") || "Clear All",
-                    t("clear_all_confirm") || "Are you sure you want to clear all notifications?",
-                    [
-                      { text: t("cancel") || "Cancel", style: "cancel" },
-                      { text: t("clear_all") || "Clear All", onPress: clearAllNotifications, style: "destructive" }
-                    ]
-                  );
-                });
+                Alert.alert(
+                  t("clear_all") || "Clear All",
+                  t("clear_all_confirm") || "Are you sure you want to clear all notifications?",
+                  [
+                    { text: t("cancel") || "Cancel", style: "cancel" },
+                    { text: t("clear_all") || "Clear All", onPress: clearAllNotifications, style: "destructive" }
+                  ]
+                );
               }}
               style={styles.clearBtn}
             >

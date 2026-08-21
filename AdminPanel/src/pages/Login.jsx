@@ -131,10 +131,10 @@ const Login = ({ onLogin }) => {
                 const data = await response.json();
 
                 if (response.ok) {
-                    localStorage.setItem(
-                        "adminToken",
-                        data.token
-                    );
+                    localStorage.setItem("adminToken", data.token);
+                    localStorage.setItem("token", data.token);
+                    localStorage.setItem("isLoggedIn", "true");
+                    localStorage.setItem("adminPhone", phone);
 
                     onLogin();
                 } else {

@@ -1,5 +1,5 @@
 import Constants from "expo-constants";
-import { Platform } from "react-native";
+import { AppState } from "react-native";
 
 let Notifications = null;
 
@@ -10,6 +10,20 @@ if (Constants.appOwnership !== "expo") {
   } catch (e) {
     console.warn("Failed to load expo-notifications:", e);
   }
+}
+
+if (Notifications?.setNotificationHandler) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => {
+      const inForeground = AppState.currentState === "active";
+      return {
+        shouldShowBanner: !inForeground,
+        shouldShowList: true,
+        shouldPlaySound: !inForeground,
+        shouldSetBadge: true,
+      };
+    },
+  });
 }
 
 const isMock = !Notifications;

@@ -2,7 +2,7 @@ from django.db import transaction
 from django.db.models import Q
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from HAC.models import JoinRequest, Tenent, Owners, BlockedTenant, TenantBeds, ApartmentTenantBeds, CommercialTenantBeds, ExistingTenantRequest, TenantNotification
+from HAC.models import JoinRequest, Tenent, Owners, BlockedTenant, TenantBeds, ApartmentTenantBeds, CommercialTenantBeds, ExistingTenantRequest, TenantNotification, VacateRequest, HostelChangeRequest
 from .common_service import CommonService
 from .notification_service import NotificationService
 
@@ -111,20 +111,36 @@ class RequestService:
         if is_blocked:
             raise ValueError("You are blocked by an owner and cannot book new properties until unblocked.")
 
+        owner = CommonService.get_owner(lookup_id)
+        if not owner:
+            raise Exception("Owner not found")
+
         # A tenant is truly active only after they've clicked Join (is_vacant=False
         # AND have a joined/completed request). A pending_confirmation tenant has not
         # yet joined so they are NOT considered active.
         if not tenant.is_vacant:
+            from HAC.models import HostelChangeRequest
+            approved_change = HostelChangeRequest.objects.filter(
+                tenant=tenant,
+                status='approved',
+            ).select_related('target_hostel', 'target_owner').first()
+
+            has_approved_switch = False
+            if approved_change:
+                target_name = (approved_change.target_hostel.hostelName or "").strip().lower()
+                has_approved_switch = (
+                    approved_change.target_owner_id == owner.id
+                    or (property_name or "").strip().lower() == target_name
+                )
+
             has_active_join = JoinRequest.objects.filter(
                 tenant=tenant,
                 status__in=['joined', 'completed']
             ).exists()
-            if has_active_join:
+            if has_active_join and not has_approved_switch:
                 raise ValueError("You already have an active stay. You must vacate your current property before booking another one.")
-
-        owner = CommonService.get_owner(lookup_id)
-        if not owner:
-            raise Exception("Owner not found")
+        else:
+            has_approved_switch = False
 
         existing = JoinRequest.objects.filter(
             tenant=tenant,
@@ -147,8 +163,10 @@ class RequestService:
             status="pending"
         )
 
-        tenant.owner = owner
-        tenant.save()
+        # Keep current owner until the tenant actually joins the new hostel.
+        if not has_approved_switch:
+            tenant.owner = owner
+            tenant.save()
 
         if owner.push_token:
             NotificationService.send_push_notification(owner.push_token, "New Join Request 📩", f"{tenant.name} requested to join your property")
@@ -289,6 +307,9 @@ class RequestService:
             tenant_phone__in=tenant_phone_variants
         ).order_by('-created_at')
         for n in msg_notifications:
+            title_l = (n.title or "").lower()
+            if "vacate" in title_l or "hostel change" in title_l:
+                continue
             data.append({
                 "id": f"notif_{n.id}",
                 "type": "MESSAGE",
@@ -296,6 +317,46 @@ class RequestService:
                 "message": n.message,
                 "is_read": n.is_read,
                 "created_at": n.created_at,
+            })
+
+        vacate_requests = VacateRequest.objects.filter(tenant=tenant).order_by('-created_at')
+        for v in vacate_requests:
+            data.append({
+                "id": f"vacate_{v.id}",
+                "type": "vacate_request",
+                "title": "Vacate Request",
+                "message": (
+                    "Your vacate request has been approved. You have been removed from the property."
+                    if (v.status or "").lower() == "approved"
+                    else "Your vacate request has been declined. You remain in the property."
+                    if (v.status or "").lower() == "declined"
+                    else f"Your vacate request for {v.property_name} is waiting for owner approval."
+                ),
+                "status": (v.status or "Pending").lower(),
+                "propertyName": v.property_name,
+                "created_at": v.created_at,
+            })
+
+        hostel_changes = HostelChangeRequest.objects.filter(tenant=tenant).select_related(
+            'current_hostel', 'target_hostel'
+        ).order_by('-created_at')
+        for h in hostel_changes:
+            target_name = h.target_hostel.hostelName if h.target_hostel else "hostel"
+            if h.status == "approved":
+                message = f"Your hostel change request for {target_name} was approved. Select floor, room, and bed to complete the move."
+            elif h.status == "rejected":
+                message = f"Your hostel change request for {target_name} was rejected. You remain in your current hostel."
+            else:
+                message = f"Your hostel change request for {target_name} is pending owner approval."
+            data.append({
+                "id": f"hc_{h.id}",
+                "type": "hostel_change_request",
+                "title": "Hostel Change Request",
+                "message": message,
+                "status": h.status,
+                "propertyName": target_name,
+                "rejection_reason": h.rejection_reason,
+                "created_at": h.created_at,
             })
 
         data.sort(key=lambda x: x['created_at'], reverse=True)

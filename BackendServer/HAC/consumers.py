@@ -59,8 +59,9 @@ class OwnerStatusConsumer(AsyncWebsocketConsumer):
 
     # Receive message from room group
     async def status_update(self, event):
-        # Send message to WebSocket
-        # Message format: {"type": "status_update", "status": "active", "reason": "..."}
+        await self.send(text_data=json.dumps(event["content"]))
+
+    async def send_notification(self, event):
         await self.send(text_data=json.dumps(event["content"]))
 
  
