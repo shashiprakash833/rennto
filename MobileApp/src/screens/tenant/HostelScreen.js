@@ -295,9 +295,8 @@ export default function HostelScreen() {
             
             facilities: item.facilities || [],
             price: item.rent || "",
-            contact: item.owner_phone,
             ownerName: item.owner_name || "Owner",
-            contact: item.contact || "No Contact",
+            contact: item.contact || item.owner_phone || "No Contact",
             ownerPhone: item.owner_phone,
             owner_id: item.owner_id,
             latitude: item.latitude ? parseFloat(item.latitude) : null,

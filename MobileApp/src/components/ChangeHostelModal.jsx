@@ -178,8 +178,7 @@ export const BookNowModal = ({
                 color={COLORS.primary}
               />
               <Text style={styles.helpText}>
-                Click "Book Now" to send a request to the hostel owner. They will
-                review your request and notify you once approved.
+                {"Click \"Book Now\" to send a request to the hostel owner. They will review your request and notify you once approved."}
               </Text>
             </View>
           </ScrollView>
@@ -1013,12 +1012,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
-  },
-
-  // Placeholder text enhancement
-  placeholderText: {
-    color: "#a0aec0",
-    fontSize: 14,
   },
 
   // Form section header with icon

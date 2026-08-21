@@ -841,6 +841,7 @@ class HostelChangeRequest(models.Model):
         choices=STATUS_CHOICES,
         default='pending'
     )
+    rejection_reason = models.TextField(blank=True, null=True)
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -848,7 +849,6 @@ class HostelChangeRequest(models.Model):
     
     class Meta:
         ordering = ['-created_at']
-        unique_together = ('tenant', 'target_hostel', 'status')
 
     def __str__(self):
         return f"{self.tenant.name}: {self.current_hostel.hostelName} → {self.target_hostel.hostelName} ({self.status})"

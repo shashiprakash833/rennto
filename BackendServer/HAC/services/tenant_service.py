@@ -168,19 +168,7 @@ class TenantService:
                 selfie_url = tenant.selfie.url
  
         # ── STATUS ENFORCEMENT ──
-        # If tenant is vacant, or their latest JoinRequest/ExistingTenantRequest is still in a pre-join state,
-        # they are in 'Pending Join' state. We must strictly hide all property/bed details.
-        is_pending = tenant.is_vacant
-        
-        latest_jr = JoinRequest.objects.filter(tenant=tenant).order_by('-created_at').first()
-        if latest_jr and latest_jr.status in ['pending', 'accepted', 'allotted', 'pending_confirmation']:
-            is_pending = True
-            
-        latest_ex_req = ExistingTenantRequest.objects.filter(tenant=tenant).order_by('-created_at').first()
-        if latest_ex_req and latest_ex_req.status in ['pending', 'accepted']:
-            is_pending = True
-
-        if is_pending:
+        if tenant.is_vacant or not tenant.owner:
             property_name = "N/A"
             property_type = "N/A"
             location = "N/A"
@@ -189,9 +177,36 @@ class TenantService:
             floor_no = "N/A"
             check_in = "N/A"
             rent = "N/A"
-            final_status = "Pending Join"
+            final_status = "Vacated"
         else:
             final_status = "Active"
+
+        # ── PROPERTY-SPECIFIC VACATE STATUS ──
+        has_pending_vacate = False
+        vacate_request_id = None
+        vacate_status = None
+        if not tenant.is_vacant and tenant.owner and property_name and property_name != "N/A":
+            current_stay_joined_at = None
+            last_join = JoinRequest.objects.filter(
+                tenant=tenant,
+                owner=tenant.owner,
+                status__in=['completed', 'joined']
+            ).order_by('-created_at').first()
+            if last_join:
+                current_stay_joined_at = last_join.created_at
+
+            pending_vacate = VacateRequest.objects.filter(
+                tenant=tenant,
+                owner=tenant.owner,
+                property_name__iexact=property_name,
+                status="Pending"
+            ).order_by('-created_at').first()
+
+            if pending_vacate:
+                if not current_stay_joined_at or pending_vacate.created_at >= current_stay_joined_at:
+                    has_pending_vacate = True
+                    vacate_request_id = pending_vacate.id
+                    vacate_status = "Pending"
 
         return {
             "id": tenant.id,
@@ -216,9 +231,20 @@ class TenantService:
             "room_number": room_no,
             "floor_number": floor_no,
             "check_in": check_in,
-            "rent": rent,
- 
+            # OWNER
+            "owner_id": tenant.owner.owner_id if tenant.owner else "",
+            "owner_phone": tenant.owner.phone if tenant.owner else "",
+            "owner_name": tenant.owner.name if tenant.owner else "",
+
             "status": final_status,
+            "is_vacant": bool(tenant.is_vacant or not tenant.owner),
+            "owner_id": tenant.owner.owner_id if tenant.owner else None,
+            "owner_phone": tenant.owner.phone if tenant.owner else None,
+
+            # VACATE
+            "has_pending_vacate": has_pending_vacate,
+            "vacate_request_id": vacate_request_id,
+            "vacate_status": vacate_status,
         }
 
     @staticmethod
@@ -807,7 +833,7 @@ class TenantService:
             floor_no = "N/A"
             check_in = "N/A"
             rent = "N/A"
-            final_status = "Pending Join"
+            final_status = "Vacated" if tenant.is_vacant else "Pending Join"
         else:
             final_status = "Active"
 
@@ -1116,6 +1142,42 @@ class TenantService:
         if join_req:
             join_req.status = 'joined'
             join_req.save()
+
+        # ── Notify Owner of document submission ──
+        owner = (join_req.owner if join_req else None) or tenant.owner
+        if owner:
+            from HAC.models import Notification
+            notif_msg = f"{tenant.name} has completed verification and submitted the required documents."
+            Notification.objects.create(
+                owner_account=owner,
+                recipient_phone=owner.phone or owner.owner_id or "",
+                title="Verification Completed 📄",
+                message=notif_msg,
+                type="VERIFICATION",
+                related_id=join_req.id if join_req else None,
+                is_read=False,
+            )
+            if owner.push_token:
+                NotificationService.send_push_notification(owner.push_token, "Verification Completed 📄", notif_msg)
+
+            try:
+                channel_layer = get_channel_layer()
+                sanitized_owner = owner.owner_id if owner.owner_id else (owner.phone.replace("+", "") if owner else "")
+                for group in [f"owner_status_{sanitized_owner}", f"user_notifications_{sanitized_owner}", f"notifications_{sanitized_owner}"]:
+                    async_to_sync(channel_layer.group_send)(
+                        group,
+                        {
+                            "type": "send_notification",
+                            "content": {
+                                "type": "verification_completed",
+                                "message": notif_msg,
+                                "id": join_req.id if join_req else None,
+                                "status": "joined"
+                            }
+                        }
+                    )
+            except Exception:
+                pass
 
         return {"message": "Verification submitted successfully!"}
 

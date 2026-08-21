@@ -167,9 +167,9 @@ class ExistingTenantService:
         beds tables, marks those units as vacant (isOccupied=False) in building_layout,
         and deletes the old allocation records.
         """
-        # 1. Hostel Bed allocation
-        hostel_bed = TenantBeds.objects.filter(phone=tenant.phone).first()
-        if hostel_bed:
+        # 1. Hostel Bed allocations
+        hostel_beds = TenantBeds.objects.filter(phone=tenant.phone)
+        for hostel_bed in hostel_beds:
             floor_str = str(hostel_bed.floor)
             room_str = str(hostel_bed.roomno)
             bed_str = str(hostel_bed.bed)
@@ -184,11 +184,11 @@ class ExistingTenantService:
                                     if str(bed.get("bedNumber")) == bed_str:
                                         bed["isOccupied"] = False
                                         break
-            hostel_bed.delete()
+        hostel_beds.delete()
 
-        # 2. Apartment allocation
-        apt_bed = ApartmentTenantBeds.objects.filter(phone=tenant.phone).first()
-        if apt_bed:
+        # 2. Apartment allocations
+        apt_beds = ApartmentTenantBeds.objects.filter(phone=tenant.phone)
+        for apt_bed in apt_beds:
             floor_str = str(apt_bed.floor)
             flat_str = str(apt_bed.flatno)
 
@@ -198,11 +198,11 @@ class ExistingTenantService:
                         if str(flat.get("flatNo")) == flat_str:
                             flat["isOccupied"] = False
                             break
-            apt_bed.delete()
+        apt_beds.delete()
 
-        # 3. Commercial allocation
-        comm_bed = CommercialTenantBeds.objects.filter(phone=tenant.phone).first()
-        if comm_bed:
+        # 3. Commercial allocations
+        comm_beds = CommercialTenantBeds.objects.filter(phone=tenant.phone)
+        for comm_bed in comm_beds:
             floor_str = str(comm_bed.floor)
             sec_str = str(comm_bed.sectionNo)
 
@@ -212,7 +212,7 @@ class ExistingTenantService:
                         if str(sec.get("sectionNo")) == sec_str:
                             sec["isOccupied"] = False
                             break
-            comm_bed.delete()
+        comm_beds.delete()
 
     # ─────────────────────────────────────────────────────────────────────
     #  CREATE REQUEST

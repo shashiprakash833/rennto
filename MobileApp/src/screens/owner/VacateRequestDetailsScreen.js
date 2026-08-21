@@ -49,7 +49,7 @@ export default function VacateRequestDetailsScreen() {
   };
 
   useEffect(() => {
-    if (requestId && !requestParam?.tenant) {
+    if (requestId) {
       loadDetails();
     }
   }, [requestId]);
@@ -91,26 +91,13 @@ export default function VacateRequestDetailsScreen() {
   const handleApproveConfirm = async () => {
     try {
       setLoading(true);
-      let success = false;
-      try {
-        const res = await fetchWithAuth(`${BASE_URL}/api/vacate/request/${requestId}/approve/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        });
-        if (res.ok) {
-          success = true;
-        }
-      } catch (err) {
-        console.log("Dedicated vacate approve endpoint error, trying update_request_status fallback:", err);
-      }
-
-      if (!success) {
-        const resFallback = await fetchWithAuth(`${BASE_URL}/api/update_request_status/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: requestId, status: "accepted", is_existing_tenant: true }),
-        });
-        if (resFallback.ok) success = true;
+      const res = await fetchWithAuth(`${BASE_URL}/api/vacate/request/${requestId}/approve/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || data.message || "Could not process tenant removal.");
       }
 
       if (updateOwnerRequestStatus) {
@@ -119,9 +106,14 @@ export default function VacateRequestDetailsScreen() {
 
       setRefreshTrigger((prev) => prev + 1);
       setRequestData((prev) => ({ ...prev, status: "Approved" }));
-      Alert.alert("Tenant Removed 🚀", `${tenant.name} has been removed from the property.`);
+      setAcceptModalVisible(false);
+      Alert.alert(
+        "Tenant Removed 🚀",
+        `${tenant.name} has been removed from the property.`,
+        [{ text: "OK", onPress: () => navigation.goBack() }]
+      );
     } catch (e) {
-      Alert.alert("Error", "Could not process tenant removal.");
+      Alert.alert("Error", e.message || "Could not process tenant removal.");
     } finally {
       setLoading(false);
     }
@@ -130,26 +122,13 @@ export default function VacateRequestDetailsScreen() {
   const handleDeclineConfirm = async () => {
     try {
       setLoading(true);
-      let success = false;
-      try {
-        const res = await fetchWithAuth(`${BASE_URL}/api/vacate/request/${requestId}/decline/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        });
-        if (res.ok) {
-          success = true;
-        }
-      } catch (err) {
-        console.log("Dedicated vacate decline endpoint error, trying update_request_status fallback:", err);
-      }
-
-      if (!success) {
-        const resFallback = await fetchWithAuth(`${BASE_URL}/api/update_request_status/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: requestId, status: "rejected", is_existing_tenant: true }),
-        });
-        if (resFallback.ok) success = true;
+      const res = await fetchWithAuth(`${BASE_URL}/api/vacate/request/${requestId}/decline/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || data.message || "Could not decline request.");
       }
 
       if (updateOwnerRequestStatus) {
@@ -158,9 +137,14 @@ export default function VacateRequestDetailsScreen() {
 
       setRefreshTrigger((prev) => prev + 1);
       setRequestData((prev) => ({ ...prev, status: "Declined" }));
-      Alert.alert("Request Declined ❌", "Vacate request has been declined. Tenant remains in property.");
+      setDeclineModalVisible(false);
+      Alert.alert(
+        "Request Declined ❌",
+        "Vacate request has been declined. Tenant remains in property.",
+        [{ text: "OK", onPress: () => navigation.goBack() }]
+      );
     } catch (e) {
-      Alert.alert("Error", "Could not decline request.");
+      Alert.alert("Error", e.message || "Could not decline request.");
     } finally {
       setLoading(false);
     }

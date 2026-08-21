@@ -20,11 +20,6 @@ function StatsCards({ onCardClick }) {
         suspended_owners: 0,
         total_tenants: 0
     });
-    const [error, setError] = useState("");
-
-    useEffect(() => {
-        fetchStats();
-    }, [notifications]); // Refresh when notifications change (new registration/update)
 
     const fetchStats = async () => {
         try {
@@ -40,15 +35,15 @@ function StatsCards({ onCardClick }) {
                     total_tenants: result.data.total_tenants || 0
                 });
             }
-            else {
-                setError(result?.error || "Failed to fetch owner data");
-            }
         }
         catch (err) {
             console.error("Fetch stats error:", err);
-            setError(err.message === "Failed to fetch" ? "Server not reachable" : err.message);
         }
-    }
+    };
+
+    useEffect(() => {
+        fetchStats();
+    }, [notifications]); // Refresh when notifications change (new registration/update)
     const stats = [
         {
             title: "Total Owners",

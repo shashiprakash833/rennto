@@ -245,6 +245,7 @@ export default function OwnerEditProfileScreen({ navigation }) {
             value={ownerData.name}
             onChangeText={(text) => setOwnerData({ ...ownerData, name: text })}
             placeholder="Enter your name"
+            placeholderTextColor={COLORS.TEXT_LIGHT}
             returnKeyType="next"
           />
         </View>
@@ -256,6 +257,7 @@ export default function OwnerEditProfileScreen({ navigation }) {
             value={ownerData.property_name}
             onChangeText={(text) => setOwnerData({ ...ownerData, property_name: text })}
             placeholder="Enter property name"
+            placeholderTextColor={COLORS.TEXT_LIGHT}
             returnKeyType="next"
           />
         </View>
@@ -267,6 +269,7 @@ export default function OwnerEditProfileScreen({ navigation }) {
             value={ownerData.area}
             onChangeText={(text) => setOwnerData({ ...ownerData, area: text })}
             placeholder="Enter area"
+            placeholderTextColor={COLORS.TEXT_LIGHT}
             returnKeyType="done"
           />
         </View>

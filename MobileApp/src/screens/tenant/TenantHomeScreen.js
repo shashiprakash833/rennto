@@ -21,14 +21,6 @@ import { useHostelChangeRequest } from "@/src/hooks/useHostelChangeRequest";
 import * as Notifications from "../../utils/NotificationsProxy";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
 
 import {
   Animated,
@@ -213,68 +205,100 @@ export default function TenantHomeScreen({ route }) {
   const { t } = useLanguage();
   const bookingCtx = useContext(BookingContext);
   const submitOwnerRequest = bookingCtx?.submitOwnerRequest;
+  const joinedProperty = bookingCtx?.joinedProperty;
+  const isJoined = Boolean(bookingCtx?.isJoined && joinedProperty && joinedProperty.property_name !== "N/A");
 
   const [vacateModalVisible, setVacateModalVisible] = useState(false);
+  const [vacateSubmitting, setVacateSubmitting] = useState(false);
+  const [vacateRequestStatus, setVacateRequestStatus] = useState(null);
   const [accommodationModalVisible, setAccommodationModalVisible] = useState(false);
   const [accommodationType, setAccommodationType] = useState("FLOOR");
 
+  useEffect(() => {
+    const fetchVacateStatus = async () => {
+      const phone = bookingCtx?.userPhone || (await AsyncStorage.getItem("tenantPhone"));
+      if (phone && isJoined && joinedProperty) {
+        try {
+          const currentPropName = (joinedProperty.property_name || joinedProperty.name || "").toLowerCase().trim();
+          const vRes = await fetchWithAuth(
+            `${BASE_URL}/api/vacate/requests/?tenant_phone=${encodeURIComponent(phone)}`
+          );
+          if (vRes.ok) {
+            const vJson = await vRes.json();
+            const matchingPending = Array.isArray(vJson)
+              ? vJson.find(
+                  (r) =>
+                    (r.property_name || r.propertyName || "").toLowerCase().trim() === currentPropName &&
+                    (r.status || "").toLowerCase() === "pending"
+                )
+              : null;
+            setVacateRequestStatus(matchingPending ? "Pending" : null);
+          } else if (joinedProperty.has_pending_vacate) {
+            setVacateRequestStatus("Pending");
+          } else {
+            setVacateRequestStatus(null);
+          }
+        } catch (ve) {
+          console.log("Error fetching vacate status:", ve);
+          setVacateRequestStatus(joinedProperty.has_pending_vacate ? "Pending" : null);
+        }
+      } else {
+        setVacateRequestStatus(null);
+      }
+    };
+    fetchVacateStatus();
+  }, [bookingCtx?.userPhone, bookingCtx?.refreshTrigger, isJoined, joinedProperty]);
+
   const handleVacateConfirm = async () => {
+    if (vacateSubmitting) return;
+    if ((vacateRequestStatus || "").toLowerCase() === "pending") {
+      Alert.alert("Request Pending ⏳", "You already have a pending vacate request. Please wait for the owner to respond.");
+      return;
+    }
     try {
+      setVacateSubmitting(true);
       const tenantPhoneNum =
         bookingCtx?.userPhone ||
         joinedProperty?.tenant_phone ||
         joinedProperty?.phone ||
-        joinedProperty?.phoneNumber ||
-        joinedProperty?.mobile ||
-        joinedProperty?.contactNumber ||
         (await AsyncStorage.getItem("tenantPhone")) ||
-        (await AsyncStorage.getItem("userPhone")) ||
         "";
+
+      if (!tenantPhoneNum) {
+        Alert.alert("Error", "Tenant phone missing. Please log in again.");
+        return;
+      }
 
       const vacatePayload = {
         tenant_phone: tenantPhoneNum,
         owner_id: joinedProperty?.owner_id || joinedProperty?.owner_phone || joinedProperty?.owner,
         owner_phone: joinedProperty?.owner_phone || joinedProperty?.owner_id || joinedProperty?.owner,
         property_name: joinedProperty?.property_name || joinedProperty?.name || "Property",
-        property_type: joinedProperty?.property_type || joinedProperty?.type || "Hostel",
-        remarks: "Vacate property request",
+        property_type: joinedProperty?.property_type || joinedProperty?.type || "hostel",
+        remarks: "Tenant requested to vacate the property.",
       };
 
-      let successMsg = "Vacate request sent successfully.";
       const res = await fetchWithAuth(`${BASE_URL}/api/vacate/request/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(vacatePayload),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.message) {
-          successMsg = data.message;
-        }
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || errData.message || "Could not submit vacate request.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || data.message || "Could not submit vacate request.");
       }
 
-      const requestPayload = {
-        type: "vacate_request",
-        request_type: "VACATE_REQUEST",
-        title: "Vacate Request",
-        message: `${joinedProperty?.tenant_name || tenantPhoneNum || "Tenant"} has requested to vacate the property.`,
-        status: "pending",
-        tenant_name: joinedProperty?.tenant_name || "Tenant",
-        tenant_phone: tenantPhoneNum,
-        property_name: joinedProperty?.property_name || "Property",
-      };
-
-      if (submitOwnerRequest) {
-        submitOwnerRequest(requestPayload);
-      }
-
-      Alert.alert("Vacate Request Submitted 🚀", successMsg);
+      setVacateRequestStatus(data.status || "Pending");
+      bookingCtx?.setRefreshTrigger?.((prev) => prev + 1);
+      Alert.alert(
+        data.existing ? "Request Pending ⏳" : "Vacate Request Submitted 🚀",
+        data.message || "Your vacate request has been submitted to your property owner. You will remain in this property until the owner accepts your request."
+      );
     } catch (e) {
       Alert.alert("Error", e.message || "Could not submit vacate request.");
+    } finally {
+      setVacateSubmitting(false);
     }
   };
 
@@ -507,8 +531,6 @@ export default function TenantHomeScreen({ route }) {
     checkEmail();
   }, []);
 
-  const [joinedProperty, setJoinedProperty] = useState(null);
-
   // Hostel Change Request States & Hook
   const { checkBookingStatus, createChangeRequest, getAvailableHostels, loading: hcLoading } = useHostelChangeRequest();
   const [bookNowModalVisible, setBookNowModalVisible] = useState(false);
@@ -516,28 +538,6 @@ export default function TenantHomeScreen({ route }) {
   const [targetHostelInfo, setTargetHostelInfo] = useState(null);
   const [currentHostelInfo, setCurrentHostelInfo] = useState(null);
   const [availableHostelList, setAvailableHostelList] = useState([]);
-
-  useEffect(() => {
-    const fetchJoinedProperty = async () => {
-      if (bookingContext?.isJoined) {
-        try {
-          const phone = await AsyncStorage.getItem("tenantPhone");
-          if (phone) {
-            const res = await fetchWithAuth(`${BASE_URL}/api/tenantdetails/${encodeURIComponent(phone)}/`);
-            if (res.ok) {
-              const data = await res.json();
-              setJoinedProperty(data);
-            }
-          }
-        } catch (e) {
-          console.log("Error fetching joined property details:", e);
-        }
-      } else {
-        setJoinedProperty(null);
-      }
-    };
-    fetchJoinedProperty();
-  }, [bookingContext?.isJoined, refreshTrigger]);
 
   const formatCheckInDate = (dateStr) => {
     if (!dateStr || dateStr === "N/A") return "12 Jul 2025";
@@ -1265,7 +1265,7 @@ export default function TenantHomeScreen({ route }) {
           )}
 
           {/* JOINED TENANT MY STAY DASHBOARD VS EXPLORE SECTION */}
-          {bookingContext?.isJoined && joinedProperty && joinedProperty.property_name !== "N/A" ? (
+          {isJoined && joinedProperty ? (
             <View>
               {/* COMPACT EXPLORE MORE PROPERTIES CARD */}
               <View style={homeStyles.exploreMoreCard}>
@@ -1289,6 +1289,60 @@ export default function TenantHomeScreen({ route }) {
               {!showExploreProperties ? (
                 /* MY STAY DASHBOARD */
                 <View style={homeStyles.myStayContainer}>
+                  {/* ACTIVE STAY SUMMARY CARD */}
+                  <View style={{
+                    backgroundColor: "#FFFFFF",
+                    borderRadius: 20,
+                    padding: 18,
+                    marginBottom: 16,
+                    borderWidth: 1,
+                    borderColor: "#E5E7EB",
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 8,
+                    elevation: 3,
+                  }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <View style={{ flex: 1, marginRight: 10 }}>
+                        <Text style={{ fontSize: 18, fontWeight: "800", color: "#1F2937" }} numberOfLines={1}>
+                          {joinedProperty.property_name || joinedProperty.name}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
+                          {joinedProperty.location || joinedProperty.address || "Active Residence"}
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#166534" }}>Active Stay</Text>
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F3F4F6" }}>
+                      <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                          Type: {joinedProperty.property_type || joinedProperty.type || "Hostel"}
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                          Floor: {joinedProperty.floor || joinedProperty.floor_number || joinedProperty.floor_no || "1"}
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                          Room: {joinedProperty.room || joinedProperty.room_number || joinedProperty.room_no || "101"}
+                        </Text>
+                      </View>
+                      {Boolean(joinedProperty.bed || joinedProperty.bed_number) && (
+                        <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                          <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                            Bed: {joinedProperty.bed || joinedProperty.bed_number}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
                   <View style={homeStyles.myStayHeaderRow}>
                     <Text style={homeStyles.myStayTitle}>
                       {t("my_stay") || "My Stay"}
@@ -1300,15 +1354,29 @@ export default function TenantHomeScreen({ route }) {
                     <TouchableOpacity
                       style={homeStyles.myStayCard}
                       activeOpacity={0.85}
-                      onPress={() => setVacateModalVisible(true)}
+                      onPress={() => {
+                        if ((vacateRequestStatus || "").toLowerCase() === "pending") {
+                          Alert.alert("Request Pending ⏳", "Your vacate request is waiting for the owner to accept or decline.");
+                          return;
+                        }
+                        setVacateModalVisible(true);
+                      }}
                     >
                       <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FEF2F2" }]}>
                         <Ionicons name="log-out-outline" size={24} color="#EF4444" />
                       </View>
                       <Text style={homeStyles.myStayCardTitle}>Vacate Property</Text>
-                      <Text style={homeStyles.myStayCardSub}>Request to vacate your current property.</Text>
+                      <Text style={homeStyles.myStayCardSub}>
+                        {(vacateRequestStatus || "").toLowerCase() === "pending"
+                          ? "Vacate request is pending owner approval."
+                          : (vacateRequestStatus || "").toLowerCase() === "declined"
+                            ? "Last vacate request was declined. You remain in this property."
+                            : "Request to vacate your current property."}
+                      </Text>
                       <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FEF2F2" }]}>
-                        <Text style={[homeStyles.myStayRequestBtnText, { color: "#EF4444" }]}>Request</Text>
+                        <Text style={[homeStyles.myStayRequestBtnText, { color: "#EF4444" }]}>
+                          {(vacateRequestStatus || "").toLowerCase() === "pending" ? "Pending" : "Request"}
+                        </Text>
                       </View>
                     </TouchableOpacity>
 
@@ -3274,7 +3342,7 @@ export function PropertyDetailsScreen(props) {
                     Welcome to {property.name}! 🎉
                   </Text>
                   <Text style={{ color: "#666", textAlign: "center", marginTop: 10, fontSize: 16 }}>
-                    Your request has been accepted by the owner. We're excited to have you!
+                    {"Your request has been accepted by the owner. We're excited to have you!"}
                   </Text>
                 </View>
 ) : (
@@ -4541,12 +4609,6 @@ const homeStyles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-  },
-
-  locationText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600",
   },
 
   heroIcons: {
