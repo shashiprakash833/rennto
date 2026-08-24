@@ -1375,7 +1375,7 @@ export default function TenantHomeScreen({ route }) {
                                   <View style={[homeStyles.statusBadge, { backgroundColor: "#27ae60" }]}>
                                     <Text style={homeStyles.statusText}>CURRENT STAY</Text>
                                   </View>
-                                ) : latestReq && latestReq.status && latestReq.status !== 'none' ? (
+                                ) : latestReq && latestReq.status && !['none', 'withdrawn', 'vacated', 'removed'].includes(latestReq.status?.toLowerCase()) ? (
                                   <View style={[
                                     homeStyles.statusBadge,
                                     {
@@ -1786,7 +1786,7 @@ export default function TenantHomeScreen({ route }) {
                     const latestReq = requests.find(r =>
                       normalize(r.propertyName || r.property_name) === normalize(item.name)
                     );
-                    const showBadge = latestReq && latestReq.status && latestReq.status !== 'none';
+                    const showBadge = latestReq && latestReq.status && !['none', 'withdrawn', 'vacated', 'removed'].includes(latestReq.status?.toLowerCase());
 
                     return (
                       <TouchableOpacity
