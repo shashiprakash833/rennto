@@ -1838,19 +1838,29 @@ export function PropertyDetailsScreen(props) {
   const [etRoom, setEtRoom] = useState(""); // used for Room, Flat, Unit
   const [etBed, setEtBed] = useState(""); // used for Bed
   const [etSharing, setEtSharing] = useState(""); // used for Sharing in Apartment
-  const [propertyStructure, setPropertyStructure] = useState({ floors: {} });
+  const [propertyStructure, setPropertyStructure] = useState({ building_layout: [] });
+  const [loadingStructure, setLoadingStructure] = useState(false);
 
   const fetchPropertyStructure = async (prop) => {
-    const ownerId = prop?.owner_id || prop?.contact;
-    if (!ownerId) return;
+    const ownerId = prop?.owner_id || prop?.contact || prop?.ownerPhone;
+    if (!ownerId) {
+      console.log("No owner identifier for property structure:", prop?.name);
+      return;
+    }
+    setLoadingStructure(true);
     try {
       const res = await fetchWithAuth(`${BASE_URL}/api/details/${encodeURIComponent(ownerId)}/`);
       if (res.ok) {
         const data = await res.json();
-        setPropertyStructure(data || { building_layout: [] });
+        const layout = data?.building_layout || data?.step3?.building_layout || [];
+        setPropertyStructure({ ...data, building_layout: layout });
+      } else {
+        console.log("Error fetching property structure, status:", res.status);
       }
     } catch (e) {
       console.log("Error fetching property structure:", e);
+    } finally {
+      setLoadingStructure(false);
     }
   };
 
@@ -3501,17 +3511,11 @@ export function PropertyDetailsScreen(props) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => {
+              onPress={async () => {
                 setTenantTypeModalVisible(false);
-                if (property?.type === "Hostel") {
-                  setEtFloor(""); setEtRoom(""); setEtBed("");
-                } else if (property?.type === "Apartment") {
-                  setEtFloor(""); setEtRoom(""); setEtSharing("");
-                } else if (property?.type === "Commercial") {
-                  setEtFloor(""); setEtRoom("");
-                }
-                fetchPropertyStructure(property);
+                setEtFloor(""); setEtRoom(""); setEtBed(""); setEtSharing("");
                 setExistingTenantModalVisible(true);
+                await fetchPropertyStructure(property);
               }}
               style={{ backgroundColor: "#f1f5f9", paddingVertical: 14, borderRadius: 12, alignItems: "center", marginBottom: 20, borderWidth: 1, borderColor: "#cbd5e1" }}
             >
@@ -3528,7 +3532,7 @@ export function PropertyDetailsScreen(props) {
       {/* --- EXISTING TENANT SELECTION MODAL (DYNAMIC UI) --- */}
       <Modal visible={existingTenantModalVisible} transparent animationType="slide">
         <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: "80%" }}>
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: "85%" }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <Text style={{ fontSize: 20, fontWeight: "800", color: "#1e293b" }}>{t("existing_tenant_selection") || "Existing Tenant Selection"}</Text>
               <TouchableOpacity onPress={() => setExistingTenantModalVisible(false)}>
@@ -3539,338 +3543,397 @@ export function PropertyDetailsScreen(props) {
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={{ fontSize: 14, color: "#64748b", fontWeight: "700", marginBottom: 16 }}>{t("building") || "Building"}: {property?.name || t("selected_property") || "Selected Property"}</Text>
 
-              <View style={{ gap: 20 }}>
-                {/* 1. FLOOR SELECTION */}
-                <View>
-                  <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_floor") || "1. Select Floor"}</Text>
-                  <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-                    {(propertyStructure?.building_layout || []).map(floorObj => {
-                      const floorKey = `Floor ${floorObj.floorNo}`;
-                      const floorStr = `${t("floor") || "Floor"} ${floorObj.floorNo}`;
-                      return (
-                        <TouchableOpacity key={floorKey} onPress={() => { setEtFloor(floorKey); setEtRoom(""); setEtBed(""); setEtSharing(""); }} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etFloor === floorKey ? COLORS.PRIMARY : "#f1f5f9" }}>
-                          <Text style={{ color: etFloor === floorKey ? "#fff" : "#475569", fontWeight: "700" }}>{floorStr}</Text>
-                        </TouchableOpacity>
-                      )
-                    })}
-                  </View>
-                </View>
+              {(() => {
+                const propType = (property?.type || "").toLowerCase();
+                const isHostel = propType === "hostel";
+                const isApartment = propType === "apartment";
+                const isCommercial = propType === "commercial";
+                const layoutList = propertyStructure?.building_layout || [];
 
-                {/* 2. ROOM SELECTION (Depends on Floor) */}
-                {etFloor !== "" && (
-                  <View>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", textTransform: "uppercase" }}>{t("select") || "2. Select"} {property?.type === "Hostel" ? (t("room") || "Room") : property?.type === "Apartment" ? (t("flat") || "Flat") : (t("unit") || "Unit")}</Text>
-                      {property?.type === "Apartment" && (
-                        <TouchableOpacity onPress={() => setAddUnitModalVisible(true)} style={{ backgroundColor: "#e2e8f0", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#475569" }}>+ {t("add_unit") || "ADD UNIT"}</Text>
-                        </TouchableOpacity>
+                const isSubmitDisabled =
+                  loadingStructure ||
+                  uploading ||
+                  (isHostel && (!etFloor || !etRoom || !etBed)) ||
+                  (isApartment && (!etFloor || !etRoom || !etSharing)) ||
+                  (isCommercial && (!etFloor || !etRoom)) ||
+                  !aadharId || aadharId.length !== 12 || !selectedFile || !selectedPaymentScreenshot;
+
+                return (
+                  <View style={{ gap: 20 }}>
+                    {/* 1. FLOOR SELECTION */}
+                    <View>
+                      <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_floor") || "1. Select Floor"}</Text>
+                      {loadingStructure ? (
+                        <View style={{ paddingVertical: 14, alignItems: "center", justifyContent: "center" }}>
+                          <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                          <Text style={{ color: "#64748b", fontSize: 12, marginTop: 6 }}>Loading building layout...</Text>
+                        </View>
+                      ) : layoutList.length > 0 ? (
+                        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+                          {layoutList.map(floorObj => {
+                            const floorKey = `Floor ${floorObj.floorNo}`;
+                            const floorStr = `${t("floor") || "Floor"} ${floorObj.floorNo}`;
+                            return (
+                              <TouchableOpacity
+                                key={floorKey}
+                                onPress={() => { setEtFloor(floorKey); setEtRoom(""); setEtBed(""); setEtSharing(""); }}
+                                style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etFloor === floorKey ? COLORS.PRIMARY : "#f1f5f9" }}
+                              >
+                                <Text style={{ color: etFloor === floorKey ? "#fff" : "#475569", fontWeight: "700" }}>{floorStr}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 13, color: "#94a3b8", fontStyle: "italic", marginVertical: 4 }}>
+                          No floor layout available for this property.
+                        </Text>
                       )}
                     </View>
-                    <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-                      {(() => {
-                        const floorObj = (propertyStructure?.building_layout || []).find(f => `Floor ${f.floorNo}` === etFloor);
-                        if (floorObj) {
-                          let units = [];
-                          if (property?.type === "Hostel") units = floorObj.rooms || [];
-                          else if (property?.type === "Apartment") units = floorObj.flats || [];
-                          else if (property?.type === "Commercial") units = floorObj.sections || [];
 
-                          if (units.length > 0) {
-                            return units.map(unit => {
-                              let rStr = "";
-                              let unitId = "";
+                    {/* 2. ROOM SELECTION (Depends on Floor) */}
+                    {etFloor !== "" && (
+                      <View>
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                          <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", textTransform: "uppercase" }}>{t("select") || "2. Select"} {isHostel ? (t("room") || "Room") : isApartment ? (t("flat") || "Flat") : (t("unit") || "Unit")}</Text>
+                          {isApartment && (
+                            <TouchableOpacity onPress={() => setAddUnitModalVisible(true)} style={{ backgroundColor: "#e2e8f0", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                              <Text style={{ fontSize: 11, fontWeight: "700", color: "#475569" }}>+ {t("add_unit") || "ADD UNIT"}</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+                          {(() => {
+                            const floorObj = layoutList.find(f => `Floor ${f.floorNo}` === etFloor);
+                            if (floorObj) {
+                              let units = [];
+                              if (isHostel) units = floorObj.rooms || [];
+                              else if (isApartment) units = floorObj.flats || [];
+                              else if (isCommercial) units = floorObj.sections || [];
 
-                              if (property?.type === "Hostel") {
-                                unitId = `${unit.roomNo}`;
-                                rStr = unitId.includes("-") ? unitId : `${etFloor.replace("Floor ", "")}-${unitId.padStart(2, '0')}`;
-                              } else if (property?.type === "Apartment") {
-                                unitId = `${unit.flatNo}`;
-                                rStr = unitId.includes(etFloor.replace("Floor ", "")) ? unitId : `${etFloor.replace("Floor ", "")}${unitId.padStart(2, '0')}`;
-                              } else if (property?.type === "Commercial") {
-                                unitId = `${unit.sectionNo}`;
-                                rStr = unitId.startsWith("C-") ? unitId : `C-${etFloor.replace("Floor ", "")}0${unitId}`;
+                              if (units.length > 0) {
+                                return units.map(unit => {
+                                  let rStr = "";
+                                  let unitId = "";
+
+                                  if (isHostel) {
+                                    unitId = `${unit.roomNo}`;
+                                    rStr = unitId.includes("-") ? unitId : `${etFloor.replace("Floor ", "")}-${unitId.padStart(2, '0')}`;
+                                  } else if (isApartment) {
+                                    unitId = `${unit.flatNo}`;
+                                    rStr = unitId.includes(etFloor.replace("Floor ", "")) ? unitId : `${etFloor.replace("Floor ", "")}${unitId.padStart(2, '0')}`;
+                                  } else if (isCommercial) {
+                                    unitId = `${unit.sectionNo}`;
+                                    rStr = unitId.startsWith("C-") ? unitId : `C-${etFloor.replace("Floor ", "")}0${unitId}`;
+                                  }
+
+                                  return (
+                                    <TouchableOpacity
+                                      key={rStr}
+                                      onPress={() => {
+                                        setEtRoom(rStr);
+                                        setEtBed("");
+                                        setEtSharing(isApartment ? (unit.bhk || "") : "");
+                                      }}
+                                      style={{
+                                        paddingHorizontal: 16,
+                                        paddingVertical: 10,
+                                        borderRadius: 8,
+                                        backgroundColor: etRoom === rStr ? COLORS.PRIMARY : "#f1f5f9",
+                                      }}
+                                    >
+                                      <Text style={{ color: etRoom === rStr ? "#fff" : "#475569", fontWeight: "700" }}>
+                                        {isHostel ? `${t("room") || "Room"} ${rStr}` : isApartment ? `${t("flat") || "Flat"} ${rStr}` : `${t("unit") || "Unit"} ${rStr}`}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  );
+                                });
                               }
+                            }
+                            return <Text style={{ fontSize: 12, color: "#94a3b8" }}>{t("no_units_available") || "No units available for this floor."}</Text>;
+                          })()}
+                          {/* Render dynamically added units for this floor */}
+                          {addedUnits.filter(u => `Floor ${u.floor}` === etFloor).map((u, i) => (
+                            <TouchableOpacity key={`added-${i}`} onPress={() => { setEtRoom(u.unit); setEtSharing(u.type); }} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etRoom === u.unit ? COLORS.PRIMARY : "#f1f5f9", borderWidth: 1, borderColor: COLORS.PRIMARY }}>
+                              <Text style={{ color: etRoom === u.unit ? "#fff" : "#475569", fontWeight: "700" }}>{u.unit} ({u.type})</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    )}
 
-                              return (
-                                <TouchableOpacity
-                                  key={rStr}
-                                  onPress={() => {
-                                    setEtRoom(rStr);
-                                    setEtBed("");
-                                    setEtSharing(property?.type === "Apartment" ? (unit.bhk || "") : "");
-                                  }}
-                                  style={{
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 10,
-                                    borderRadius: 8,
-                                    backgroundColor: etRoom === rStr ? COLORS.PRIMARY : "#f1f5f9",
-                                  }}
-                                >
-                                  <Text style={{ color: etRoom === rStr ? "#fff" : "#475569", fontWeight: "700" }}>
-                                    {property?.type === "Hostel" ? `${t("room") || "Room"} ${rStr}` : property?.type === "Apartment" ? `${t("flat") || "Flat"} ${rStr}` : `${t("unit") || "Unit"} ${rStr}`}
-                                  </Text>
-                                </TouchableOpacity>
-                              );
-                            });
-                          }
-                        }
-                        return <Text style={{ fontSize: 12, color: "#94a3b8" }}>{t("no_units_available") || "No units available for this floor."}</Text>;
-                      })()}
-                      {/* Render dynamically added units for this floor */}
-                      {addedUnits.filter(u => `Floor ${u.floor}` === etFloor).map((u, i) => (
-                        <TouchableOpacity key={`added-${i}`} onPress={() => { setEtRoom(u.unit); setEtSharing(u.type); }} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etRoom === u.unit ? COLORS.PRIMARY : "#f1f5f9", borderWidth: 1, borderColor: COLORS.PRIMARY }}>
-                          <Text style={{ color: etRoom === u.unit ? "#fff" : "#475569", fontWeight: "700" }}>{u.unit} ({u.type})</Text>
+                    {/* 3. BED / SHARING SELECTION (Depends on Room) */}
+                    {etFloor !== "" && etRoom !== "" && isHostel && (
+                      <View>
+                        <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_bed") || "3. Select Bed"}</Text>
+                        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+                          {(() => {
+                            const floorObj = layoutList.find(f => `Floor ${f.floorNo}` === etFloor);
+                            if (floorObj) {
+                              const room = (floorObj.rooms || []).find(r => {
+                                let testStr = `${r.roomNo}`;
+                                if (!testStr.includes("-")) testStr = `${etFloor.replace("Floor ", "")}-${testStr.padStart(2, '0')}`;
+                                return testStr === etRoom;
+                              });
+
+                              if (room) {
+                                if (Array.isArray(room.beds) && room.beds.length > 0) {
+                                  return room.beds.map((bObj, i) => {
+                                    const bNum = typeof bObj === "object" ? (bObj.bedNumber || (i + 1)) : bObj;
+                                    const bKey = `Bed ${bNum}`;
+                                    const bStr = `${t("bed") || "Bed"} ${bNum}`;
+                                    return (
+                                      <TouchableOpacity
+                                        key={bKey}
+                                        onPress={() => setEtBed(bKey)}
+                                        style={{
+                                          paddingHorizontal: 16,
+                                          paddingVertical: 10,
+                                          borderRadius: 8,
+                                          backgroundColor: etBed === bKey ? COLORS.PRIMARY : "#f1f5f9",
+                                        }}
+                                      >
+                                        <Text style={{ color: etBed === bKey ? "#fff" : "#475569", fontWeight: "700" }}>{bStr}</Text>
+                                      </TouchableOpacity>
+                                    );
+                                  });
+                                } else {
+                                  const numBeds = typeof room.beds === "number" ? room.beds : (parseInt(room.beds, 10) || (room.sharing || 1));
+                                  return Array.from({ length: numBeds }, (_, i) => i + 1).map(b => {
+                                    const bKey = `Bed ${b}`;
+                                    const bStr = `${t("bed") || "Bed"} ${b}`;
+                                    return (
+                                      <TouchableOpacity
+                                        key={bKey}
+                                        onPress={() => setEtBed(bKey)}
+                                        style={{
+                                          paddingHorizontal: 16,
+                                          paddingVertical: 10,
+                                          borderRadius: 8,
+                                          backgroundColor: etBed === bKey ? COLORS.PRIMARY : "#f1f5f9",
+                                        }}
+                                      >
+                                        <Text style={{ color: etBed === bKey ? "#fff" : "#475569", fontWeight: "700" }}>{bStr}</Text>
+                                      </TouchableOpacity>
+                                    );
+                                  });
+                                }
+                              }
+                            }
+                            return <Text style={{ fontSize: 12, color: "#94a3b8" }}>{t("no_beds_available") || "No beds available for this room."}</Text>;
+                          })()}
+                        </View>
+                      </View>
+                    )}
+
+                    {etFloor !== "" && etRoom !== "" && isApartment && (
+                      <View>
+                        <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_type") || "3. Select Type"}</Text>
+                        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+                          {["1BHK", "2BHK", "3BHK"].map(tType => (
+                            <TouchableOpacity key={tType} onPress={() => setEtSharing(tType)} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etSharing === tType ? COLORS.PRIMARY : "#f1f5f9" }}>
+                              <Text style={{ color: etSharing === tType ? "#fff" : "#475569", fontWeight: "700" }}>{tType}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {etFloor !== "" && etRoom !== "" && (
+                      <View style={{ gap: 16, marginTop: 10, borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 20 }}>
+                        <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", textTransform: "uppercase" }}>{t("upload_identity_payment") || "4. Upload Identity & Payment Proof"}</Text>
+                        {/* Aadhaar ID */}
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("aadhaar_id") || "Aadhaar ID *"}</Text>
+                        <TextInput
+                          style={{
+                            backgroundColor: "#f8fafc",
+                            borderWidth: 1,
+                            borderColor: "#cbd5e1",
+                            borderRadius: 10,
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            fontSize: 14,
+                            color: "#1e293b",
+                          }}
+                          placeholder={t("enter_aadhaar") || "Enter 12-digit Aadhaar ID"}
+                          placeholderTextColor="#94a3b8"
+                          keyboardType="numeric"
+                          maxLength={12}
+                          value={aadharId}
+                          onChangeText={(text) => setAadharId(text.replace(/[^0-9]/g, ''))}
+                        />
+                        {/* Aadhaar Image */}
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("aadhaar_image") || "Aadhaar Card Image *"}</Text>
+                        <TouchableOpacity
+                          onPress={() => handlePickDocument("front")}
+                          style={{
+                            backgroundColor: "#f8fafc",
+                            borderWidth: 1,
+                            borderStyle: selectedFile ? "solid" : "dashed",
+                            borderColor: selectedFile ? COLORS.PRIMARY : "#cbd5e1",
+                            borderRadius: 10,
+                            padding: 14,
+                            alignItems: "center",
+                          }}
+                        >
+                          {selectedFile ? (
+                            <Text style={{ color: COLORS.PRIMARY, fontWeight: "600" }} numberOfLines={1}>
+                              ✓ {selectedFile.name || t("aadhaar_image_selected") || "Aadhaar Card Image Selected"}
+                            </Text>
+                          ) : (
+                            <Text style={{ color: "#64748b" }}>{t("choose_aadhaar") || "Choose Aadhaar Card Image"}</Text>
+                          )}
                         </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
+                        {/* Payment Screenshot */}
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("payment_proof") || "Payment Proof / Screenshot *"}</Text>
+                        <TouchableOpacity
+                          onPress={() => handlePickDocument("payment")}
+                          style={{
+                            backgroundColor: "#f8fafc",
+                            borderWidth: 1,
+                            borderStyle: selectedPaymentScreenshot ? "solid" : "dashed",
+                            borderColor: selectedPaymentScreenshot ? COLORS.PRIMARY : "#cbd5e1",
+                            borderRadius: 10,
+                            padding: 14,
+                            alignItems: "center",
+                          }}
+                        >
+                          {selectedPaymentScreenshot ? (
+                            <Text style={{ color: COLORS.PRIMARY, fontWeight: "600" }} numberOfLines={1}>
+                              ✓ {selectedPaymentScreenshot.name || "Payment Proof Selected"}
+                            </Text>
+                          ) : (
+                            <Text style={{ color: "#64748b" }}>{t("choose_payment_proof") || "Choose Payment Proof / Screenshot"}</Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    )}
 
-                {/* 3. BED / SHARING SELECTION (Depends on Room) */}
-                {etFloor !== "" && etRoom !== "" && property?.type === "Hostel" && (
-                  <View>
-                    <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_bed") || "3. Select Bed"}</Text>
-                    <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-                      {(() => {
-                        const floorObj = (propertyStructure?.building_layout || []).find(f => `Floor ${f.floorNo}` === etFloor);
-                        if (floorObj && property?.type === "Hostel") {
-                          const room = (floorObj.rooms || []).find(r => {
-                            let testStr = `${r.roomNo}`;
-                            if (!testStr.includes("-")) testStr = `${etFloor.replace("Floor ", "")}-${testStr.padStart(2, '0')}`;
-                            return testStr === etRoom;
+                    <TouchableOpacity
+                      disabled={isSubmitDisabled}
+                      onPress={async () => {
+                        try {
+                          setUploading(true);
+                          const tenantPhone = await AsyncStorage.getItem("tenantPhone");
+                          if (!tenantPhone) {
+                            Alert.alert("Error", "Tenant phone missing. Please login again.");
+                            return;
+                          }
+                          const ownerContact = property?.contact || property?.ownerPhone || property?.owner_id;
+                          if (!ownerContact) {
+                            Alert.alert("Error", "Owner details missing for this property.");
+                            return;
+                          }
+                          if (!aadharId || !selectedFile || !selectedPaymentScreenshot) {
+                            Alert.alert("Missing Information", "Please enter Aadhaar ID and upload Aadhaar Card Image and Payment Screenshot.");
+                            return;
+                          }
+                          if (aadharId.length !== 12) {
+                            Alert.alert("Invalid Aadhaar", "Aadhaar ID must be exactly 12 numeric digits.");
+                            return;
+                          }
+                          // 1. Upload Identity and Payment Proofs first
+                          const formData = new FormData();
+                          formData.append("phone", tenantPhone);
+                          formData.append("aadhar_id", aadharId);
+                          formData.append("aadhar_image", {
+                            uri: selectedFile.uri,
+                            name: selectedFile.name || "aadhar.jpg",
+                            type: selectedFile.mimeType || "image/jpeg"
                           });
-
-                          if (room && room.beds > 0) {
-                            return Array.from({ length: room.beds }, (_, i) => i + 1).map(b => {
-                              const bKey = `Bed ${b}`;
-                              const bStr = `${t("bed") || "Bed"} ${b}`;
-                              return (
-                                <TouchableOpacity
-                                  key={bKey}
-                                  onPress={() => setEtBed(bKey)}
-                                  style={{
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 10,
-                                    borderRadius: 8,
-                                    backgroundColor: etBed === bKey ? COLORS.PRIMARY : "#f1f5f9",
-                                  }}
-                                >
-                                  <Text style={{ color: etBed === bKey ? "#fff" : "#475569", fontWeight: "700" }}>{bStr}</Text>
-                                </TouchableOpacity>
-                              );
+                          if (selectedBackFile) {
+                            formData.append("aadhar_back_image", {
+                              uri: selectedBackFile.uri,
+                              name: selectedBackFile.name || "aadhar_back.jpg",
+                              type: selectedBackFile.mimeType || "image/jpeg"
                             });
                           }
+                          formData.append("payment_screenshot", {
+                            uri: selectedPaymentScreenshot.uri,
+                            name: selectedPaymentScreenshot.name || "payment_proof.jpg",
+                            type: selectedPaymentScreenshot.mimeType || "image/jpeg"
+                          });
+                          const uploadRes = await fetchWithAuth(`${BASE_URL}/api/tenant/submit_verification/`, {
+                            method: "POST",
+                            body: formData,
+                          });
+                          const uploadData = await uploadRes.json();
+                          if (!uploadRes.ok) {
+                            Alert.alert("Upload Failed", "Failed to upload proofs: " + (uploadData.error || "Unknown error"));
+                            return;
+                          }
+                          // 2. Submit Existing Tenant Request
+                          const reqData = {
+                            tenant_phone: tenantPhone,
+                            owner_id: property.owner_id || "",
+                            owner_phone: property.contact || property.ownerPhone || "",
+                            property_name: property.name,
+                            property_type: property.type,
+                            check_in: new Date().toISOString().split("T")[0],
+                            check_out: "N/A",
+                            sharing: isApartment ? etSharing : "",
+                            flat: isApartment ? etRoom : "",
+                            section: isCommercial ? etRoom : "",
+                            is_existing_tenant: true,
+                            requested_floor: etFloor.replace("Floor ", ""),
+                            requested_room: (isHostel || isCommercial) ? etRoom.replace("Room ", "").replace("Unit ", "") : (isApartment ? etRoom : ""),
+                            requested_bed: isHostel ? etBed.replace("Bed ", "") : "",
+                          };
+                          const response = await fetchWithAuth(
+                            `${BASE_URL}/api/existing_tenant_request/`,
+                            {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify(reqData),
+                            }
+                          );
+                          const textData = await response.text();
+                          let data;
+                          try {
+                            data = JSON.parse(textData);
+                          } catch (e) {
+                            data = { error: textData };
+                          }
+                          if (response.ok) {
+                            Alert.alert("Request Sent! 🎉", `Existing Tenant Request Sent!\nWe will contact you shortly regarding ${property.name}.`);
+                            setRequestStatus("pending");
+                            if (bookingContext?.setRefreshTrigger) {
+                              bookingContext.setRefreshTrigger(prev => prev + 1);
+                            }
+                            setExistingTenantModalVisible(false);
+                            if (typeof setStatusModalVisible === "function") {
+                              setStatusModalVisible(true);
+                            }
+                          } else {
+                            Alert.alert("Booking Failed", data.error || data.message || "Failed to send booking request.");
+                          }
+                        } catch (error) {
+                          console.log("Booking Error:", error);
+                          Alert.alert("Error", "Something went wrong. Please try again.");
+                        } finally {
+                          setUploading(false);
                         }
-                        return <Text style={{ fontSize: 12, color: "#94a3b8" }}>{t("no_beds_available") || "No beds available for this room."}</Text>;
-                      })()}
-                    </View>
-                  </View>
-                )}
-                {etFloor !== "" && etRoom !== "" && property?.type === "Apartment" && (
-                  <View>
-                    <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_type") || "3. Select Type"}</Text>
-                    <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-                      {["1BHK", "2BHK", "3BHK"].map(t => (
-                        <TouchableOpacity key={t} onPress={() => setEtSharing(t)} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etSharing === t ? COLORS.PRIMARY : "#f1f5f9" }}>
-                          <Text style={{ color: etSharing === t ? "#fff" : "#475569", fontWeight: "700" }}>{t}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
-                {etFloor !== "" && etRoom !== "" && (
-                  <View style={{ gap: 16, marginTop: 10, borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 20 }}>
-                    <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", textTransform: "uppercase" }}>{t("upload_identity_payment") || "4. Upload Identity & Payment Proof"}</Text>
-                    {/* Aadhaar ID */}
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("aadhaar_id") || "Aadhaar ID *"}</Text>
-                    <TextInput
-                      style={{
-                        backgroundColor: "#f8fafc",
-                        borderWidth: 1,
-                        borderColor: "#cbd5e1",
-                        borderRadius: 10,
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        fontSize: 14,
-                        color: "#1e293b",
                       }}
-                      placeholder={t("enter_aadhaar") || "Enter 12-digit Aadhaar ID"}
-                      placeholderTextColor="#94a3b8"
-                      keyboardType="numeric"
-                      maxLength={12}
-                      value={aadharId}
-                      onChangeText={(text) => setAadharId(text.replace(/[^0-9]/g, ''))}
-                    />
-                    {/* Aadhaar Image */}
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("aadhaar_image") || "Aadhaar Card Image *"}</Text>
-                    <TouchableOpacity
-                      onPress={() => handlePickDocument("front")}
                       style={{
-                        backgroundColor: "#f8fafc",
-                        borderWidth: 1,
-                        borderStyle: selectedFile ? "solid" : "dashed",
-                        borderColor: selectedFile ? COLORS.PRIMARY : "#cbd5e1",
-                        borderRadius: 10,
-                        padding: 14,
+                        backgroundColor: COLORS.PRIMARY,
+                        paddingVertical: 16,
+                        borderRadius: 14,
                         alignItems: "center",
+                        marginTop: 20,
+                        opacity: isSubmitDisabled ? 0.5 : 1
                       }}
                     >
-                      {selectedFile ? (
-                        <Text style={{ color: COLORS.PRIMARY, fontWeight: "600" }} numberOfLines={1}>
-                          ✓ {selectedFile.name || t("aadhaar_image_selected") || "Aadhaar Card Image Selected"}
-                        </Text>
+                      {uploading ? (
+                        <ActivityIndicator color="#fff" />
                       ) : (
-                        <Text style={{ color: "#64748b" }}>{t("choose_aadhaar") || "Choose Aadhaar Card Image"}</Text>
-                      )}
-                    </TouchableOpacity>
-                    {/* Payment Screenshot */}
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("payment_proof") || "Payment Proof / Screenshot *"}</Text>
-                    <TouchableOpacity
-                      onPress={() => handlePickDocument("payment")}
-                      style={{
-                        backgroundColor: "#f8fafc",
-                        borderWidth: 1,
-                        borderStyle: selectedPaymentScreenshot ? "solid" : "dashed",
-                        borderColor: selectedPaymentScreenshot ? COLORS.PRIMARY : "#cbd5e1",
-                        borderRadius: 10,
-                        padding: 14,
-                        alignItems: "center",
-                      }}
-                    >
-                      {selectedPaymentScreenshot ? (
-                        <Text style={{ color: COLORS.PRIMARY, fontWeight: "600" }} numberOfLines={1}>
-                          ✓ {selectedPaymentScreenshot.name || "Payment Proof Selected"}
-                        </Text>
-                      ) : (
-                        <Text style={{ color: "#64748b" }}>{t("choose_payment_proof") || "Choose Payment Proof / Screenshot"}</Text>
+                        <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>{buttonText || "Book Now"}</Text>
                       )}
                     </TouchableOpacity>
                   </View>
-                )}
-              </View>
-              <TouchableOpacity
-                disabled={
-                  (property?.type === "Hostel" && (!etFloor || !etRoom || !etBed)) ||
-                  (property?.type === "Apartment" && (!etFloor || !etRoom || !etSharing)) ||
-                  (property?.type === "Commercial" && (!etFloor || !etRoom)) ||
-                  !aadharId || !selectedFile || !selectedPaymentScreenshot
-                }
-                onPress={async () => {
-                  try {
-                    const tenantPhone = await AsyncStorage.getItem("tenantPhone");
-                    if (!tenantPhone) {
-                      alert("Tenant phone missing. Please login again.");
-                      return;
-                    }
-                    if (!property.contact) {
-                      alert("Owner phone missing");
-                      return;
-                    }
-                    if (!aadharId || !selectedFile || !selectedPaymentScreenshot) {
-                      alert("Please enter Aadhaar ID and upload Aadhaar Card Image and Payment Screenshot.");
-                      return;
-                    }
-                    if (aadharId.length !== 12) {
-                      alert("Aadhaar ID must be exactly 12 numeric digits.");
-                      return;
-                    }
-                    // 1. Upload Identity and Payment Proofs first
-                    const formData = new FormData();
-                    formData.append("phone", tenantPhone);
-                    formData.append("aadhar_id", aadharId);
-                    formData.append("aadhar_image", {
-                      uri: selectedFile.uri,
-                      name: selectedFile.name || "aadhar.jpg",
-                      type: selectedFile.mimeType || "image/jpeg"
-                    });
-                    if (selectedBackFile) {
-                      formData.append("aadhar_back_image", {
-                        uri: selectedBackFile.uri,
-                        name: selectedBackFile.name || "aadhar_back.jpg",
-                        type: selectedBackFile.mimeType || "image/jpeg"
-                      });
-                    }
-                    formData.append("payment_screenshot", {
-                      uri: selectedPaymentScreenshot.uri,
-                      name: selectedPaymentScreenshot.name || "payment_proof.jpg",
-                      type: selectedPaymentScreenshot.mimeType || "image/jpeg"
-                    });
-                    const uploadRes = await fetchWithAuth(`${BASE_URL}/api/tenant/submit_verification/`, {
-                      method: "POST",
-                      body: formData,
-                    });
-                    const uploadData = await uploadRes.json();
-                    if (!uploadRes.ok) {
-                      alert("Failed to upload proofs: " + (uploadData.error || "Unknown error"));
-                      return;
-                    }
-                    // 2. Submit Existing Tenant Request
-                    const reqData = {
-                      tenant_phone: tenantPhone,
-                      owner_id: property.owner_id || "",
-                      owner_phone: property.contact,
-                      property_name: property.name,
-                      property_type: property.type,
-                      check_in: new Date().toISOString().split("T")[0],
-                      check_out: "N/A",
-                      sharing: property?.type === "Apartment" ? etSharing : "",
-                      flat: property?.type === "Apartment" ? etRoom : "",
-                      section: "",
-                      is_existing_tenant: true,
-                      requested_floor: etFloor.replace("Floor ", ""),
-                      requested_room: (property?.type === "Hostel" || property?.type === "Commercial") ? etRoom.replace("Room ", "").replace("Unit ", "") : (property?.type === "Apartment" ? etRoom : ""),
-                      requested_bed: property?.type === "Hostel" ? etBed.replace("Bed ", "") : "",
-                    };
-                    const response = await fetchWithAuth(
-                      `${BASE_URL}/api/existing_tenant_request/`,
-                      {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify(reqData),
-                      }
-                    );
-                    const textData = await response.text();
-                    console.log("Raw Response Data:", textData);
-                    let data;
-                    try {
-                      data = JSON.parse(textData);
-                    } catch (e) {
-                      console.log("JSON Parse Error on Response:", e);
-                      data = { error: textData };
-                    }
-                    if (response.ok) {
-                      alert(`Existing Tenant Request Sent! 🎉\nWe will contact you shortly regarding ${property.name}.`);
-                      setRequestStatus("pending");
-                      if (bookingContext?.setRefreshTrigger) {
-                        bookingContext.setRefreshTrigger(prev => prev + 1);
-                      }
-                    } else {
-                      alert("Failed to send booking request: " + (data.error || data.message || "Unknown error"));
-                      console.log("Server Error:", data);
-                    }
-                    setExistingTenantModalVisible(false);
-                    if (typeof setStatusModalVisible === "function") {
-                      setStatusModalVisible(true);
-                    }
-                  } catch (error) {
-                    console.log("Booking Error:", error);
-                    alert("Something went wrong. Please try again.");
-                  }
-                }}
-                style={{
-                  backgroundColor: COLORS.PRIMARY,
-                  paddingVertical: 16,
-                  borderRadius: 14,
-                  alignItems: "center",
-                  marginTop: 30,
-                  opacity: 1
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>{buttonText}</Text>
-              </TouchableOpacity>
+                );
+              })()}
             </ScrollView>
           </View>
         </View>
