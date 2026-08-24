@@ -1386,60 +1386,6 @@ export default function TenantHomeScreen({ route }) {
 
               {/* JOINED TENANT MY STAY DASHBOARD */}
               <View style={homeStyles.myStayContainer}>
-                {/* ACTIVE STAY SUMMARY CARD */}
-                <View style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: 20,
-                  padding: 18,
-                  marginBottom: 16,
-                  borderWidth: 1,
-                  borderColor: "#E5E7EB",
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 8,
-                  elevation: 3,
-                }}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <View style={{ flex: 1, marginRight: 10 }}>
-                      <Text style={{ fontSize: 18, fontWeight: "800", color: "#1F2937" }} numberOfLines={1}>
-                        {joinedProperty.property_name || joinedProperty.name}
-                      </Text>
-                      <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-                        {joinedProperty.location || joinedProperty.address || "Active Residence"}
-                      </Text>
-                    </View>
-                    <View style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#166534" }}>Active Stay</Text>
-                    </View>
-                  </View>
-
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F3F4F6" }}>
-                    <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                        Type: {joinedProperty.property_type || joinedProperty.type || "Hostel"}
-                      </Text>
-                    </View>
-                    <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                        Floor: {joinedProperty.floor || joinedProperty.floor_number || joinedProperty.floor_no || "1"}
-                      </Text>
-                    </View>
-                    <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                        Room: {joinedProperty.room || joinedProperty.room_number || joinedProperty.room_no || "101"}
-                      </Text>
-                    </View>
-                    {Boolean(joinedProperty.bed || joinedProperty.bed_number) && (
-                      <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                          Bed: {joinedProperty.bed || joinedProperty.bed_number}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
                 <View style={homeStyles.myStayHeaderRow}>
                   <Text style={homeStyles.myStayTitle}>
                     {t("my_stay") || "My Stay"}
