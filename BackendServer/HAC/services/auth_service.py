@@ -329,14 +329,14 @@ class AuthService:
         raise ValueError("Invalid role")
 
     ADMIN_PHONES = ["6281808454", "9347074726", "8919326265"]
-    ADMIN_PHONE = "8919326265"
+    ADMIN_PHONE = "6304601921"
 
     @classmethod
     def is_admin_phone(cls, phone):
         if not phone:
             return False
         clean_phone = str(phone).strip()
-        if clean_phone in cls.ADMIN_PHONES:
+        if clean_phone in cls.ADMIN_PHONES or clean_phone == cls.ADMIN_PHONE:
             return True
         return AdminPassword.objects.filter(phone=clean_phone).exists()
 

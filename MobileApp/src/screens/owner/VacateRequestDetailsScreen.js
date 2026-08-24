@@ -359,6 +359,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
+    paddingTop: 60,
   },
   backBtn: {
     padding: 6,
