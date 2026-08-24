@@ -76,22 +76,39 @@ class DashboardService:
         owners = Owners.objects.filter(phone=actual_phone).order_by('created_at')
         data = []
         for o in owners:
-            p_type = "N/A"
+            p_type = "Hostel"
             p_name = "N/A"
+            p_loc = ""
+            p_img = None
             hostel = StayHostelDetails.objects.filter(owner=o).first()
             if hostel:
                 p_type = "Hostel"
                 p_name = hostel.hostelName
+                p_loc = hostel.location or ""
+                if hostel.cover_image and hasattr(hostel.cover_image, 'url'):
+                    p_img = hostel.cover_image.url
+                elif hostel.gallery_images and len(hostel.gallery_images) > 0:
+                    p_img = hostel.gallery_images[0]
             else:
                 apartment = ApartmentStayDetails.objects.filter(owner=o).first()
                 if apartment:
                     p_type = "Apartment"
                     p_name = apartment.apartmentName
+                    p_loc = apartment.location or ""
+                    if apartment.cover_image and hasattr(apartment.cover_image, 'url'):
+                        p_img = apartment.cover_image.url
+                    elif apartment.gallery_images and len(apartment.gallery_images) > 0:
+                        p_img = apartment.gallery_images[0]
                 else:
                     commercial = CommericialDetails.objects.filter(owner=o).first()
                     if commercial:
                         p_type = "Commercial"
                         p_name = commercial.commercialName
+                        p_loc = commercial.location or ""
+                        if commercial.cover_image and hasattr(commercial.cover_image, 'url'):
+                            p_img = commercial.cover_image.url
+                        elif commercial.gallery_images and len(commercial.gallery_images) > 0:
+                            p_img = commercial.gallery_images[0]
             
             data.append({
                 "id": o.pk,
@@ -100,6 +117,8 @@ class DashboardService:
                 "phone": o.phone,
                 "property_type": p_type,
                 "property_name": p_name,
+                "location": p_loc,
+                "property_image": p_img,
                 "status": o.status,
                 "suspension_reason": o.suspension_reason or ""
             })

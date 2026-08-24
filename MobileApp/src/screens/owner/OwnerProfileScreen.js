@@ -80,11 +80,11 @@ export default function OwnerProfile({ navigation }) {
 
 
   const initialOwner = {
-    name: "Loading...",
+    name: "",
     role: "Property Owner",
-    phone: "Loading...",
-    propertyName: "Loading...",
-    location: "Loading..."
+    phone: "",
+    propertyName: "",
+    location: ""
   };
 
   const [editableOwner, setEditableOwner] = useState(initialOwner);
@@ -431,27 +431,35 @@ export default function OwnerProfile({ navigation }) {
       const response = await fetchWithAuth(`${BASE_URL}/api/owner_data/${encodeURIComponent(ownerId)}/`);
       const data = await response.json();
       if (response.ok) {
+        const propDetails = data.step2?.property_details || {};
+        const pName = propDetails.property_name || propDetails.hostelName || propDetails.apartmentName || propDetails.commercialName || data.step1?.property_name;
+        const pLoc = propDetails.location || propDetails.address || propDetails.area || data.step1?.area;
+        const pType = data.property_type ? (data.property_type.charAt(0).toUpperCase() + data.property_type.slice(1)) : (selectedAccount?.property_type || "Hostel");
+        const gallery = propDetails.gallery_images || [];
+        const propImg = (gallery && gallery.length > 0) ? gallery[0] : (propDetails.cover_image || selectedAccount?.property_image || null);
+
         setEditableOwner({
-          name: data.step1.name,
-          role: data.property_type ? `${data.property_type.charAt(0).toUpperCase() + data.property_type.slice(1)} Owner` : "Owner",
-          phone: data.step1.phone,
-          propertyName: data.step1.property_name || "New Property",
-          location: data.step1.area || "Location missing"
+          name: data.step1?.name || selectedAccount?.owner_name || selectedAccount?.name || "Owner",
+          role: `${pType} Owner`,
+          phone: data.step1?.phone || selectedAccount?.phone || "",
+          propertyName: pName || selectedAccount?.property_name || selectedAccount?.name || "",
+          location: pLoc || selectedAccount?.location || "",
+          propertyImage: propImg,
         });
-        setProfileImage(data.step1.owner_img_field ? `${data.step1.owner_img_field}?t=${new Date().getTime()}` : null);
+        setProfileImage(data.step1?.owner_img_field ? `${data.step1.owner_img_field}?t=${new Date().getTime()}` : null);
 
         // Upsert into multi-account storage
-        upsertCurrentAccount(ownerId, data.step1.name, data.step1.owner_img_field, data.step1.phone);
+        upsertCurrentAccount(ownerId, data.step1?.name, data.step1?.owner_img_field, data.step1?.phone);
 
         const stats = data.stats || { total_beds: 0, occupied_beds: 0, total_rent: 0 };
         setProperty({
-          totalBeds: stats.total_beds,
-          occupied: stats.occupied_beds,
-          baseIncome: stats.total_rent,
-          structure: data.step3.building_layout || [],
+          totalBeds: stats.total_beds || 0,
+          occupied: stats.occupied_beds || 0,
+          baseIncome: stats.total_rent || 0,
+          structure: data.step3?.building_layout || [],
         });
       }
-    } catch (e) { console.log(e); }
+    } catch (e) { console.log("Fetch owner profile error:", e); }
     finally { setLoading(false); }
   };
 
@@ -926,9 +934,9 @@ export default function OwnerProfile({ navigation }) {
                   overflow: 'hidden',
                 }}
               >
-                {selectedAccount?.property_image ? (
+                {(editableOwner.propertyImage || selectedAccount?.property_image) ? (
                   <Image
-                    source={{ uri: selectedAccount.property_image }}
+                    source={{ uri: editableOwner.propertyImage || selectedAccount?.property_image }}
                     style={{ width: '100%', height: '100%', borderRadius: 15 }}
                   />
                 ) : (
@@ -946,17 +954,13 @@ export default function OwnerProfile({ navigation }) {
                   }}
                   numberOfLines={1}
                 >
-                  {editableOwner.propertyName && editableOwner.propertyName !== "Loading..."
-                    ? editableOwner.propertyName
-                    : (selectedAccount?.property_name || selectedAccount?.name || "Active Property")}
+                  {editableOwner.propertyName || selectedAccount?.property_name || selectedAccount?.name || "Property Name"}
                 </Text>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                   <Ionicons name="location-sharp" size={14} color="#6B7280" style={{ marginRight: 4 }} />
                   <Text style={{ fontSize: 13, color: '#6B7280', flex: 1 }} numberOfLines={1}>
-                    {editableOwner.location && editableOwner.location !== "Loading..."
-                      ? editableOwner.location
-                      : (selectedAccount?.location || selectedAccount?.area || "Location not set")}
+                    {editableOwner.location || selectedAccount?.location || selectedAccount?.area || "Location not set"}
                   </Text>
                 </View>
 
