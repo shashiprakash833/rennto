@@ -44,6 +44,8 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   RefreshControl,
+  LayoutAnimation,
+  UIManager,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import VacatePropertyModal from "../../components/VacatePropertyModal";
@@ -53,6 +55,10 @@ import ImageViewer from "react-native-image-zoom-viewer";
 
 import axios from "axios";
 import COLORS from "../../theme/colors";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width - 40;
@@ -546,7 +552,22 @@ export default function TenantHomeScreen({ route }) {
   const [targetHostelInfo, setTargetHostelInfo] = useState(null);
   const [currentHostelInfo, setCurrentHostelInfo] = useState(null);
   const [availableHostelList, setAvailableHostelList] = useState([]);
-  const [showJoinedProperties, setShowJoinedProperties] = useState(false);
+  const [showProperties, setShowProperties] = useState(false);
+  const mainScrollViewRef = useRef(null);
+
+  const togglePropertiesView = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowProperties(prev => {
+      const next = !prev;
+      if (!next) {
+        // Collapsed back to My Stay - smooth scroll to top/My Stay
+        setTimeout(() => {
+          mainScrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        }, 100);
+      }
+      return next;
+    });
+  };
 
   const handleOpenAdvanceBooking = (targetProp = null) => {
     setCurrentHostelInfo({
@@ -1101,6 +1122,7 @@ export default function TenantHomeScreen({ route }) {
         {/* HERO SECTION */}
 
         <ScrollView
+          ref={mainScrollViewRef}
           showsVerticalScrollIndicator={false}
           stickyHeaderIndices={[1]}
           scrollEventThrottle={16}
@@ -1194,76 +1216,113 @@ export default function TenantHomeScreen({ route }) {
                 </View>
               </ImageBackground>
 
-              {/* VIEW PROPERTIES ACTION BUTTON (In between Search Bar and Vacate Property) */}
-              <View style={{ paddingHorizontal: 16, marginTop: 14, marginBottom: 4 }}>
+              {/* DYNAMIC TOGGLE BUTTON (Explore Properties <-> View My Stay) */}
+              <View style={{ paddingHorizontal: 16, marginTop: 14, marginBottom: 6 }}>
                 <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => setShowJoinedProperties(prev => !prev)}
-                  style={{
-                    backgroundColor: "#FFFFFF",
-                    borderRadius: 18,
-                    paddingVertical: 14,
-                    paddingHorizontal: 16,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    borderWidth: 1.5,
-                    borderColor: showJoinedProperties ? "#7C3AED" : "#E2E8F0",
-                    shadowColor: "#7C3AED",
-                    shadowOffset: { width: 0, height: 3 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 8,
-                    elevation: 3,
-                  }}
+                  activeOpacity={0.88}
+                  onPress={togglePropertiesView}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-                    <View style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 14,
-                      backgroundColor: showJoinedProperties ? "#7C3AED" : "#F5F3FF",
-                      justifyContent: "center",
+                  <LinearGradient
+                    colors={["#8B5CF6", "#7C3AED", "#6D28D9"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{
+                      borderRadius: 24,
+                      paddingVertical: 12,
+                      paddingHorizontal: 14,
+                      flexDirection: "row",
                       alignItems: "center",
-                      marginRight: 12,
-                    }}>
+                      justifyContent: "space-between",
+                      shadowColor: "#7C3AED",
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.28,
+                      shadowRadius: 10,
+                      elevation: 5,
+                    }}
+                  >
+                    {/* Left Icon */}
+                    <View
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: "rgba(255, 255, 255, 0.2)",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        marginRight: 12,
+                      }}
+                    >
                       <Ionicons
-                        name="business"
+                        name="business-outline"
                         size={22}
-                        color={showJoinedProperties ? "#FFFFFF" : "#7C3AED"}
+                        color="#FFFFFF"
                       />
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontWeight: "800", color: "#1E293B" }}>
-                        View Properties
+
+                    {/* Middle Title & Subtitle */}
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: "800",
+                          color: "#FFFFFF",
+                          letterSpacing: -0.2,
+                        }}
+                      >
+                        {showProperties ? "View My Stay" : "Explore Properties"}
                       </Text>
-                      <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
-                        {showJoinedProperties ? "Tap to hide property listings" : "Browse & advance book other properties"}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(255, 255, 255, 0.85)",
+                          marginTop: 2,
+                        }}
+                      >
+                        {showProperties
+                          ? "Check your current booking details"
+                          : "Browse available spaces"}
                       </Text>
                     </View>
-                  </View>
-                  <View style={{
-                    backgroundColor: showJoinedProperties ? "#EDE9FE" : "#F1F5F9",
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 20,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 4,
-                  }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#7C3AED" }}>
-                      {showJoinedProperties ? "Hide" : "Explore"}
-                    </Text>
-                    <Ionicons
-                      name={showJoinedProperties ? "chevron-up" : "chevron-down"}
-                      size={14}
-                      color="#7C3AED"
-                    />
-                  </View>
+
+                    {/* Right CTA Button */}
+                    <View
+                      style={{
+                        backgroundColor: "#FFFFFF",
+                        paddingHorizontal: 16,
+                        paddingVertical: 8,
+                        borderRadius: 20,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 3,
+                        elevation: 2,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: "800",
+                          color: "#7C3AED",
+                          marginRight: 4,
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        VIEW
+                      </Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={14}
+                        color="#7C3AED"
+                      />
+                    </View>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
 
-              {/* IF VIEW PROPERTIES IS OPEN OR SEARCH IS ACTIVE: SHOW PROPERTIES LIST WITH ADVANCE BOOKING ACTION */}
-              {(showJoinedProperties || mainSearch.trim().length > 0) && (
+              {/* EXPANDABLE AVAILABLE PROPERTY LISTINGS (When showProperties is true OR active search) */}
+              {(showProperties || mainSearch.trim().length > 0) && (
                 <View style={{ marginTop: 8, marginBottom: 12 }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, marginBottom: 12 }}>
                     <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A" }}>
