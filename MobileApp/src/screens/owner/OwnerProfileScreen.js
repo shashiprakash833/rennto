@@ -373,7 +373,7 @@ export default function OwnerProfile({ navigation }) {
     useCallback(() => {
       if (isConnected !== undefined) {
         setAnimationFinished(false);
-        setCoords(null);
+        isAnimatingRef.current = false;
         loadAccounts();
         fetchOwnerProfile();
         fetchPayments();
