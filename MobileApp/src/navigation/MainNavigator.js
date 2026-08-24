@@ -21,6 +21,7 @@ import OnboardingScreen from "../screens/onboarding/OnboardingScreen";
 import TenantNavigation from "./TenantNavigation";
 import TenantNotificationScreen from "../screens/tenant/TenantNotificationScreen";
 import TenantPaymentHistoryScreen from "../screens/tenant/TenantPaymentHistoryScreen";
+import TenantRequestHistoryScreen from "../screens/tenant/TenantRequestHistoryScreen";
 // import ForgetPasswordScreen from "../screens/auth/ForgetPasswordScreen";
 import WaitingScreen from "../screens/auth/WaitingScreen";
 import { useMaintenance } from "../context/MaintenanceContext";
@@ -139,6 +140,7 @@ const checkSession = async () => {
   component={TenantNotificationScreen}
 />
 <Stack.Screen name="TenantPaymentHistory" component={TenantPaymentHistoryScreen} />
+<Stack.Screen name="TenantRequestHistory" component={TenantRequestHistoryScreen} />
 
       {/* ✅ KEEP ONLY ONE */}
       <Stack.Screen name="IssuesScreen" component={TenantIssuesScreen} />

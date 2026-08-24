@@ -2,7 +2,21 @@ from django.db import transaction
 from django.db.models import Q
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from HAC.models import Tenent, Owners, TenantBeds, ApartmentTenantBeds, CommercialTenantBeds, BlockedTenant, JoinRequest, ExistingTenantRequest, TenantNotification, StayHostelDetails, ApartmentStayDetails, CommericialDetails
+from HAC.models import (
+    VacateRequest,
+    Tenent,
+    Owners,
+    TenantBeds,
+    ApartmentTenantBeds,
+    CommercialTenantBeds,
+    BlockedTenant,
+    JoinRequest,
+    ExistingTenantRequest,
+    TenantNotification,
+    StayHostelDetails,
+    ApartmentStayDetails,
+    CommericialDetails,
+)
 from HAC.serializers import TenentSerializer
 from .common_service import CommonService
 from .notification_service import NotificationService
@@ -23,6 +37,30 @@ class TenantService:
             else:
                 image_url = tenant.selfie.url
  
+        # ── ACTIVE ALLOCATION SYNC ──
+        hostel_bed = TenantBeds.objects.filter(phone__iexact=tenant.phone).first()
+        apt_bed = ApartmentTenantBeds.objects.filter(phone__iexact=tenant.phone).first()
+        comm_bed = CommercialTenantBeds.objects.filter(phone__iexact=tenant.phone).first()
+        active_bed = hostel_bed or apt_bed or comm_bed
+
+        if active_bed:
+            if not tenant.owner:
+                if active_bed.owner:
+                    tenant.owner = active_bed.owner
+                elif active_bed.owner_phone:
+                    tenant.owner = CommonService.get_owner(active_bed.owner_phone)
+            tenant.is_vacant = False
+            tenant.save()
+        elif not tenant.owner:
+            jr_active = JoinRequest.objects.filter(
+                tenant=tenant,
+                status__in=['completed', 'joined', 'active']
+            ).order_by('-created_at').first()
+            if jr_active and jr_active.owner:
+                tenant.owner = jr_active.owner
+                tenant.is_vacant = False
+                tenant.save()
+
         # PROPERTY DETAILS
         property_name = "N/A"
         property_type = "N/A"
@@ -32,120 +70,109 @@ class TenantService:
         if tenant.owner and not tenant.is_vacant:
             jr = JoinRequest.objects.filter(
                 tenant=tenant,
-                status__in=['completed', 'joined']
+                status__in=['completed', 'joined', 'active']
             ).order_by('-created_at').first()
             
             property_found = False
             if jr and jr.property_name:
                 # Search Hostel
                 hostel = StayHostelDetails.objects.filter(owner=tenant.owner, hostelName__iexact=jr.property_name.strip()).first()
+                if not hostel:
+                    hostel = StayHostelDetails.objects.filter(hostelName__iexact=jr.property_name.strip()).first()
                 if hostel:
                     property_name = hostel.hostelName
-                    property_type = hostel.stayType
+                    property_type = hostel.stayType or "Hostel"
                     location = hostel.location
                     if hostel.cover_image:
-                        if request:
-                            property_image = request.build_absolute_uri(hostel.cover_image.url)
-                        else:
-                            property_image = hostel.cover_image.url
+                        property_image = request.build_absolute_uri(hostel.cover_image.url) if request else hostel.cover_image.url
                     property_found = True
                 else:
                     # Search Apartment
                     apt = ApartmentStayDetails.objects.filter(owner=tenant.owner, apartmentName__iexact=jr.property_name.strip()).first()
+                    if not apt:
+                        apt = ApartmentStayDetails.objects.filter(apartmentName__iexact=jr.property_name.strip()).first()
                     if apt:
                         property_name = apt.apartmentName
-                        property_type = apt.stayType
+                        property_type = apt.stayType or "Apartment"
                         location = apt.location
                         if apt.cover_image:
-                            if request:
-                                property_image = request.build_absolute_uri(apt.cover_image.url)
-                            else:
-                                property_image = apt.cover_image.url
+                            property_image = request.build_absolute_uri(apt.cover_image.url) if request else apt.cover_image.url
                         property_found = True
                     else:
                         # Search Commercial
                         comm = CommericialDetails.objects.filter(owner=tenant.owner, commercialName__iexact=jr.property_name.strip()).first()
+                        if not comm:
+                            comm = CommericialDetails.objects.filter(commercialName__iexact=jr.property_name.strip()).first()
                         if comm:
                             property_name = comm.commercialName
-                            property_type = comm.stayType
+                            property_type = comm.stayType or "Commercial"
                             location = comm.location
                             if comm.cover_image:
-                                if request:
-                                    property_image = request.build_absolute_uri(comm.cover_image.url)
-                                else:
-                                    property_image = comm.cover_image.url
+                                property_image = request.build_absolute_uri(comm.cover_image.url) if request else comm.cover_image.url
                             property_found = True
 
             if not property_found:
                 hostel = StayHostelDetails.objects.filter(owner=tenant.owner).first()
                 if hostel:
                     property_name = hostel.hostelName
-                    property_type = hostel.stayType
+                    property_type = hostel.stayType or "Hostel"
                     location = hostel.location
                     if hostel.cover_image:
-                        if request:
-                            property_image = request.build_absolute_uri(hostel.cover_image.url)
-                        else:
-                            property_image = hostel.cover_image.url
+                        property_image = request.build_absolute_uri(hostel.cover_image.url) if request else hostel.cover_image.url
                 else:
                     apartment = ApartmentStayDetails.objects.filter(owner=tenant.owner).first()
                     if apartment:
                         property_name = apartment.apartmentName
-                        property_type = apartment.stayType
+                        property_type = apartment.stayType or "Apartment"
                         location = apartment.location
                         if apartment.cover_image:
-                            if request:
-                                property_image = request.build_absolute_uri(apartment.cover_image.url)
-                            else:
-                                property_image = apartment.cover_image.url
+                            property_image = request.build_absolute_uri(apartment.cover_image.url) if request else apartment.cover_image.url
                     else:
                         commercial = CommericialDetails.objects.filter(owner=tenant.owner).first()
                         if commercial:
                             property_name = commercial.commercialName
-                            property_type = commercial.stayType
+                            property_type = commercial.stayType or "Commercial"
                             location = commercial.location
                             if commercial.cover_image:
-                                if request:
-                                    property_image = request.build_absolute_uri(commercial.cover_image.url)
-                                else:
-                                    property_image = commercial.cover_image.url
+                                property_image = request.build_absolute_uri(commercial.cover_image.url) if request else commercial.cover_image.url
  
-        # ROOM / FLOOR DETAILS
+        # ROOM / FLOOR / BED DETAILS
         room_no = "N/A"
         floor_no = "N/A"
+        bed_no = "N/A"
         check_in = "N/A"
         rent = "N/A"
  
-        hostel_bed = TenantBeds.objects.filter(phone__iexact=tenant.phone).first()
         if hostel_bed:
-            room_no = hostel_bed.roomno
-            floor_no = hostel_bed.floor
+            room_no = str(hostel_bed.roomno) if hostel_bed.roomno is not None else "N/A"
+            floor_no = str(hostel_bed.floor) if hostel_bed.floor is not None else "N/A"
+            bed_no = str(hostel_bed.bed) if hostel_bed.bed is not None else "N/A"
             check_in = str(hostel_bed.checkIn) if hostel_bed.checkIn else "N/A"
             rent = str(hostel_bed.rent)
-        else:
-            apt_bed = ApartmentTenantBeds.objects.filter(phone__iexact=tenant.phone).first()
-            if apt_bed:
-                room_no = apt_bed.flatno
-                floor_no = apt_bed.floor
-                check_in = str(apt_bed.checkIn) if apt_bed.checkIn else "N/A"
-                rent = str(apt_bed.rent)
-            else:
-                comm_bed = CommercialTenantBeds.objects.filter(phone__iexact=tenant.phone).first()
-                if comm_bed:
-                    room_no = comm_bed.sectionNo
-                    floor_no = comm_bed.floor
-                    check_in = str(comm_bed.checkIn) if comm_bed.checkIn else "N/A"
-                    rent = str(comm_bed.rent)
+        elif apt_bed:
+            room_no = str(apt_bed.flatno) if apt_bed.flatno is not None else "N/A"
+            floor_no = str(apt_bed.floor) if apt_bed.floor is not None else "N/A"
+            bed_no = "N/A"
+            check_in = str(apt_bed.checkIn) if apt_bed.checkIn else "N/A"
+            rent = str(apt_bed.rent)
+        elif comm_bed:
+            room_no = str(comm_bed.sectionNo) if comm_bed.sectionNo is not None else "N/A"
+            floor_no = str(comm_bed.floor) if comm_bed.floor is not None else "N/A"
+            bed_no = "N/A"
+            check_in = str(comm_bed.checkIn) if comm_bed.checkIn else "N/A"
+            rent = str(comm_bed.rent)
         
         if room_no == "N/A" and not tenant.is_vacant:
             jr = JoinRequest.objects.filter(
                 tenant=tenant,
-                status__in=['completed', 'joined']
+                status__in=['completed', 'joined', 'active']
             ).order_by('-created_at').first()
             if jr:
-                room_no = jr.sharing or jr.flat or jr.section or "N/A"
-                floor_no = "1"
-                check_in = str(jr.created_at.date()) if jr.created_at else "N/A"
+                room_no = str(jr.allotted_roomno or jr.allotted_flatno or jr.allotted_sectionno or jr.sharing or jr.flat or jr.section or "N/A")
+                floor_no = str(jr.allotted_floor or "1")
+                bed_no = str(jr.allotted_bed or "N/A")
+                check_in = str(jr.allotted_check_in or (jr.created_at.date() if jr.created_at else "N/A"))
+                rent = str(jr.allotted_rent or "N/A")
 
         aadhar_back_url = None
         payment_screenshot_url = None
@@ -168,18 +195,22 @@ class TenantService:
                 selfie_url = tenant.selfie.url
  
         # ── STATUS ENFORCEMENT ──
-        if tenant.is_vacant or not tenant.owner:
+        if (tenant.is_vacant or not tenant.owner) and not active_bed:
             property_name = "N/A"
             property_type = "N/A"
             location = "N/A"
             property_image = None
             room_no = "N/A"
             floor_no = "N/A"
+            bed_no = "N/A"
             check_in = "N/A"
             rent = "N/A"
             final_status = "Vacated"
         else:
             final_status = "Active"
+            if tenant.is_vacant:
+                tenant.is_vacant = False
+                tenant.save()
 
         # ── PROPERTY-SPECIFIC VACATE STATUS ──
         has_pending_vacate = False
@@ -227,15 +258,17 @@ class TenantService:
             "location": location,
             "property_image": property_image,
  
-            # ROOM
+            # ROOM & ALLOCATION
+            "room": room_no,
             "room_number": room_no,
+            "floor": floor_no,
             "floor_number": floor_no,
+            "bed": bed_no,
+            "bed_number": bed_no,
             "check_in": check_in,
-            # OWNER
-            "owner_id": tenant.owner.owner_id if tenant.owner else "",
-            "owner_phone": tenant.owner.phone if tenant.owner else "",
-            "owner_name": tenant.owner.name if tenant.owner else "",
-
+            "checkIn": check_in,
+            "rent": rent,
+ 
             "status": final_status,
             "is_vacant": bool(tenant.is_vacant or not tenant.owner),
             "owner_id": tenant.owner.owner_id if tenant.owner else None,
@@ -1142,42 +1175,6 @@ class TenantService:
         if join_req:
             join_req.status = 'joined'
             join_req.save()
-
-        # ── Notify Owner of document submission ──
-        owner = (join_req.owner if join_req else None) or tenant.owner
-        if owner:
-            from HAC.models import Notification
-            notif_msg = f"{tenant.name} has completed verification and submitted the required documents."
-            Notification.objects.create(
-                owner_account=owner,
-                recipient_phone=owner.phone or owner.owner_id or "",
-                title="Verification Completed 📄",
-                message=notif_msg,
-                type="VERIFICATION",
-                related_id=join_req.id if join_req else None,
-                is_read=False,
-            )
-            if owner.push_token:
-                NotificationService.send_push_notification(owner.push_token, "Verification Completed 📄", notif_msg)
-
-            try:
-                channel_layer = get_channel_layer()
-                sanitized_owner = owner.owner_id if owner.owner_id else (owner.phone.replace("+", "") if owner else "")
-                for group in [f"owner_status_{sanitized_owner}", f"user_notifications_{sanitized_owner}", f"notifications_{sanitized_owner}"]:
-                    async_to_sync(channel_layer.group_send)(
-                        group,
-                        {
-                            "type": "send_notification",
-                            "content": {
-                                "type": "verification_completed",
-                                "message": notif_msg,
-                                "id": join_req.id if join_req else None,
-                                "status": "joined"
-                            }
-                        }
-                    )
-            except Exception:
-                pass
 
         return {"message": "Verification submitted successfully!"}
 

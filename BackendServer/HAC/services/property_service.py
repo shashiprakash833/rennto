@@ -224,6 +224,7 @@ class PropertyService:
 
     @staticmethod
     def get_hostel_step3(phone):
+        from django.db.models import Q
         owner = CommonService.get_owner(phone)
         if not owner:
             raise Exception("Owner not found")
@@ -235,7 +236,7 @@ class PropertyService:
         response_data = {}
 
         if hostel:
-            floors = HostelFloorRoom.objects.filter(hostel=hostel)
+            floors = HostelFloorRoom.objects.filter(hostel=hostel).order_by('floor', 'roomNo')
             layout = {}
             for room in floors:
                 floor_no = room.floor
@@ -243,7 +244,13 @@ class PropertyService:
                     layout[floor_no] = []
                 layout[floor_no].append({"roomNo": room.roomNo, "beds": room.sharing})
 
-            result = [{"floorNo": fn, "rooms": rooms} for fn, rooms in layout.items()]
+            result = [{"floorNo": fn, "rooms": rooms} for fn, rooms in sorted(layout.items())]
+            if not result:
+                from HAC.models import Property
+                prop = Property.objects.filter(Q(owner_account=owner) | Q(owner_phone=owner.owner_id) | Q(owner_phone=owner.phone)).first()
+                if prop and prop.building_layout:
+                    result = prop.building_layout
+
             response_data = {
                 "property_type": "hostel",
                 "name": hostel.hostelName,
@@ -251,7 +258,7 @@ class PropertyService:
                 "building_layout": result
             }
         elif apartment:
-            floors = ApartmentFloorUnit.objects.filter(apartment=apartment)
+            floors = ApartmentFloorUnit.objects.filter(apartment=apartment).order_by('floor', 'flatNo')
             layout = {}
             for flat in floors:
                 floor_no = flat.floor
@@ -259,7 +266,13 @@ class PropertyService:
                     layout[floor_no] = []
                 layout[floor_no].append({"flatNo": flat.flatNo, "bhk": flat.bhk})
 
-            result = [{"floorNo": fn, "flats": flats} for fn, flats in layout.items()]
+            result = [{"floorNo": fn, "flats": flats} for fn, flats in sorted(layout.items())]
+            if not result:
+                from HAC.models import Property
+                prop = Property.objects.filter(Q(owner_account=owner) | Q(owner_phone=owner.owner_id) | Q(owner_phone=owner.phone)).first()
+                if prop and prop.building_layout:
+                    result = prop.building_layout
+
             response_data = {
                 "property_type": "apartment",
                 "name": apartment.apartmentName,
@@ -275,7 +288,13 @@ class PropertyService:
                     layout_dict[floor_no] = []
                 layout_dict[floor_no].append({"sectionNo": floor.sectionNo, "area_sqft": floor.area_sqft})
 
-            result = [{"floorNo": fn, "sections": secs} for fn, secs in layout_dict.items()]
+            result = [{"floorNo": fn, "sections": secs} for fn, secs in sorted(layout_dict.items())]
+            if not result:
+                from HAC.models import Property
+                prop = Property.objects.filter(Q(owner_account=owner) | Q(owner_phone=owner.owner_id) | Q(owner_phone=owner.phone)).first()
+                if prop and prop.building_layout:
+                    result = prop.building_layout
+
             response_data = {
                 "property_type": "commercial",
                 "name": commercial.commercialName,
@@ -283,7 +302,17 @@ class PropertyService:
                 "building_layout": result
             }
         else:
-            raise ValueError("No property found for this owner")
+            from HAC.models import Property
+            prop = Property.objects.filter(Q(owner_account=owner) | Q(owner_phone=owner.owner_id) | Q(owner_phone=owner.phone)).first()
+            if prop and prop.building_layout:
+                response_data = {
+                    "property_type": prop.property_type or "hostel",
+                    "name": getattr(owner, 'name', 'Property'),
+                    "address": getattr(prop, 'address', '') or '',
+                    "building_layout": prop.building_layout
+                }
+            else:
+                raise ValueError("No property found for this owner")
 
         response_data["owner"] = {"id": owner.pk, "name": owner.name, "phone": owner.phone}
         return response_data

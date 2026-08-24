@@ -37,33 +37,39 @@ class RequestService:
 
             if status_value in ['accepted', 'rejected', 'allotted', 'pending_confirmation']:
                 sanitized_phone = req.tenant.phone.replace("+", "").replace("@", "_").replace(".", "_")
-                message = f"Your room has been allotted in {req.property_name}." if status_value in ["allotted", "pending_confirmation"] else f"Your request for {req.property_name} has been {status_value}."
+                message = f"Your request for {req.property_name} has been {status_value}."
 
                 tenant = req.tenant
+                
 
-                from HAC.models import TenantNotification
-                TenantNotification.objects.create(
-                    tenant_phone=tenant.phone,
-                    title="Room Allotted 🎉" if status_value in ["allotted", "pending_confirmation"] else f"Booking {status_value.capitalize()}",
-                    message=message,
-                    is_read=False,
-                )
 
                 if tenant.push_token:
                     if status_value == "accepted":
-                        NotificationService.send_push_notification(tenant.push_token, "Booking Accepted ✅", f"Congratulations! Your booking for {req.property_name} has been accepted by the owner.")
+                        NotificationService.send_push_notification(tenant.push_token, "Upload Aadhaar to Join 📄", f"Your booking for {req.property_name} has been approved! Please upload Aadhaar verification to finalize your stay.")
                     elif status_value == "allotted":
-                        NotificationService.send_push_notification(tenant.push_token, "Room Allotted 🎉", f"Your room has been allotted in {req.property_name}")
+                        NotificationService.send_push_notification(tenant.push_token, "Room Allotted – Upload Aadhaar 🏠", f"Your room has been allotted in {req.property_name}. Please upload Aadhaar verification to finalize your stay.")
                     elif status_value == "pending_confirmation":
                         NotificationService.send_push_notification(tenant.push_token, "Room Allotted – Action Required 🏠", f"Your room/bed has been allotted in {req.property_name}. Please open the app and confirm to activate your stay.")
                     elif status_value == "rejected":
                         NotificationService.send_push_notification(tenant.push_token, "Booking Rejected ❌", f"Your booking request for {req.property_name} has been rejected by the owner.")
 
+                if status_value in ["accepted", "allotted", "pending_confirmation"]:
+                    try:
+                        from HAC.models import TenantNotification
+                        TenantNotification.objects.create(
+                            tenant_phone=tenant.phone,
+                            title="Upload Aadhaar to Join 📄",
+                            message=f"Your booking for {req.property_name} has been approved! Please upload your Aadhaar document to complete verification and join.",
+                            is_read=False
+                        )
+                    except Exception as ex:
+                        print("Error creating TenantNotification record:", ex)
+
                 try:
                     channel_layer = get_channel_layer()
-                    for group in [f"tenant_notifications_{sanitized_phone}", f"user_notifications_{sanitized_phone}"]:
+                    for group_name in [f"user_notifications_{sanitized_phone}", f"tenant_notifications_{sanitized_phone}"]:
                         async_to_sync(channel_layer.group_send)(
-                            group,
+                            group_name,
                             {
                                 "type": "send_notification",
                                 "content": {
@@ -122,19 +128,32 @@ class RequestService:
         if not owner:
             raise Exception("Owner not found")
 
-        from HAC.models import HostelChangeRequest
-        approved_change = HostelChangeRequest.objects.filter(
-            tenant=tenant,
-            status='approved',
-        ).select_related('target_hostel', 'target_owner').first()
+        # A tenant is truly active only after they've clicked Join (is_vacant=False
+        # AND have a joined/completed request). A pending_confirmation tenant has not
+        # yet joined so they are NOT considered active.
+        if not tenant.is_vacant:
+            from HAC.models import HostelChangeRequest
+            approved_change = HostelChangeRequest.objects.filter(
+                tenant=tenant,
+                status='approved',
+            ).select_related('target_hostel', 'target_owner').first()
 
-        has_approved_switch = False
-        if approved_change:
-            target_name = (approved_change.target_hostel.hostelName or "").strip().lower()
-            has_approved_switch = (
-                approved_change.target_owner_id == owner.id
-                or (property_name or "").strip().lower() == target_name
-            )
+            has_approved_switch = False
+            if approved_change:
+                target_name = (approved_change.target_hostel.hostelName or "").strip().lower()
+                has_approved_switch = (
+                    approved_change.target_owner_id == owner.id
+                    or (property_name or "").strip().lower() == target_name
+                )
+
+            has_active_join = JoinRequest.objects.filter(
+                tenant=tenant,
+                status__in=['joined', 'completed']
+            ).exists()
+            if has_active_join and not has_approved_switch:
+                raise ValueError("You already have an active stay. You must vacate your current property before booking another one.")
+        else:
+            has_approved_switch = False
 
         existing = JoinRequest.objects.filter(
             tenant=tenant,
@@ -145,7 +164,7 @@ class RequestService:
         if existing:
             return {"message": "You already have an active request for this property", "existing": True}
 
-        join_req = JoinRequest.objects.create(
+        JoinRequest.objects.create(
             tenant=tenant,
             owner=owner,
             property_name=property_name,
@@ -157,18 +176,21 @@ class RequestService:
             status="pending"
         )
 
-        if (tenant.is_vacant or not tenant.owner) and not has_approved_switch:
+        # Keep current owner until the tenant actually joins the new hostel.
+        if not has_approved_switch:
             tenant.owner = owner
-            tenant.save(update_fields=['owner'])
+            tenant.save()
 
         if owner.push_token:
-            NotificationService.send_push_notification(owner.push_token, "New Join Request 📩", f"{tenant.name} wants to stay in your PG/Hostel ({property_name}).")
+            NotificationService.send_push_notification(owner.push_token, "New Join Request 📩", f"{tenant.name} requested to join your property")
 
         try:
             channel_layer = get_channel_layer()
             sanitized_phone = owner.owner_id if owner.owner_id else (owner.phone.replace("+", "") if owner else "")
+            
 
-            for group in [f"owner_status_{sanitized_phone}", f"user_notifications_{sanitized_phone}", f"notifications_{sanitized_phone}"]:
+
+            for group in [f"owner_status_{sanitized_phone}", f"user_notifications_{sanitized_phone}"]:
                 async_to_sync(channel_layer.group_send)(
                     group,
                     {
@@ -176,7 +198,7 @@ class RequestService:
                         "content": {
                             "type": "incoming_request",
                             "message": f"New join request from {tenant.name}",
-                            "id": join_req.id,
+                            "id": tenant.id,
                             "status": "pending"
                         }
                     }
@@ -238,63 +260,6 @@ class RequestService:
                 "is_existing_tenant": True,
             })
 
-        # ── Vacate Requests ──
-        vacate_requests = VacateRequest.objects.filter(owner=owner).order_by('-created_at')
-        for r in vacate_requests:
-            data.append({
-                "id": r.id,
-                "db_id": r.id,
-                "name": r.tenant.name,
-                "phone": r.tenant.phone,
-                "status": r.status,
-                "propertyName": r.property_name,
-                "propertyType": r.property_type,
-                "requested_floor": r.requested_floor,
-                "requested_room": r.requested_room,
-                "requested_bed": r.requested_bed,
-                "requested_flat": r.requested_flat,
-                "floor": r.requested_floor,
-                "room": r.requested_room,
-                "bed": r.requested_bed,
-                "flat": r.requested_flat,
-                "type": "vacate_request",
-                "request_type": "VACATE_REQUEST",
-                "title": "Vacate Request",
-                "message": f"{r.tenant.name} has requested to vacate the property.",
-                "remarks": r.remarks or "",
-                "created_at": r.created_at,
-                "is_vacate_request": True,
-                "is_existing_tenant": False,
-            })
-
-        # ── Notifications (Issues, payments, general alerts) ──
-        from HAC.models import Notification
-        owner_phone_variants = [owner.phone, owner.phone.lstrip('+')] if owner.phone else []
-        if owner.owner_id and owner.owner_id not in owner_phone_variants:
-            owner_phone_variants.append(owner.owner_id)
-        if owner.phone:
-            if not owner.phone.startswith('+'):
-                owner_phone_variants.extend(['+' + owner.phone, '+91' + owner.phone, '91' + owner.phone])
-            elif owner.phone.startswith('+91'):
-                owner_phone_variants.append(owner.phone.replace('+91', ''))
-            elif owner.phone.startswith('91'):
-                owner_phone_variants.append(owner.phone[2:])
-
-        owner_notifications = Notification.objects.filter(
-            Q(owner_account=owner) | Q(recipient_phone__in=owner_phone_variants)
-        ).exclude(type__in=["JOIN_REQUEST", "VACATE_REQUEST"]).order_by('-created_at')
-        for n in owner_notifications:
-            data.append({
-                "id": f"notif_{n.id}",
-                "db_id": n.id,
-                "type": n.type or "MESSAGE",
-                "title": n.title,
-                "message": n.message,
-                "is_read": n.is_read,
-                "created_at": n.created_at,
-                "related_id": n.related_id,
-            })
-
         # Sort combined list by created_at descending
         data.sort(key=lambda x: x['created_at'], reverse=True)
         return data
@@ -307,7 +272,6 @@ class RequestService:
 
         join_requests = JoinRequest.objects.filter(tenant=tenant).order_by('-created_at')
         existing_requests = ExistingTenantRequest.objects.filter(tenant=tenant).order_by('-created_at')
-        vacate_requests = VacateRequest.objects.filter(tenant=tenant).order_by('-created_at')
         data = []
         
         for r in join_requests:
@@ -341,25 +305,6 @@ class RequestService:
                 "ownerPhone": r.owner.phone if r.owner else None,
                 "created_at": r.created_at,
             })
-        vacate_requests = VacateRequest.objects.filter(tenant=tenant).order_by('-created_at')
-        for v in vacate_requests:
-            data.append({
-                "id": f"vacate_{v.id}",
-                "db_id": v.id,
-                "type": "vacate_request",
-                "notification_type": "vacate_request",
-                "title": "Vacate Request",
-                "message": (
-                    "Your vacate request has been approved. You have been removed from the property."
-                    if (v.status or "").lower() == "approved"
-                    else "Your vacate request has been declined. You remain in the property."
-                    if (v.status or "").lower() == "declined"
-                    else f"Your vacate request for {v.property_name} is waiting for owner approval."
-                ),
-                "status": (v.status or "Pending").lower(),
-                "propertyName": v.property_name,
-                "created_at": v.created_at,
-            })
 
         # Also include owner-sent TenantNotification records (reminders, messages, etc.)
         tenant_phone_variants = [tenant.phone, tenant.phone.lstrip('+')]
@@ -387,20 +332,22 @@ class RequestService:
                 "created_at": n.created_at,
             })
 
-        # Also include general Notification records sent to the tenant (payments, issues, etc.)
-        from HAC.models import Notification
-        general_notifications = Notification.objects.filter(
-            recipient_phone__in=tenant_phone_variants
-        ).order_by('-created_at')
-        for n in general_notifications:
+        vacate_requests = VacateRequest.objects.filter(tenant=tenant).order_by('-created_at')
+        for v in vacate_requests:
             data.append({
-                "id": f"gen_notif_{n.id}",
-                "type": n.type or "MESSAGE",
-                "title": n.title,
-                "message": n.message,
-                "is_read": n.is_read,
-                "created_at": n.created_at,
-                "related_id": n.related_id,
+                "id": f"vacate_{v.id}",
+                "type": "vacate_request",
+                "title": "Vacate Request",
+                "message": (
+                    "Your vacate request has been approved. You have been removed from the property."
+                    if (v.status or "").lower() == "approved"
+                    else "Your vacate request has been declined. You remain in the property."
+                    if (v.status or "").lower() == "declined"
+                    else f"Your vacate request for {v.property_name} is waiting for owner approval."
+                ),
+                "status": (v.status or "Pending").lower(),
+                "propertyName": v.property_name,
+                "created_at": v.created_at,
             })
 
         hostel_changes = HostelChangeRequest.objects.filter(tenant=tenant).select_related(

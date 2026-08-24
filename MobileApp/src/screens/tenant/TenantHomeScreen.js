@@ -23,6 +23,7 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 
 import {
+  ActivityIndicator,
   Animated,
   ImageBackground,
   BackHandler,
@@ -206,7 +207,14 @@ export default function TenantHomeScreen({ route }) {
   const bookingCtx = useContext(BookingContext);
   const submitOwnerRequest = bookingCtx?.submitOwnerRequest;
   const joinedProperty = bookingCtx?.joinedProperty;
-  const isJoined = Boolean(bookingCtx?.isJoined && joinedProperty && joinedProperty.property_name !== "N/A");
+  const isJoined = Boolean(
+    bookingCtx?.isJoined &&
+    joinedProperty &&
+    !joinedProperty.is_vacant &&
+    joinedProperty.status !== "Vacated" &&
+    (joinedProperty.property_name || joinedProperty.name) &&
+    (joinedProperty.property_name || joinedProperty.name) !== "N/A"
+  );
 
   const [vacateModalVisible, setVacateModalVisible] = useState(false);
   const [vacateSubmitting, setVacateSubmitting] = useState(false);
@@ -577,18 +585,18 @@ export default function TenantHomeScreen({ route }) {
     }
   };
 
-  const unreadCount = bookingContext?.unreadNotificationCount || 0;
+  const unreadCount = bookingCtx?.unreadNotificationCount || 0;
   const badgeText = unreadCount > 99 ? "99+" : `${unreadCount}`;
 
   useFocusEffect(
     useCallback(() => {
-      bookingContext?.fetchUnreadCount?.();
-    }, [])
+      bookingCtx?.fetchUnreadCount?.();
+    }, [bookingCtx?.fetchUnreadCount])
   );
 
   const fetchTenantRequests = () => {
     // Rely on BookingContext to fetch and sync state. Just trigger a refresh if needed.
-    bookingContext?.setRefreshTrigger?.(prev => prev + 1);
+    bookingCtx?.setRefreshTrigger?.(prev => prev + 1);
   };
 
   // Animation logic for pulsating notification
@@ -682,44 +690,12 @@ export default function TenantHomeScreen({ route }) {
         };
       });
 
-      // AUTO GEOCODE MISSING LOCATIONS
-      const geocodedData = await Promise.all(
-        formattedData.map(async (p) => {
-
-          if (!p.latitude || !p.longitude) {
-            try {
-
-              console.log("Geocoding:", p.name);
-
-              const geo = await Location.geocodeAsync(p.address);
-
-              if (geo.length > 0) {
-                return {
-                  ...p,
-                  latitude: geo[0].latitude,
-                  longitude: geo[0].longitude,
-                };
-              }
-
-            } catch (e) {
-              console.log("Geocode Error:", e);
-            }
-          }
-
-          return p;
-        })
-      );
-
-      console.log("FINAL PROPERTIES:", geocodedData);
-
-      setAllProperties(geocodedData);
+      console.log("PROPERTIES LOADED:", formattedData.length);
+      setAllProperties(formattedData);
     } catch (error) {
       console.log("Fetch Properties Error:", error);
-    }
-    finally {
-
+    } finally {
       setLoading(false);
-
     }
   };
 
@@ -766,18 +742,18 @@ export default function TenantHomeScreen({ route }) {
 
   useFocusEffect(
     useCallback(() => {
-      const init = async () => {
-        fetchProperties();
-        if (!hasFetchedLocationRef.current) {
-          hasFetchedLocationRef.current = true;
-          const coords = await getLocation();
-          if (coords) {
-            fetchProperties(coords);
-          }
-        }
-      };
-      init();
-    }, [tenantEmail, refreshTrigger])
+      bookingCtx?.fetchRequests?.();
+      bookingCtx?.fetchUnreadCount?.();
+      fetchProperties();
+      if (!hasFetchedLocationRef.current) {
+        hasFetchedLocationRef.current = true;
+        getLocation()
+          .then((coords) => {
+            if (coords) fetchProperties(coords);
+          })
+          .catch(() => {});
+      }
+    }, [])
   );
 
   // Removed useEffect for fetchProperties to avoid continuous API calls on filter change
@@ -1076,293 +1052,152 @@ export default function TenantHomeScreen({ route }) {
           showsVerticalScrollIndicator={false}
           stickyHeaderIndices={[1]}
           scrollEventThrottle={16}
+          contentContainerStyle={{ paddingBottom: 110 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={refreshLocation} />
           }
         >
-          {bookingContext?.isJoined && joinedProperty && joinedProperty.property_name !== "N/A" ? (
-            <ImageBackground
-              source={
-                joinedProperty.property_image
-                  ? { uri: joinedProperty.property_image }
-                  : require("../../../assets/images/tenantBackground.jpg")
-              }
-              style={homeStyles.joinedHeroSection}
-              imageStyle={homeStyles.joinedHeroBgImage}
-            >
-              {/* Overlay for readability */}
-              <View style={homeStyles.overlay} />
+          {isJoined && joinedProperty && (joinedProperty.property_name || joinedProperty.name) !== "N/A" ? (
+            <>
+              <ImageBackground
+                source={
+                  joinedProperty.property_image
+                    ? { uri: joinedProperty.property_image }
+                    : require("../../../assets/images/tenantBackground.jpg")
+                }
+                style={homeStyles.joinedHeroSection}
+                imageStyle={homeStyles.joinedHeroBgImage}
+              >
+                {/* Overlay for readability */}
+                <View style={homeStyles.overlay} />
 
-              {/* TOP ROW WITH NOTIFICATION */}
-              <View style={homeStyles.topRow}>
-                <View style={homeStyles.joinedStatusBadge}>
-                  <Ionicons name="checkmark-circle" size={14} color="#FFF" />
-                  <Text style={homeStyles.joinedStatusText}>{t("joined_property") || "Joined Property"}</Text>
-                </View>
+                {/* TOP ROW WITH NOTIFICATION */}
+                <View style={homeStyles.topRow}>
+                  <View style={homeStyles.joinedStatusBadge}>
+                    <Ionicons name="checkmark-circle" size={14} color="#FFF" />
+                    <Text style={homeStyles.joinedStatusText}>{t("joined_property") || "Joined Property"}</Text>
+                  </View>
 
-                <View style={homeStyles.heroIcons}>
-                  <TouchableOpacity
-                    style={homeStyles.heroIconBtn}
-                    onPress={() => navigation.navigate("TenantNotification")}
-                  >
-                    <Ionicons
-                      name="notifications-outline"
-                      size={22}
-                      color="#fff"
-                    />
-                    {unreadCount > 0 && (
-                      <View style={homeStyles.heroBadge}>
-                        <Text style={homeStyles.heroBadgeText}>
-                          {badgeText}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* PROPERTY INFORMATION */}
-              <View style={homeStyles.joinedHeroContent}>
-                <Text style={homeStyles.joinedPropertyType}>
-                  {(joinedProperty.property_type ? (t(joinedProperty.property_type.toLowerCase()) || joinedProperty.property_type) : (t("joined") || "Joined")).toUpperCase()}
-                </Text>
-                <Text style={homeStyles.joinedPropertyName} numberOfLines={1}>
-                  {joinedProperty.property_name}
-                </Text>
-                <View style={homeStyles.joinedLocationWrapper}>
-                  <Ionicons name="location" size={16} color="#FFF" style={{ marginRight: 4 }} />
-                  <Text style={homeStyles.joinedLocationText} numberOfLines={2}>
-                    {joinedProperty.location || "No Address Available"}
-                  </Text>
-                </View>
-              </View>
-
-              {/* SEARCH */}
-              <View style={homeStyles.newSearchBar}>
-                <Ionicons
-                  name="search"
-                  size={20}
-                  color="#999"
-                />
-                <TextInput
-                  style={homeStyles.newSearchInput}
-                  placeholder={t("search_location_property") || "Search location, property..."}
-                  placeholderTextColor="#999"
-                  value={mainSearch}
-                  onChangeText={(text) => setMainSearch(text)}
-                  returnKeyType="search"
-                  clearButtonMode="while-editing"
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity
-                  style={homeStyles.filterBtn}
-                  onPress={() => filterSheetRef.current?.present()}
-                >
-                  <Ionicons
-                    name="options-outline"
-                    size={20}
-                    color="#6C63FF"
-                  />
-                  <Text style={homeStyles.filterText}>
-                    {t("filters") || "Filters"}
-                    {activeFilterCount > 0
-                      ? ` (${activeFilterCount})`
-                      : ""}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ImageBackground>
-          ) : (
-            <ImageBackground
-              source={require("../../../assets/images/tenantBackground.jpg")}
-              style={homeStyles.heroSection}
-              imageStyle={homeStyles.heroBgImage}
-            >
-              {/* TOP ROW */}
-              <View style={homeStyles.topRow}>
-                <View style={homeStyles.locationWrapper}>
-                  <Ionicons
-                    name="location-outline"
-                    size={14}
-                    color="#fff"
-                  />
-                  <Text
-                    numberOfLines={1}
-                    style={homeStyles.locationText}
-                  >
-                    {locationName}
-                  </Text>
-                </View>
-
-                <View style={homeStyles.heroIcons}>
-                  <TouchableOpacity
-                    style={homeStyles.heroIconBtn}
-                    onPress={() => navigation.navigate("TenantNotification")}
-                  >
-                    <Ionicons
-                      name="notifications-outline"
-                      size={22}
-                      color="#fff"
-                    />
-                    {unreadCount > 0 && (
-                      <View style={homeStyles.heroBadge}>
-                        <Text style={homeStyles.heroBadgeText}>
-                          {badgeText}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* TITLE */}
-              <View style={homeStyles.heroContent}>
-                <Text style={homeStyles.heroTitle}>
-                  {t("find_perfect_space") || "Find Your\nPerfect Space"}
-                </Text>
-                <Text style={homeStyles.heroSubtitle}>
-                  {t("perfect_space_subtitle") || "Hostels, Apartments & Commercial spaces near you"}
-                </Text>
-              </View>
-
-              {/* SEARCH */}
-              <View style={homeStyles.newSearchBar}>
-                <Ionicons
-                  name="search"
-                  size={20}
-                  color="#999"
-                />
-                <TextInput
-                  style={homeStyles.newSearchInput}
-                  placeholder={t("search_location_placeholder") || "Search location, property..."}
-                  placeholderTextColor="#999"
-                  value={mainSearch}
-                  onChangeText={(text) => setMainSearch(text)}
-                  returnKeyType="search"
-                  clearButtonMode="while-editing"
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity
-                  style={homeStyles.filterBtn}
-                  onPress={() => filterSheetRef.current?.present()}
-                >
-                  <Ionicons
-                    name="options-outline"
-                    size={20}
-                    color="#6C63FF"
-                  />
-                  <Text style={homeStyles.filterText}>
-                    {t("filter") || "Filters"}
-                    {activeFilterCount > 0
-                      ? ` (${activeFilterCount})`
-                      : ""}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ImageBackground>
-          )}
-
-          {/* JOINED TENANT MY STAY DASHBOARD VS EXPLORE SECTION */}
-          {isJoined && joinedProperty ? (
-            <View>
-              {/* COMPACT EXPLORE MORE PROPERTIES CARD */}
-              <View style={homeStyles.exploreMoreCard}>
-                <Text style={homeStyles.exploreMoreSubtitle}>
-                  {t("explore_more_subtitle") || "Browse other hostels, apartments and commercial spaces."}
-                </Text>
-                <TouchableOpacity
-                  style={homeStyles.exploreMorePillBtn}
-                  onPress={() => setShowExploreProperties(prev => !prev)}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="search" size={16} color="#7C3AED" style={{ marginRight: 6 }} />
-                  <Text style={homeStyles.exploreMorePillBtnText}>
-                    {showExploreProperties
-                      ? (t("view_my_stay") || "View My Stay Dashboard")
-                      : (t("explore_more_properties") || "Explore More Properties")}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {!showExploreProperties ? (
-                /* MY STAY DASHBOARD */
-                <View style={homeStyles.myStayContainer}>
-                  {/* ACTIVE STAY SUMMARY CARD */}
-                  <View style={{
-                    backgroundColor: "#FFFFFF",
-                    borderRadius: 20,
-                    padding: 18,
-                    marginBottom: 16,
-                    borderWidth: 1,
-                    borderColor: "#E5E7EB",
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.05,
-                    shadowRadius: 8,
-                    elevation: 3,
-                  }}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                      <View style={{ flex: 1, marginRight: 10 }}>
-                        <Text style={{ fontSize: 18, fontWeight: "800", color: "#1F2937" }} numberOfLines={1}>
-                          {joinedProperty.property_name || joinedProperty.name}
-                        </Text>
-                        <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-                          {joinedProperty.location || joinedProperty.address || "Active Residence"}
-                        </Text>
-                      </View>
-                      <View style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#166534" }}>Active Stay</Text>
-                      </View>
-                    </View>
-
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F3F4F6" }}>
-                      <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                          Type: {joinedProperty.property_type || joinedProperty.type || "Hostel"}
-                        </Text>
-                      </View>
-                      <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                          Floor: {joinedProperty.floor || joinedProperty.floor_number || joinedProperty.floor_no || "1"}
-                        </Text>
-                      </View>
-                      <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                          Room: {joinedProperty.room || joinedProperty.room_number || joinedProperty.room_no || "101"}
-                        </Text>
-                      </View>
-                      {Boolean(joinedProperty.bed || joinedProperty.bed_number) && (
-                        <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                          <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
-                            Bed: {joinedProperty.bed || joinedProperty.bed_number}
+                  <View style={homeStyles.heroIcons}>
+                    <TouchableOpacity
+                      style={homeStyles.heroIconBtn}
+                      onPress={() => navigation.navigate("TenantNotification")}
+                    >
+                      <Ionicons
+                        name="notifications-outline"
+                        size={22}
+                        color="#fff"
+                      />
+                      {unreadCount > 0 && (
+                        <View style={homeStyles.heroBadge}>
+                          <Text style={homeStyles.heroBadgeText}>
+                            {badgeText}
                           </Text>
                         </View>
                       )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* PROPERTY INFORMATION */}
+                <View style={homeStyles.joinedHeroContent}>
+                  <Text style={homeStyles.joinedPropertyType}>
+                    {(joinedProperty.property_type ? (t(joinedProperty.property_type.toLowerCase()) || joinedProperty.property_type) : (t("joined") || "Joined")).toUpperCase()}
+                  </Text>
+                  <Text style={homeStyles.joinedPropertyName} numberOfLines={1}>
+                    {joinedProperty.property_name}
+                  </Text>
+                  <View style={homeStyles.joinedLocationWrapper}>
+                    <Ionicons name="location" size={16} color="#FFF" style={{ marginRight: 4 }} />
+                    <Text style={homeStyles.joinedLocationText} numberOfLines={2}>
+                      {joinedProperty.location || "No Address Available"}
+                    </Text>
+                  </View>
+                </View>
+              </ImageBackground>
+
+              {/* JOINED TENANT MY STAY DASHBOARD */}
+              <View style={homeStyles.myStayContainer}>
+                {/* ACTIVE STAY SUMMARY CARD */}
+                <View style={{
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: 20,
+                  padding: 18,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: "#E5E7EB",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 8,
+                  elevation: 3,
+                }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text style={{ fontSize: 18, fontWeight: "800", color: "#1F2937" }} numberOfLines={1}>
+                        {joinedProperty.property_name || joinedProperty.name}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
+                        {joinedProperty.location || joinedProperty.address || "Active Residence"}
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#166534" }}>Active Stay</Text>
                     </View>
                   </View>
 
-                  <View style={homeStyles.myStayHeaderRow}>
-                    <Text style={homeStyles.myStayTitle}>
-                      {t("my_stay") || "My Stay"}
-                    </Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F3F4F6" }}>
+                    <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                        Type: {joinedProperty.property_type || joinedProperty.type || "Hostel"}
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                        Floor: {joinedProperty.floor || joinedProperty.floor_number || joinedProperty.floor_no || "1"}
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                        Room: {joinedProperty.room || joinedProperty.room_number || joinedProperty.room_no || "101"}
+                      </Text>
+                    </View>
+                    {Boolean(joinedProperty.bed || joinedProperty.bed_number) && (
+                      <View style={{ backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>
+                          Bed: {joinedProperty.bed || joinedProperty.bed_number}
+                        </Text>
+                      </View>
+                    )}
                   </View>
+                </View>
 
-                  <View style={homeStyles.myStayGrid}>
-                    {/* 1. Vacate Property Card */}
-                    <TouchableOpacity
-                      style={homeStyles.myStayCard}
-                      activeOpacity={0.85}
-                      onPress={() => {
-                        if ((vacateRequestStatus || "").toLowerCase() === "pending") {
-                          Alert.alert("Request Pending ⏳", "Your vacate request is waiting for the owner to accept or decline.");
-                          return;
-                        }
-                        setVacateModalVisible(true);
-                      }}
+                <View style={homeStyles.myStayHeaderRow}>
+                  <Text style={homeStyles.myStayTitle}>
+                    {t("my_stay") || "My Stay"}
+                  </Text>
+                </View>
+
+                <View style={homeStyles.myStayGrid}>
+                  {/* 1. Vacate Property Card: Light Red -> Light Pink */}
+                  <TouchableOpacity
+                    style={homeStyles.myStayCardWrapper}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      if ((vacateRequestStatus || "").toLowerCase() === "pending") {
+                        Alert.alert("Request Pending ⏳", "Your vacate request is waiting for the owner to accept or decline.");
+                        return;
+                      }
+                      setVacateModalVisible(true);
+                    }}
+                  >
+                    <LinearGradient
+                      colors={["#FFF5F5", "#FFE4E6"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[homeStyles.myStayCard, { borderColor: "#FECDD3" }]}
                     >
-                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FEF2F2" }]}>
+                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FEE2E2" }]}>
                         <Ionicons name="log-out-outline" size={24} color="#EF4444" />
                       </View>
                       <Text style={homeStyles.myStayCardTitle}>Vacate Property</Text>
@@ -1373,44 +1208,58 @@ export default function TenantHomeScreen({ route }) {
                             ? "Last vacate request was declined. You remain in this property."
                             : "Request to vacate your current property."}
                       </Text>
-                      <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FEF2F2" }]}>
+                      <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FEE2E2" }]}>
                         <Text style={[homeStyles.myStayRequestBtnText, { color: "#EF4444" }]}>
-                          {(vacateRequestStatus || "").toLowerCase() === "pending" ? "Pending" : "Request"}
+                          {(vacateRequestStatus || "").toLowerCase() === "pending" ? "Pending Approval" : "Request"}
                         </Text>
                       </View>
-                    </TouchableOpacity>
+                    </LinearGradient>
+                  </TouchableOpacity>
 
-                    {/* 2. Change Floor Card (Hostel & Apartment) */}
-                    {((joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") ||
-                      (joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("apartment")) && (
-                      <TouchableOpacity
-                        style={homeStyles.myStayCard}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                          setAccommodationType("FLOOR");
-                          setAccommodationModalVisible(true);
-                        }}
+                  {/* 2. Change Floor Card (Hostel & Apartment): Light Purple -> Lavender */}
+                  {((joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") ||
+                    (joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("apartment")) && (
+                    <TouchableOpacity
+                      style={homeStyles.myStayCardWrapper}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setAccommodationType("FLOOR");
+                        setAccommodationModalVisible(true);
+                      }}
+                    >
+                      <LinearGradient
+                        colors={["#F5F3FF", "#EDE9FE"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[homeStyles.myStayCard, { borderColor: "#DDD6FE" }]}
                       >
-                        <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#F3E8FF" }]}>
+                        <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#EDE9FE" }]}>
                           <Ionicons name="layers-outline" size={24} color="#7C3AED" />
                         </View>
                         <Text style={homeStyles.myStayCardTitle}>Change Floor</Text>
                         <Text style={homeStyles.myStayCardSub}>Request a floor change in this property.</Text>
-                        <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#F3E8FF" }]}>
+                        <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#EDE9FE" }]}>
                           <Text style={[homeStyles.myStayRequestBtnText, { color: "#7C3AED" }]}>Request</Text>
                         </View>
-                      </TouchableOpacity>
-                    )}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
 
-                    {/* 3. Change Room Card (Hostel Only) */}
-                    {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
-                      <TouchableOpacity
-                        style={homeStyles.myStayCard}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                          setAccommodationType("ROOM");
-                          setAccommodationModalVisible(true);
-                        }}
+                  {/* 3. Change Room Card (Hostel Only): Light Blue -> Sky Blue */}
+                  {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
+                    <TouchableOpacity
+                      style={homeStyles.myStayCardWrapper}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setAccommodationType("ROOM");
+                        setAccommodationModalVisible(true);
+                      }}
+                    >
+                      <LinearGradient
+                        colors={["#EFF6FF", "#DBEAFE"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[homeStyles.myStayCard, { borderColor: "#BFDBFE" }]}
                       >
                         <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#DBEAFE" }]}>
                           <Ionicons name="business-outline" size={24} color="#2563EB" />
@@ -1420,43 +1269,64 @@ export default function TenantHomeScreen({ route }) {
                         <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#DBEAFE" }]}>
                           <Text style={[homeStyles.myStayRequestBtnText, { color: "#2563EB" }]}>Request</Text>
                         </View>
-                      </TouchableOpacity>
-                    )}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
 
-                    {/* 4. Change Bed Card (Hostel Only) */}
-                    {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
-                      <TouchableOpacity
-                        style={homeStyles.myStayCard}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                          setAccommodationType("BED");
-                          setAccommodationModalVisible(true);
-                        }}
+                  {/* 4. Change Bed Card (Hostel Only): Light Orange -> Light Peach */}
+                  {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
+                    <TouchableOpacity
+                      style={homeStyles.myStayCardWrapper}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setAccommodationType("BED");
+                        setAccommodationModalVisible(true);
+                      }}
+                    >
+                      <LinearGradient
+                        colors={["#FFF7ED", "#FFEDD5"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[homeStyles.myStayCard, { borderColor: "#FED7AA" }]}
                       >
                         <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#FFEDD5" }]}>
-                          <Ionicons name="bed-outline" size={24} color="#D97706" />
+                          <Ionicons name="bed-outline" size={24} color="#EA580C" />
                         </View>
                         <Text style={homeStyles.myStayCardTitle}>Change Bed</Text>
                         <Text style={homeStyles.myStayCardSub}>Request a bed change in this property.</Text>
                         <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#FFEDD5" }]}>
-                          <Text style={[homeStyles.myStayRequestBtnText, { color: "#D97706" }]}>Request</Text>
+                          <Text style={[homeStyles.myStayRequestBtnText, { color: "#EA580C" }]}>Request</Text>
                         </View>
-                      </TouchableOpacity>
-                    )}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
 
-                    {/* 5. Check-in Date Card */}
-                    <View style={[homeStyles.myStayCard, homeStyles.checkInCard]}>
+                  {/* 5. Check-in Date Card */}
+                  <View style={homeStyles.myStayCardWrapper}>
+                    <LinearGradient
+                      colors={["#F0FDF4", "#DCFCE7"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[homeStyles.myStayCard, homeStyles.checkInCard]}
+                    >
                       <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#D1FAE5" }]}>
                         <Ionicons name="calendar-outline" size={24} color="#059669" />
                       </View>
                       <Text style={homeStyles.dateCardLabel}>CHECK-IN DATE</Text>
                       <Text style={homeStyles.checkInDateValue}>
-                        {formatCheckInDate(joinedProperty?.checkIn || joinedProperty?.check_in_date || joinedProperty?.joining_date)}
+                        {formatCheckInDate(joinedProperty?.checkIn || joinedProperty?.check_in || joinedProperty?.check_in_date || joinedProperty?.joining_date)}
                       </Text>
-                    </View>
+                    </LinearGradient>
+                  </View>
 
-                    {/* 6. Rent Due Card */}
-                    <View style={[homeStyles.myStayCard, homeStyles.rentDueCard]}>
+                  {/* 6. Rent Due Card */}
+                  <View style={homeStyles.myStayCardWrapper}>
+                    <LinearGradient
+                      colors={["#7C3AED", "#6D28D9"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[homeStyles.myStayCard, homeStyles.rentDueCard]}
+                    >
                       <View style={[homeStyles.myStayIconCircle, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
                         <Ionicons name="cash-outline" size={24} color="#FFFFFF" />
                       </View>
@@ -1464,327 +1334,276 @@ export default function TenantHomeScreen({ route }) {
                       <Text style={homeStyles.rentDueValue}>
                         {formatDueDate(joinedProperty?.next_due_date || joinedProperty?.due_date || joinedProperty?.rent_due_date)}
                       </Text>
-                    </View>
-                  </View>
-
-                  {/* 5. Invite Friends Banner */}
-                  <LinearGradient
-                    colors={["#7C3AED", "#6D28D9", "#5B21B6"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={homeStyles.inviteFriendsBanner}
-                  >
-                    <View style={homeStyles.inviteContent}>
-                      <Text style={homeStyles.inviteTitle}>Invite Friends</Text>
-                      <Text style={homeStyles.inviteSub}>
-                        Invite friends to Rennto and earn rewards for your next payment.
-                      </Text>
-                      <TouchableOpacity
-                        style={homeStyles.inviteBtn}
-                        activeOpacity={0.9}
-                        onPress={handleShareInvite}
-                      >
-                        <Text style={homeStyles.inviteBtnText}>Invite Now</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <Ionicons name="people-outline" size={72} color="rgba(255, 255, 255, 0.2)" style={homeStyles.inviteBgIcon} />
-                  </LinearGradient>
-                </View>
-              ) : (
-                /* CATEGORIES + PROPERTY LISTINGS WHEN EXPLORE IS TOGGLED ON */
-                <View>
-<View style={{ backgroundColor: "#fff", paddingBottom: 5 }}>
-                    <View style={homeStyles.categoryHeadingRow}>
-                      <Text style={homeStyles.categoryHeading}>
-                        {t("explore_categories") || "Explore by Categories"}
-                      </Text>
-                    </View>
-                    <View style={homeStyles.customCategoryWrapper}>
-                      <TouchableOpacity
-                        style={[homeStyles.customCard, { backgroundColor: "#7c3aed" }]}
-                        onPress={() => navigation.navigate("HostelScreen")}
-                      >
-                        <Image
-                          source={require("../../../assets/images/hostelLogo.png")}
-                          style={homeStyles.customCardImage}
-                          resizeMode="contain"
-                        />
-                        <Text style={homeStyles.customCardTitle}>
-                          {t("hostels") || "Hostels"}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[homeStyles.customCard, { backgroundColor: "#60a5fa" }]}
-                        onPress={() => navigation.navigate("ApartmentScreen")}
-                      >
-                        <Image
-                          source={require("../../../assets/images/apartmentLogo.png")}
-                          style={homeStyles.customCardImage}
-                          resizeMode="contain"
-                        />
-                        <Text style={homeStyles.customCardTitle}>
-                          {t("apartments") || "Apartments"}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[homeStyles.customCard, { backgroundColor: "#fb923c" }]}
-                        onPress={() => navigation.navigate("CommercialScreen")}
-                      >
-                        <Image
-                          source={require("../../../assets/images/commercialLogo.png")}
-                          style={homeStyles.customCardImage}
-                          resizeMode="contain"
-                        />
-                        <Text style={homeStyles.customCardTitle}>
-                          {t("commercial") || "Commercial"}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <View style={homeStyles.propertyGrid}>
-                    {filteredProperties.map((item) => {
-                      const normalize = (str) => (str || "").replace(/\s+/g, '').toLowerCase();
-                      const latestReq = requests.find(r =>
-                        normalize(r.propertyName || r.property_name) === normalize(item.name)
-                      );
-                      const showBadge = latestReq && latestReq.status && latestReq.status !== 'none';
-
-                      return (
-                        <TouchableOpacity
-                          key={`${item.id}-${item.type}`}
-                          activeOpacity={0.9}
-                          style={homeStyles.gridItem}
-                          onPress={() => handlePress(item)}
-                        >
-                          <View style={homeStyles.card}>
-                            <Image
-                              source={{ uri: item.image || item.galleryImages?.[0] }}
-                              style={homeStyles.cardImg}
-                              resizeMode="cover"
-                              onError={() => console.log("Card image failed:", item.image)}
-                            />
-
-                            <View style={homeStyles.cardBody}>
-                              <View style={homeStyles.row}>
-                                <Text style={homeStyles.cardName}>{item.name}</Text>
-                                {showBadge ? (
-                                  <View style={[
-                                    homeStyles.statusBadge,
-                                    {
-                                      backgroundColor:
-                                        latestReq.status?.toLowerCase() === "completed" ||
-                                          latestReq.status?.toLowerCase() === "joined" ||
-                                          latestReq.status?.toLowerCase() === "active"
-                                          ? "#27ae60"
-                                          : latestReq.status?.toLowerCase() === "accepted" ||
-                                            latestReq.status?.toLowerCase() === "allotted"
-                                            ? "#3498db"
-                                            : latestReq.status?.toLowerCase() === "rejected"
-                                              ? "#e74c3c"
-                                              : "#f39c12"
-                                    }
-                                  ]}>
-                                    <Text style={homeStyles.statusText}>
-                                      {
-                                        latestReq.status?.toLowerCase() === "completed" ||
-                                          latestReq.status?.toLowerCase() === "joined" ||
-                                          latestReq.status?.toLowerCase() === "active"
-                                          ? (t("joined") || "JOINED").toUpperCase()
-                                          : (t(latestReq.status?.toLowerCase()) || latestReq.status)?.toUpperCase()
-                                      }
-                                    </Text>
-                                  </View>
-                                ) : (
-                                  item.isAvailable && (
-                                    <View style={[homeStyles.statusBadge, { backgroundColor: "#3498db" }]}>
-                                      <Text style={homeStyles.statusText}>{(t("vacant") || "VACANT").toUpperCase()}</Text>
-                                    </View>
-                                  )
-                                )}
-                              </View>
-                              <Text style={homeStyles.cardSub} numberOfLines={2}>
-                                {t(item.type?.toLowerCase()) || item.type} • {item.address}
-                              </Text>
-                              {item.rent ? (
-                                <Text style={homeStyles.cardRent}>
-                                  ₹{item.rent} / {t("month_suffix") || "month"}
-                                </Text>
-                              ) : null}
-                              {item.distance_km != null ? (
-                                <Text style={homeStyles.cardDistance}>
-                                  {item.distance_km} {t("km_away") || "km away"}
-                                </Text>
-                              ) : item.distance != null ? (
-                                <Text style={homeStyles.cardDistance}>
-                                  {item.distance} {t("km_away") || "km away"}
-                                </Text>
-                              ) : (
-                                <Text style={homeStyles.cardDistance}>
-                                  0.0 {t("km_away") || "km away"}
-                                </Text>
-                              )}
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
+                    </LinearGradient>
                   </View>
                 </View>
-)}
-            </View>
+
+                {/* Invite Friends Banner */}
+                <LinearGradient
+                  colors={["#7C3AED", "#6D28D9", "#5B21B6"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={homeStyles.inviteFriendsBanner}
+                >
+                  <View style={homeStyles.inviteContent}>
+                    <Text style={homeStyles.inviteTitle}>Invite Friends</Text>
+                    <Text style={homeStyles.inviteSub}>
+                      Invite friends to Rennto and earn rewards for your next payment.
+                    </Text>
+                    <TouchableOpacity
+                      style={homeStyles.inviteBtn}
+                      activeOpacity={0.9}
+                      onPress={handleShareInvite}
+                    >
+                      <Text style={homeStyles.inviteBtnText}>Invite Now</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Ionicons name="people-outline" size={72} color="rgba(255, 255, 255, 0.2)" style={homeStyles.inviteBgIcon} />
+                </LinearGradient>
+              </View>
+            </>
           ) : (
-            /* NEW TENANT: STANDARD CATEGORIES & PROPERTY LISTINGS */
-            <View>
-<View style={{ backgroundColor: "#fff", paddingBottom: 5 }}>
-                <View style={homeStyles.categoryHeadingRow}>
-                  <Text style={homeStyles.categoryHeading}>
-                    {t("explore_categories") || "Explore by Categories"}
+            <>
+              <ImageBackground
+                source={require("../../../assets/images/tenantBackground.jpg")}
+                style={homeStyles.heroSection}
+                imageStyle={homeStyles.heroBgImage}
+              >
+                {/* TOP ROW */}
+                <View style={homeStyles.topRow}>
+                  <View style={homeStyles.locationWrapper}>
+                    <Ionicons
+                      name="location-outline"
+                      size={14}
+                      color="#fff"
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={homeStyles.locationText}
+                    >
+                      {locationName}
+                    </Text>
+                  </View>
+
+                  <View style={homeStyles.heroIcons}>
+                    <TouchableOpacity
+                      style={homeStyles.heroIconBtn}
+                      onPress={() => navigation.navigate("TenantNotification")}
+                    >
+                      <Ionicons
+                        name="notifications-outline"
+                        size={22}
+                        color="#fff"
+                      />
+                      {unreadCount > 0 && (
+                        <View style={homeStyles.heroBadge}>
+                          <Text style={homeStyles.heroBadgeText}>
+                            {badgeText}
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* TITLE */}
+                <View style={homeStyles.heroContent}>
+                  <Text style={homeStyles.heroTitle}>
+                    {t("find_perfect_space") || "Find Your\nPerfect Space"}
+                  </Text>
+                  <Text style={homeStyles.heroSubtitle}>
+                    {t("perfect_space_subtitle") || "Hostels, Apartments & Commercial spaces near you"}
                   </Text>
                 </View>
-                <View style={homeStyles.customCategoryWrapper}>
-                  <TouchableOpacity
-                    style={[homeStyles.customCard, { backgroundColor: "#7c3aed" }]}
-                    onPress={() => navigation.navigate("HostelScreen")}
-                  >
-                    <Image
-                      source={require("../../../assets/images/hostelLogo.png")}
-                      style={homeStyles.customCardImage}
-                      resizeMode="contain"
-                    />
-                    <Text style={homeStyles.customCardTitle}>
-                      {t("hostels") || "Hostels"}
-                    </Text>
-                  </TouchableOpacity>
 
+                {/* SEARCH */}
+                <View style={homeStyles.newSearchBar}>
+                  <Ionicons
+                    name="search"
+                    size={20}
+                    color="#999"
+                  />
+                  <TextInput
+                    style={homeStyles.newSearchInput}
+                    placeholder={t("search_location_placeholder") || "Search location, property..."}
+                    placeholderTextColor="#999"
+                    value={mainSearch}
+                    onChangeText={(text) => setMainSearch(text)}
+                    returnKeyType="search"
+                    clearButtonMode="while-editing"
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                  />
                   <TouchableOpacity
-                    style={[homeStyles.customCard, { backgroundColor: "#60a5fa" }]}
-                    onPress={() => navigation.navigate("ApartmentScreen")}
+                    style={homeStyles.filterBtn}
+                    onPress={() => filterSheetRef.current?.present()}
                   >
-                    <Image
-                      source={require("../../../assets/images/apartmentLogo.png")}
-                      style={homeStyles.customCardImage}
-                      resizeMode="contain"
+                    <Ionicons
+                      name="options-outline"
+                      size={20}
+                      color="#6C63FF"
                     />
-                    <Text style={homeStyles.customCardTitle}>
-                      {t("apartments") || "Apartments"}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[homeStyles.customCard, { backgroundColor: "#fb923c" }]}
-                    onPress={() => navigation.navigate("CommercialScreen")}
-                  >
-                    <Image
-                      source={require("../../../assets/images/commercialLogo.png")}
-                      style={homeStyles.customCardImage}
-                      resizeMode="contain"
-                    />
-                    <Text style={homeStyles.customCardTitle}>
-                      {t("commercial") || "Commercial"}
+                    <Text style={homeStyles.filterText}>
+                      {t("filter") || "Filters"}
+                      {activeFilterCount > 0
+                        ? ` (${activeFilterCount})`
+                        : ""}
                     </Text>
                   </TouchableOpacity>
                 </View>
-              </View>
+              </ImageBackground>
 
-              <View style={homeStyles.propertyGrid}>
-                {filteredProperties.map((item) => {
-                  const normalize = (str) => (str || "").replace(/\s+/g, '').toLowerCase();
-                  const latestReq = requests.find(r =>
-                    normalize(r.propertyName || r.property_name) === normalize(item.name)
-                  );
-                  const showBadge = latestReq && latestReq.status && latestReq.status !== 'none';
-
-                  return (
+              {/* EXPLORE CATEGORIES & PROPERTY LISTINGS (ONLY FOR UNJOINED / VACATED TENANTS) */}
+              <View>
+                <View style={{ backgroundColor: "#fff", paddingBottom: 5 }}>
+                  <View style={homeStyles.categoryHeadingRow}>
+                    <Text style={homeStyles.categoryHeading}>
+                      {t("explore_categories") || "Explore by Categories"}
+                    </Text>
+                  </View>
+                  <View style={homeStyles.customCategoryWrapper}>
                     <TouchableOpacity
-                      key={`${item.id}-${item.type}`}
-                      activeOpacity={0.9}
-                      style={homeStyles.gridItem}
-                      onPress={() => handlePress(item)}
+                      style={[homeStyles.customCard, { backgroundColor: "#7c3aed" }]}
+                      onPress={() => navigation.navigate("HostelScreen")}
                     >
-                      <View style={homeStyles.card}>
-                        <Image
-                          source={{ uri: item.image || item.galleryImages?.[0] }}
-                          style={homeStyles.cardImg}
-                          resizeMode="cover"
-                          onError={() => console.log("Card image failed:", item.image)}
-                        />
+                      <Image
+                        source={require("../../../assets/images/hostelLogo.png")}
+                        style={homeStyles.customCardImage}
+                        resizeMode="contain"
+                      />
+                      <Text style={homeStyles.customCardTitle}>
+                        {t("hostels") || "Hostels"}
+                      </Text>
+                    </TouchableOpacity>
 
-                        <View style={homeStyles.cardBody}>
-                          <View style={homeStyles.row}>
-                            <Text style={homeStyles.cardName}>{item.name}</Text>
-                            {showBadge ? (
-                              <View style={[
-                                homeStyles.statusBadge,
-                                {
-                                  backgroundColor:
-                                    latestReq.status?.toLowerCase() === "completed" ||
-                                      latestReq.status?.toLowerCase() === "joined" ||
-                                      latestReq.status?.toLowerCase() === "active"
-                                      ? "#27ae60"
-                                      : latestReq.status?.toLowerCase() === "accepted" ||
-                                        latestReq.status?.toLowerCase() === "allotted"
-                                        ? "#3498db"
-                                        : latestReq.status?.toLowerCase() === "rejected"
-                                          ? "#e74c3c"
-                                          : "#f39c12"
-                                }
-                              ]}>
-                                <Text style={homeStyles.statusText}>
+                    <TouchableOpacity
+                      style={[homeStyles.customCard, { backgroundColor: "#60a5fa" }]}
+                      onPress={() => navigation.navigate("ApartmentScreen")}
+                    >
+                      <Image
+                        source={require("../../../assets/images/apartmentLogo.png")}
+                        style={homeStyles.customCardImage}
+                        resizeMode="contain"
+                      />
+                      <Text style={homeStyles.customCardTitle}>
+                        {t("apartments") || "Apartments"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[homeStyles.customCard, { backgroundColor: "#fb923c" }]}
+                      onPress={() => navigation.navigate("CommercialScreen")}
+                    >
+                      <Image
+                        source={require("../../../assets/images/commercialLogo.png")}
+                        style={homeStyles.customCardImage}
+                        resizeMode="contain"
+                      />
+                      <Text style={homeStyles.customCardTitle}>
+                        {t("commercial") || "Commercial"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* PROPERTY LISTINGS */}
+                <View style={homeStyles.propertyGrid}>
+                  {filteredProperties.map((item) => {
+                    const normalize = (str) => (str || "").replace(/\s+/g, '').toLowerCase();
+                    const latestReq = requests.find(r =>
+                      normalize(r.propertyName || r.property_name) === normalize(item.name)
+                    );
+                    const showBadge = latestReq && latestReq.status && latestReq.status !== 'none';
+
+                    return (
+                      <TouchableOpacity
+                        key={`${item.id}-${item.type}`}
+                        activeOpacity={0.9}
+                        style={homeStyles.gridItem}
+                        onPress={() => handlePress(item)}
+                      >
+                        <View style={homeStyles.card}>
+                          <Image
+                            source={{ uri: item.image || item.galleryImages?.[0] }}
+                            style={homeStyles.cardImg}
+                            resizeMode="cover"
+                            onError={() => console.log("Card image failed:", item.image)}
+                          />
+
+                          <View style={homeStyles.cardBody}>
+                            <View style={homeStyles.row}>
+                              <Text style={homeStyles.cardName}>{item.name}</Text>
+                              {showBadge ? (
+                                <View style={[
+                                  homeStyles.statusBadge,
                                   {
-                                    latestReq.status?.toLowerCase() === "completed" ||
-                                      latestReq.status?.toLowerCase() === "joined" ||
-                                      latestReq.status?.toLowerCase() === "active"
-                                      ? (t("joined") || "JOINED").toUpperCase()
-                                      : (t(latestReq.status?.toLowerCase()) || latestReq.status)?.toUpperCase()
+                                    backgroundColor:
+                                      latestReq.status?.toLowerCase() === "completed" ||
+                                        latestReq.status?.toLowerCase() === "joined" ||
+                                        latestReq.status?.toLowerCase() === "active"
+                                        ? "#27ae60"
+                                        : latestReq.status?.toLowerCase() === "accepted" ||
+                                          latestReq.status?.toLowerCase() === "allotted"
+                                          ? "#3498db"
+                                          : latestReq.status?.toLowerCase() === "rejected"
+                                            ? "#e74c3c"
+                                            : "#f39c12"
                                   }
-                                </Text>
-                              </View>
-                            ) : (
-                              item.isAvailable && (
-                                <View style={[homeStyles.statusBadge, { backgroundColor: "#3498db" }]}>
-                                  <Text style={homeStyles.statusText}>{(t("vacant") || "VACANT").toUpperCase()}</Text>
+                                ]}>
+                                  <Text style={homeStyles.statusText}>
+                                    {
+                                      latestReq.status?.toLowerCase() === "completed" ||
+                                        latestReq.status?.toLowerCase() === "joined" ||
+                                        latestReq.status?.toLowerCase() === "active"
+                                        ? (t("joined") || "JOINED").toUpperCase()
+                                        : (t(latestReq.status?.toLowerCase()) || latestReq.status)?.toUpperCase()
+                                    }
+                                  </Text>
                                 </View>
-                              )
+                              ) : (
+                                item.isAvailable && (
+                                  <View style={[homeStyles.statusBadge, { backgroundColor: "#3498db" }]}>
+                                    <Text style={homeStyles.statusText}>{(t("vacant") || "VACANT").toUpperCase()}</Text>
+                                  </View>
+                                )
+                              )}
+                            </View>
+                            <Text style={homeStyles.cardSub} numberOfLines={2}>
+                              {t(item.type?.toLowerCase()) || item.type} • {item.address}
+                            </Text>
+                            {item.rent ? (
+                              <Text style={homeStyles.cardRent}>
+                                ₹{item.rent} / {t("month_suffix") || "month"}
+                              </Text>
+                            ) : null}
+                            {item.distance_km != null ? (
+                              <Text style={homeStyles.cardDistance}>
+                                {item.distance_km} {t("km_away") || "km away"}
+                              </Text>
+                            ) : item.distance != null ? (
+                              <Text style={homeStyles.cardDistance}>
+                                {item.distance} {t("km_away") || "km away"}
+                              </Text>
+                            ) : (
+                              <Text style={homeStyles.cardDistance}>
+                                0.0 {t("km_away") || "km away"}
+                              </Text>
                             )}
                           </View>
-                          <Text style={homeStyles.cardSub} numberOfLines={2}>
-                            {t(item.type?.toLowerCase()) || item.type} • {item.address}
-                          </Text>
-                          {item.rent ? (
-                            <Text style={homeStyles.cardRent}>
-                              ₹{item.rent} / {t("month_suffix") || "month"}
-                            </Text>
-                          ) : null}
-                          {item.distance_km != null ? (
-                            <Text style={homeStyles.cardDistance}>
-                              {item.distance_km} {t("km_away") || "km away"}
-                            </Text>
-                          ) : item.distance != null ? (
-                            <Text style={homeStyles.cardDistance}>
-                              {item.distance} {t("km_away") || "km away"}
-                            </Text>
-                          ) : (
-                            <Text style={homeStyles.cardDistance}>
-                              0.0 {t("km_away") || "km away"}
-                            </Text>
-                          )}
                         </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-)}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
-          {filteredProperties.length === 0 && (
-            <View style={{ alignItems: "center", marginTop: 50 }}>
-              <Ionicons name="search-outline" size={60} color="#ccc" />
-              <Text style={homeStyles.noResults}>No properties found.</Text>
-            </View>
+                {filteredProperties.length === 0 && (
+                  <View style={{ alignItems: "center", marginTop: 50 }}>
+                    <Ionicons name="search-outline" size={60} color="#ccc" />
+                    <Text style={homeStyles.noResults}>No properties found.</Text>
+                  </View>
+                )}
+              </View>
+            </>
           )}
         </ScrollView>
 
@@ -2018,19 +1837,29 @@ export function PropertyDetailsScreen(props) {
   const [etRoom, setEtRoom] = useState(""); // used for Room, Flat, Unit
   const [etBed, setEtBed] = useState(""); // used for Bed
   const [etSharing, setEtSharing] = useState(""); // used for Sharing in Apartment
-  const [propertyStructure, setPropertyStructure] = useState({ floors: {} });
+  const [propertyStructure, setPropertyStructure] = useState({ building_layout: [] });
+  const [loadingStructure, setLoadingStructure] = useState(false);
 
   const fetchPropertyStructure = async (prop) => {
-    const ownerId = prop?.owner_id || prop?.contact;
-    if (!ownerId) return;
+    const ownerId = prop?.owner_id || prop?.contact || prop?.ownerPhone;
+    if (!ownerId) {
+      console.log("No owner identifier for property structure:", prop?.name);
+      return;
+    }
+    setLoadingStructure(true);
     try {
       const res = await fetchWithAuth(`${BASE_URL}/api/details/${encodeURIComponent(ownerId)}/`);
       if (res.ok) {
         const data = await res.json();
-        setPropertyStructure(data || { building_layout: [] });
+        const layout = data?.building_layout || data?.step3?.building_layout || [];
+        setPropertyStructure({ ...data, building_layout: layout });
+      } else {
+        console.log("Error fetching property structure, status:", res.status);
       }
     } catch (e) {
       console.log("Error fetching property structure:", e);
+    } finally {
+      setLoadingStructure(false);
     }
   };
 
@@ -2063,74 +1892,7 @@ export function PropertyDetailsScreen(props) {
     }
   };
 
-  const submitIdentityProof = async () => {
-    if (checkReadOnly()) return;
-    const activePhone = await AsyncStorage.getItem("tenantPhone");
-    if (!activePhone) {
-      Alert.alert("Error", "Tenant details not found. Please log in again.");
-      return;
-    }
 
-    if (!selectedFile || !aadharId) {
-      Alert.alert("Error", "Please enter Aadhaar ID and upload Aadhaar image.");
-      return;
-    }
-
-    if (aadharId.length !== 12) {
-      Alert.alert("Error", "Aadhaar ID must be exactly 12 numeric digits.");
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("phone", activePhone);
-      formData.append("aadhar_id", aadharId);
-      formData.append("aadhar_image", {
-        uri: selectedFile.uri,
-        name: selectedFile.name || "aadhar.jpg",
-        type: selectedFile.mimeType || "image/jpeg"
-      });
-      if (selectedBackFile) {
-        formData.append("aadhar_back_image", {
-          uri: selectedBackFile.uri,
-          name: selectedBackFile.name || "aadhar_back.jpg",
-          type: selectedBackFile.mimeType || "image/jpeg"
-        });
-      }
-      if (selectedPaymentScreenshot) {
-        formData.append("payment_screenshot", {
-          uri: selectedPaymentScreenshot.uri,
-          name: selectedPaymentScreenshot.name || "payment_proof.jpg",
-          type: selectedPaymentScreenshot.mimeType || "image/jpeg"
-        });
-      }
-
-      const res = await fetchWithAuth(`${BASE_URL}/api/tenant/submit_verification/`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const resData = await res.json();
-
-      if (res.ok) {
-        setUploading(false);
-        setShowIdModal(false);
-        Alert.alert("Success", "Identity proof submitted successfully! You are now joined.");
-        if (bookingContext?.setRefreshTrigger) {
-          bookingContext.setRefreshTrigger(prev => prev + 1);
-        }
-      } else {
-        setUploading(false);
-        Alert.alert("Failed to Submit", resData.error || "An unexpected error occurred.");
-      }
-    } catch (err) {
-      setUploading(false);
-      console.log("Error submitting identity proof:", err);
-      Alert.alert("Error", "Could not submit identity proof. Please check your network.");
-    }
-  };
 
   const facilityIcons = {
     WiFi: "wifi",
@@ -2551,12 +2313,8 @@ export function PropertyDetailsScreen(props) {
       }
 
       // 👉 OPEN STATUS MODAL (For Accepted/Joined)
-      if (requestStatus === "accepted" || requestStatus === "completed" || requestStatus === "allotted") {
-        if (requestStatus === "completed") {
-          setStatusModalVisible(true);
-        } else {
-          setShowIdModal(true);
-        }
+      if (requestStatus === "accepted" || requestStatus === "completed" || requestStatus === "allotted" || requestStatus === "joined") {
+        setStatusModalVisible(true);
         return;
       }
     } catch (error) {
@@ -3335,19 +3093,40 @@ export function PropertyDetailsScreen(props) {
             </View>
 
             <View style={{ alignItems: "center", marginVertical: 20 }}>
-              {requestStatus === "accepted" || requestStatus === "completed" || requestStatus === "allotted" ? (
-                <View>
-<MaterialCommunityIcons name="party-popper" size={60} color="#0a9516ff" />
+              {requestStatus === "completed" || requestStatus === "joined" || isJoined ? (
+                <View style={{ alignItems: "center" }}>
+                  <MaterialCommunityIcons name="party-popper" size={60} color="#0a9516ff" />
                   <Text style={[styles.modalTitle, { fontSize: 24, marginTop: 15, textAlign: "center" }]}>
                     Welcome to {property.name}! 🎉
                   </Text>
                   <Text style={{ color: "#666", textAlign: "center", marginTop: 10, fontSize: 16 }}>
-                    {"Your request has been accepted by the owner. We're excited to have you!"}
+                    {"You are an active resident in this property. We're excited to have you!"}
                   </Text>
                 </View>
-) : (
-                <View>
-<Ionicons name="time-outline" size={60} color="#f39c12" />
+              ) : requestStatus === "accepted" || requestStatus === "allotted" ? (
+                <View style={{ alignItems: "center" }}>
+                  <Ionicons name="shield-checkmark" size={60} color={COLORS.PRIMARY} />
+                  <Text style={[styles.modalTitle, { fontSize: 22, marginTop: 15, textAlign: "center" }]}>
+                    Booking Approved! ✅
+                  </Text>
+                  <Text style={{ color: "#666", textAlign: "center", marginTop: 10, fontSize: 15 }}>
+                    Your booking was approved by the owner! Please open your Notifications to upload your Aadhaar verification and finalize your stay.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setStatusModalVisible(false);
+                      navigation.navigate("TenantNavigation", { screen: "Notification" });
+                    }}
+                    style={[styles.submitBtn, { backgroundColor: COLORS.PRIMARY, marginTop: 16, width: "100%" }]}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
+                      Go to Notifications
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={{ alignItems: "center" }}>
+                  <Ionicons name="time-outline" size={60} color="#f39c12" />
                   <Text style={[styles.modalTitle, { fontSize: 22, marginTop: 15, textAlign: "center" }]}>
                     Request Sent! ⏳
                   </Text>
@@ -3355,18 +3134,20 @@ export function PropertyDetailsScreen(props) {
                     The owner has received your request and will review it soon. Please check back later.
                   </Text>
                 </View>
-)}
+              )}
             </View>
 
             <View style={{ gap: 12, marginTop: 10 }}>
-              <TouchableOpacity
-                onPress={performWithdraw}
-                style={[styles.submitBtn, { backgroundColor: "#fff", borderWidth: 1, borderColor: "#ff4d4d" }]}
-              >
-                <Text style={{ color: "#ff4d4d", fontWeight: "bold", fontSize: 16 }}>
-                  Withdraw Request
-                </Text>
-              </TouchableOpacity>
+              {requestStatus !== "completed" && requestStatus !== "joined" && !isJoined && (
+                <TouchableOpacity
+                  onPress={performWithdraw}
+                  style={[styles.submitBtn, { backgroundColor: "#fff", borderWidth: 1, borderColor: "#ff4d4d" }]}
+                >
+                  <Text style={{ color: "#ff4d4d", fontWeight: "bold", fontSize: 16 }}>
+                    Withdraw Request
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 onPress={() => setStatusModalVisible(false)}
@@ -3374,250 +3155,6 @@ export function PropertyDetailsScreen(props) {
               >
                 <Text style={{ color: "#333", fontWeight: "bold", fontSize: 16 }}>
                   Close
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* --- IDENTITY VERIFICATION MODAL --- */}
-      <Modal
-        visible={showIdModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => {
-          if (!uploading) setShowIdModal(false);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={{
-            backgroundColor: "#fff",
-            borderTopLeftRadius: 30,
-            borderTopRightRadius: 30,
-            paddingHorizontal: 20,
-            paddingTop: 24,
-            paddingBottom: 34,
-            maxHeight: "85%",
-          }}>
-            {/* HEADER */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Identity Verification</Text>
-              <TouchableOpacity
-                disabled={uploading}
-                onPress={() => setShowIdModal(false)}
-                style={{
-                  padding: 6,
-                  backgroundColor: "#F5F3FF",
-                  borderRadius: 999,
-                }}
-              >
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 20 }}
-            >
-              {/* INFO BOX */}
-              <View style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: "#F5F3FF",
-                borderRadius: 16,
-                padding: 16,
-                gap: 12,
-                marginBottom: 20,
-                borderWidth: 1,
-                borderColor: "rgba(139, 92, 246, 0.1)",
-              }}>
-                <Ionicons name="shield-checkmark" size={24} color={COLORS.PRIMARY} />
-                <Text style={{ flex: 1, fontSize: 14, color: "#1E293B", lineHeight: 20, fontWeight: "500" }}>
-                  Please enter your 12-digit Aadhaar ID and upload a screenshot proof to verify and join the property.
-                </Text>
-              </View>
-
-              {/* AADHAAR ID INPUT */}
-              <Text style={{ fontSize: 15, fontWeight: "700", color: "#1E293B", marginBottom: 10 }}>
-                Aadhaar ID *
-              </Text>
-              <View style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: "#FAF9FF",
-                borderWidth: 1,
-                borderColor: "rgba(139, 92, 246, 0.15)",
-                borderRadius: 16,
-                paddingHorizontal: 16,
-                marginBottom: 20,
-                height: 52,
-              }}>
-                <Ionicons name="card-outline" size={20} color="#64748B" style={{ marginRight: 10 }} />
-                <TextInput
-                  style={{ flex: 1, fontSize: 15, color: "#1E293B", fontWeight: "600" }}
-                  placeholder="Enter 12-digit Aadhaar ID"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="numeric"
-                  maxLength={12}
-                  value={aadharId}
-                  onChangeText={(text) => setAadharId(text.replace(/[^0-9]/g, ''))}
-                  editable={!uploading}
-                />
-              </View>
-
-              {/* AADHAAR FRONT */}
-              {/* AADHAAR IMAGE */}
-              <Text style={{ fontSize: 15, fontWeight: "700", color: "#1E293B", marginBottom: 10 }}>
-                Aadhaar Card Front Image *
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                disabled={uploading}
-                onPress={() => handlePickDocument("front")}
-                style={{
-                  backgroundColor: "#FAF9FF",
-                  borderWidth: 2,
-                  borderStyle: selectedFile ? "solid" : "dashed",
-                  borderColor: selectedFile ? COLORS.PRIMARY : "rgba(139, 92, 246, 0.3)",
-                  borderRadius: 20,
-                  padding: 20,
-                  minHeight: 100,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginBottom: 20,
-                }}
-              >
-                {selectedFile ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", width: "100%", gap: 12 }}>
-                    <Image source={{ uri: selectedFile.uri }} style={{ width: 60, height: 60, borderRadius: 12 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }} numberOfLines={1}>
-                        {selectedFile.name || "aadhar_front.jpg"}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>Image selected</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={{ padding: 8, backgroundColor: "#FEE2E2", borderRadius: 12 }}
-                      disabled={uploading}
-                      onPress={() => setSelectedFile(null)}
-                    >
-                      <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={{ alignItems: "center" }}>
-                    <Ionicons name="image-outline" size={24} color={COLORS.PRIMARY} />
-                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#1E293B", marginTop: 8 }}>
-                      Choose Aadhaar Front
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {/* AADHAAR BACK */}
-              <Text style={{ fontSize: 15, fontWeight: "700", color: "#1E293B", marginBottom: 10 }}>
-                Aadhaar Card Back Image *
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                disabled={uploading}
-                onPress={() => handlePickDocument("back")}
-                style={{
-                  backgroundColor: "#FAF9FF",
-                  borderWidth: 2,
-                  borderStyle: selectedBackFile ? "solid" : "dashed",
-                  borderColor: selectedBackFile ? COLORS.PRIMARY : "rgba(139, 92, 246, 0.3)",
-                  borderRadius: 20,
-                  padding: 20,
-                  minHeight: 100,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginBottom: 20,
-                }}
-              >
-                {selectedBackFile ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", width: "100%", gap: 12 }}>
-                    <Image source={{ uri: selectedBackFile.uri }} style={{ width: 60, height: 60, borderRadius: 12 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }} numberOfLines={1}>
-                        {selectedBackFile.name || "aadhar_back.jpg"}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>Image selected</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={{ padding: 8, backgroundColor: "#FEE2E2", borderRadius: 12 }}
-                      disabled={uploading}
-                      onPress={() => setSelectedBackFile(null)}
-                    >
-                      <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={{ alignItems: "center" }}>
-                    <Ionicons name="image-outline" size={24} color={COLORS.PRIMARY} />
-                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#1E293B", marginTop: 8 }}>
-                      Choose Aadhaar Back
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {/* GUIDELINES */}
-              <View style={{
-                backgroundColor: "#FAF9FF",
-                borderRadius: 16,
-                padding: 16,
-                borderWidth: 1,
-                borderColor: "rgba(139, 92, 246, 0.05)",
-              }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B", marginBottom: 8 }}>
-                  Upload Guidelines:
-                </Text>
-                <Text style={{ fontSize: 13, color: "#64748B", lineHeight: 18, marginBottom: 4 }}>
-                  • Document must be clearly visible and not blurry.
-                </Text>
-                <Text style={{ fontSize: 13, color: "#64748B", lineHeight: 18, marginBottom: 4 }}>
-                  • Ensure all four edges of the document are captured.
-                </Text>
-                <Text style={{ fontSize: 13, color: "#64748B", lineHeight: 18 }}>
-                  • High resolution JPG, PNG formats are accepted.
-                </Text>
-              </View>
-            </ScrollView>
-
-            {/* ACTION BUTTONS */}
-            <View style={{ flexDirection: "row", gap: 12, marginTop: 10 }}>
-              <TouchableOpacity
-                disabled={uploading}
-                style={{
-                  flex: 1,
-                  height: 52,
-                  borderRadius: 16,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: "#F1F5F9",
-                }}
-                onPress={() => setShowIdModal(false)}
-              >
-                <Text style={{ color: "#1E293B", fontWeight: "700", fontSize: 15 }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                disabled={!selectedFile || !selectedBackFile || !aadharId || uploading}
-                style={{
-                  flex: 1,
-                  height: 52,
-                  borderRadius: 16,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: (!selectedFile || !selectedBackFile || !aadharId || uploading)
-                    ? "rgba(139, 92, 246, 0.4)"
-                    : COLORS.PRIMARY,
-                }}
-                onPress={submitIdentityProof}
-              >
-                <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>
-                  {uploading ? "Submitting..." : "Get Started"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -3681,17 +3218,11 @@ export function PropertyDetailsScreen(props) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => {
+              onPress={async () => {
                 setTenantTypeModalVisible(false);
-                if (property?.type === "Hostel") {
-                  setEtFloor(""); setEtRoom(""); setEtBed("");
-                } else if (property?.type === "Apartment") {
-                  setEtFloor(""); setEtRoom(""); setEtSharing("");
-                } else if (property?.type === "Commercial") {
-                  setEtFloor(""); setEtRoom("");
-                }
-                fetchPropertyStructure(property);
+                setEtFloor(""); setEtRoom(""); setEtBed(""); setEtSharing("");
                 setExistingTenantModalVisible(true);
+                await fetchPropertyStructure(property);
               }}
               style={{ backgroundColor: "#f1f5f9", paddingVertical: 14, borderRadius: 12, alignItems: "center", marginBottom: 20, borderWidth: 1, borderColor: "#cbd5e1" }}
             >
@@ -3708,7 +3239,7 @@ export function PropertyDetailsScreen(props) {
       {/* --- EXISTING TENANT SELECTION MODAL (DYNAMIC UI) --- */}
       <Modal visible={existingTenantModalVisible} transparent animationType="slide">
         <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: "80%" }}>
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: "85%" }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <Text style={{ fontSize: 20, fontWeight: "800", color: "#1e293b" }}>{t("existing_tenant_selection") || "Existing Tenant Selection"}</Text>
               <TouchableOpacity onPress={() => setExistingTenantModalVisible(false)}>
@@ -3719,338 +3250,397 @@ export function PropertyDetailsScreen(props) {
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={{ fontSize: 14, color: "#64748b", fontWeight: "700", marginBottom: 16 }}>{t("building") || "Building"}: {property?.name || t("selected_property") || "Selected Property"}</Text>
 
-              <View style={{ gap: 20 }}>
-                {/* 1. FLOOR SELECTION */}
-                <View>
-                  <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_floor") || "1. Select Floor"}</Text>
-                  <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-                    {(propertyStructure?.building_layout || []).map(floorObj => {
-                      const floorKey = `Floor ${floorObj.floorNo}`;
-                      const floorStr = `${t("floor") || "Floor"} ${floorObj.floorNo}`;
-                      return (
-                        <TouchableOpacity key={floorKey} onPress={() => { setEtFloor(floorKey); setEtRoom(""); setEtBed(""); setEtSharing(""); }} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etFloor === floorKey ? COLORS.PRIMARY : "#f1f5f9" }}>
-                          <Text style={{ color: etFloor === floorKey ? "#fff" : "#475569", fontWeight: "700" }}>{floorStr}</Text>
-                        </TouchableOpacity>
-                      )
-                    })}
-                  </View>
-                </View>
+              {(() => {
+                const propType = (property?.type || "").toLowerCase();
+                const isHostel = propType === "hostel";
+                const isApartment = propType === "apartment";
+                const isCommercial = propType === "commercial";
+                const layoutList = propertyStructure?.building_layout || [];
 
-                {/* 2. ROOM SELECTION (Depends on Floor) */}
-                {etFloor !== "" && (
-                  <View>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", textTransform: "uppercase" }}>{t("select") || "2. Select"} {property?.type === "Hostel" ? (t("room") || "Room") : property?.type === "Apartment" ? (t("flat") || "Flat") : (t("unit") || "Unit")}</Text>
-                      {property?.type === "Apartment" && (
-                        <TouchableOpacity onPress={() => setAddUnitModalVisible(true)} style={{ backgroundColor: "#e2e8f0", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#475569" }}>+ {t("add_unit") || "ADD UNIT"}</Text>
-                        </TouchableOpacity>
+                const isSubmitDisabled =
+                  loadingStructure ||
+                  uploading ||
+                  (isHostel && (!etFloor || !etRoom || !etBed)) ||
+                  (isApartment && (!etFloor || !etRoom || !etSharing)) ||
+                  (isCommercial && (!etFloor || !etRoom)) ||
+                  !aadharId || aadharId.length !== 12 || !selectedFile || !selectedPaymentScreenshot;
+
+                return (
+                  <View style={{ gap: 20 }}>
+                    {/* 1. FLOOR SELECTION */}
+                    <View>
+                      <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_floor") || "1. Select Floor"}</Text>
+                      {loadingStructure ? (
+                        <View style={{ paddingVertical: 14, alignItems: "center", justifyContent: "center" }}>
+                          <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                          <Text style={{ color: "#64748b", fontSize: 12, marginTop: 6 }}>Loading building layout...</Text>
+                        </View>
+                      ) : layoutList.length > 0 ? (
+                        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+                          {layoutList.map(floorObj => {
+                            const floorKey = `Floor ${floorObj.floorNo}`;
+                            const floorStr = `${t("floor") || "Floor"} ${floorObj.floorNo}`;
+                            return (
+                              <TouchableOpacity
+                                key={floorKey}
+                                onPress={() => { setEtFloor(floorKey); setEtRoom(""); setEtBed(""); setEtSharing(""); }}
+                                style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etFloor === floorKey ? COLORS.PRIMARY : "#f1f5f9" }}
+                              >
+                                <Text style={{ color: etFloor === floorKey ? "#fff" : "#475569", fontWeight: "700" }}>{floorStr}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 13, color: "#94a3b8", fontStyle: "italic", marginVertical: 4 }}>
+                          No floor layout available for this property.
+                        </Text>
                       )}
                     </View>
-                    <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-                      {(() => {
-                        const floorObj = (propertyStructure?.building_layout || []).find(f => `Floor ${f.floorNo}` === etFloor);
-                        if (floorObj) {
-                          let units = [];
-                          if (property?.type === "Hostel") units = floorObj.rooms || [];
-                          else if (property?.type === "Apartment") units = floorObj.flats || [];
-                          else if (property?.type === "Commercial") units = floorObj.sections || [];
 
-                          if (units.length > 0) {
-                            return units.map(unit => {
-                              let rStr = "";
-                              let unitId = "";
+                    {/* 2. ROOM SELECTION (Depends on Floor) */}
+                    {etFloor !== "" && (
+                      <View>
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                          <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", textTransform: "uppercase" }}>{t("select") || "2. Select"} {isHostel ? (t("room") || "Room") : isApartment ? (t("flat") || "Flat") : (t("unit") || "Unit")}</Text>
+                          {isApartment && (
+                            <TouchableOpacity onPress={() => setAddUnitModalVisible(true)} style={{ backgroundColor: "#e2e8f0", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                              <Text style={{ fontSize: 11, fontWeight: "700", color: "#475569" }}>+ {t("add_unit") || "ADD UNIT"}</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+                          {(() => {
+                            const floorObj = layoutList.find(f => `Floor ${f.floorNo}` === etFloor);
+                            if (floorObj) {
+                              let units = [];
+                              if (isHostel) units = floorObj.rooms || [];
+                              else if (isApartment) units = floorObj.flats || [];
+                              else if (isCommercial) units = floorObj.sections || [];
 
-                              if (property?.type === "Hostel") {
-                                unitId = `${unit.roomNo}`;
-                                rStr = unitId.includes("-") ? unitId : `${etFloor.replace("Floor ", "")}-${unitId.padStart(2, '0')}`;
-                              } else if (property?.type === "Apartment") {
-                                unitId = `${unit.flatNo}`;
-                                rStr = unitId.includes(etFloor.replace("Floor ", "")) ? unitId : `${etFloor.replace("Floor ", "")}${unitId.padStart(2, '0')}`;
-                              } else if (property?.type === "Commercial") {
-                                unitId = `${unit.sectionNo}`;
-                                rStr = unitId.startsWith("C-") ? unitId : `C-${etFloor.replace("Floor ", "")}0${unitId}`;
+                              if (units.length > 0) {
+                                return units.map(unit => {
+                                  let rStr = "";
+                                  let unitId = "";
+
+                                  if (isHostel) {
+                                    unitId = `${unit.roomNo}`;
+                                    rStr = unitId.includes("-") ? unitId : `${etFloor.replace("Floor ", "")}-${unitId.padStart(2, '0')}`;
+                                  } else if (isApartment) {
+                                    unitId = `${unit.flatNo}`;
+                                    rStr = unitId.includes(etFloor.replace("Floor ", "")) ? unitId : `${etFloor.replace("Floor ", "")}${unitId.padStart(2, '0')}`;
+                                  } else if (isCommercial) {
+                                    unitId = `${unit.sectionNo}`;
+                                    rStr = unitId.startsWith("C-") ? unitId : `C-${etFloor.replace("Floor ", "")}0${unitId}`;
+                                  }
+
+                                  return (
+                                    <TouchableOpacity
+                                      key={rStr}
+                                      onPress={() => {
+                                        setEtRoom(rStr);
+                                        setEtBed("");
+                                        setEtSharing(isApartment ? (unit.bhk || "") : "");
+                                      }}
+                                      style={{
+                                        paddingHorizontal: 16,
+                                        paddingVertical: 10,
+                                        borderRadius: 8,
+                                        backgroundColor: etRoom === rStr ? COLORS.PRIMARY : "#f1f5f9",
+                                      }}
+                                    >
+                                      <Text style={{ color: etRoom === rStr ? "#fff" : "#475569", fontWeight: "700" }}>
+                                        {isHostel ? `${t("room") || "Room"} ${rStr}` : isApartment ? `${t("flat") || "Flat"} ${rStr}` : `${t("unit") || "Unit"} ${rStr}`}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  );
+                                });
                               }
+                            }
+                            return <Text style={{ fontSize: 12, color: "#94a3b8" }}>{t("no_units_available") || "No units available for this floor."}</Text>;
+                          })()}
+                          {/* Render dynamically added units for this floor */}
+                          {addedUnits.filter(u => `Floor ${u.floor}` === etFloor).map((u, i) => (
+                            <TouchableOpacity key={`added-${i}`} onPress={() => { setEtRoom(u.unit); setEtSharing(u.type); }} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etRoom === u.unit ? COLORS.PRIMARY : "#f1f5f9", borderWidth: 1, borderColor: COLORS.PRIMARY }}>
+                              <Text style={{ color: etRoom === u.unit ? "#fff" : "#475569", fontWeight: "700" }}>{u.unit} ({u.type})</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    )}
 
-                              return (
-                                <TouchableOpacity
-                                  key={rStr}
-                                  onPress={() => {
-                                    setEtRoom(rStr);
-                                    setEtBed("");
-                                    setEtSharing(property?.type === "Apartment" ? (unit.bhk || "") : "");
-                                  }}
-                                  style={{
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 10,
-                                    borderRadius: 8,
-                                    backgroundColor: etRoom === rStr ? COLORS.PRIMARY : "#f1f5f9",
-                                  }}
-                                >
-                                  <Text style={{ color: etRoom === rStr ? "#fff" : "#475569", fontWeight: "700" }}>
-                                    {property?.type === "Hostel" ? `${t("room") || "Room"} ${rStr}` : property?.type === "Apartment" ? `${t("flat") || "Flat"} ${rStr}` : `${t("unit") || "Unit"} ${rStr}`}
-                                  </Text>
-                                </TouchableOpacity>
-                              );
-                            });
-                          }
-                        }
-                        return <Text style={{ fontSize: 12, color: "#94a3b8" }}>{t("no_units_available") || "No units available for this floor."}</Text>;
-                      })()}
-                      {/* Render dynamically added units for this floor */}
-                      {addedUnits.filter(u => `Floor ${u.floor}` === etFloor).map((u, i) => (
-                        <TouchableOpacity key={`added-${i}`} onPress={() => { setEtRoom(u.unit); setEtSharing(u.type); }} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etRoom === u.unit ? COLORS.PRIMARY : "#f1f5f9", borderWidth: 1, borderColor: COLORS.PRIMARY }}>
-                          <Text style={{ color: etRoom === u.unit ? "#fff" : "#475569", fontWeight: "700" }}>{u.unit} ({u.type})</Text>
+                    {/* 3. BED / SHARING SELECTION (Depends on Room) */}
+                    {etFloor !== "" && etRoom !== "" && isHostel && (
+                      <View>
+                        <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_bed") || "3. Select Bed"}</Text>
+                        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+                          {(() => {
+                            const floorObj = layoutList.find(f => `Floor ${f.floorNo}` === etFloor);
+                            if (floorObj) {
+                              const room = (floorObj.rooms || []).find(r => {
+                                let testStr = `${r.roomNo}`;
+                                if (!testStr.includes("-")) testStr = `${etFloor.replace("Floor ", "")}-${testStr.padStart(2, '0')}`;
+                                return testStr === etRoom;
+                              });
+
+                              if (room) {
+                                if (Array.isArray(room.beds) && room.beds.length > 0) {
+                                  return room.beds.map((bObj, i) => {
+                                    const bNum = typeof bObj === "object" ? (bObj.bedNumber || (i + 1)) : bObj;
+                                    const bKey = `Bed ${bNum}`;
+                                    const bStr = `${t("bed") || "Bed"} ${bNum}`;
+                                    return (
+                                      <TouchableOpacity
+                                        key={bKey}
+                                        onPress={() => setEtBed(bKey)}
+                                        style={{
+                                          paddingHorizontal: 16,
+                                          paddingVertical: 10,
+                                          borderRadius: 8,
+                                          backgroundColor: etBed === bKey ? COLORS.PRIMARY : "#f1f5f9",
+                                        }}
+                                      >
+                                        <Text style={{ color: etBed === bKey ? "#fff" : "#475569", fontWeight: "700" }}>{bStr}</Text>
+                                      </TouchableOpacity>
+                                    );
+                                  });
+                                } else {
+                                  const numBeds = typeof room.beds === "number" ? room.beds : (parseInt(room.beds, 10) || (room.sharing || 1));
+                                  return Array.from({ length: numBeds }, (_, i) => i + 1).map(b => {
+                                    const bKey = `Bed ${b}`;
+                                    const bStr = `${t("bed") || "Bed"} ${b}`;
+                                    return (
+                                      <TouchableOpacity
+                                        key={bKey}
+                                        onPress={() => setEtBed(bKey)}
+                                        style={{
+                                          paddingHorizontal: 16,
+                                          paddingVertical: 10,
+                                          borderRadius: 8,
+                                          backgroundColor: etBed === bKey ? COLORS.PRIMARY : "#f1f5f9",
+                                        }}
+                                      >
+                                        <Text style={{ color: etBed === bKey ? "#fff" : "#475569", fontWeight: "700" }}>{bStr}</Text>
+                                      </TouchableOpacity>
+                                    );
+                                  });
+                                }
+                              }
+                            }
+                            return <Text style={{ fontSize: 12, color: "#94a3b8" }}>{t("no_beds_available") || "No beds available for this room."}</Text>;
+                          })()}
+                        </View>
+                      </View>
+                    )}
+
+                    {etFloor !== "" && etRoom !== "" && isApartment && (
+                      <View>
+                        <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_type") || "3. Select Type"}</Text>
+                        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+                          {["1BHK", "2BHK", "3BHK"].map(tType => (
+                            <TouchableOpacity key={tType} onPress={() => setEtSharing(tType)} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etSharing === tType ? COLORS.PRIMARY : "#f1f5f9" }}>
+                              <Text style={{ color: etSharing === tType ? "#fff" : "#475569", fontWeight: "700" }}>{tType}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {etFloor !== "" && etRoom !== "" && (
+                      <View style={{ gap: 16, marginTop: 10, borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 20 }}>
+                        <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", textTransform: "uppercase" }}>{t("upload_identity_payment") || "4. Upload Identity & Payment Proof"}</Text>
+                        {/* Aadhaar ID */}
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("aadhaar_id") || "Aadhaar ID *"}</Text>
+                        <TextInput
+                          style={{
+                            backgroundColor: "#f8fafc",
+                            borderWidth: 1,
+                            borderColor: "#cbd5e1",
+                            borderRadius: 10,
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            fontSize: 14,
+                            color: "#1e293b",
+                          }}
+                          placeholder={t("enter_aadhaar") || "Enter 12-digit Aadhaar ID"}
+                          placeholderTextColor="#94a3b8"
+                          keyboardType="numeric"
+                          maxLength={12}
+                          value={aadharId}
+                          onChangeText={(text) => setAadharId(text.replace(/[^0-9]/g, ''))}
+                        />
+                        {/* Aadhaar Image */}
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("aadhaar_image") || "Aadhaar Card Image *"}</Text>
+                        <TouchableOpacity
+                          onPress={() => handlePickDocument("front")}
+                          style={{
+                            backgroundColor: "#f8fafc",
+                            borderWidth: 1,
+                            borderStyle: selectedFile ? "solid" : "dashed",
+                            borderColor: selectedFile ? COLORS.PRIMARY : "#cbd5e1",
+                            borderRadius: 10,
+                            padding: 14,
+                            alignItems: "center",
+                          }}
+                        >
+                          {selectedFile ? (
+                            <Text style={{ color: COLORS.PRIMARY, fontWeight: "600" }} numberOfLines={1}>
+                              ✓ {selectedFile.name || t("aadhaar_image_selected") || "Aadhaar Card Image Selected"}
+                            </Text>
+                          ) : (
+                            <Text style={{ color: "#64748b" }}>{t("choose_aadhaar") || "Choose Aadhaar Card Image"}</Text>
+                          )}
                         </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
+                        {/* Payment Screenshot */}
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("payment_proof") || "Payment Proof / Screenshot *"}</Text>
+                        <TouchableOpacity
+                          onPress={() => handlePickDocument("payment")}
+                          style={{
+                            backgroundColor: "#f8fafc",
+                            borderWidth: 1,
+                            borderStyle: selectedPaymentScreenshot ? "solid" : "dashed",
+                            borderColor: selectedPaymentScreenshot ? COLORS.PRIMARY : "#cbd5e1",
+                            borderRadius: 10,
+                            padding: 14,
+                            alignItems: "center",
+                          }}
+                        >
+                          {selectedPaymentScreenshot ? (
+                            <Text style={{ color: COLORS.PRIMARY, fontWeight: "600" }} numberOfLines={1}>
+                              ✓ {selectedPaymentScreenshot.name || "Payment Proof Selected"}
+                            </Text>
+                          ) : (
+                            <Text style={{ color: "#64748b" }}>{t("choose_payment_proof") || "Choose Payment Proof / Screenshot"}</Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    )}
 
-                {/* 3. BED / SHARING SELECTION (Depends on Room) */}
-                {etFloor !== "" && etRoom !== "" && property?.type === "Hostel" && (
-                  <View>
-                    <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_bed") || "3. Select Bed"}</Text>
-                    <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-                      {(() => {
-                        const floorObj = (propertyStructure?.building_layout || []).find(f => `Floor ${f.floorNo}` === etFloor);
-                        if (floorObj && property?.type === "Hostel") {
-                          const room = (floorObj.rooms || []).find(r => {
-                            let testStr = `${r.roomNo}`;
-                            if (!testStr.includes("-")) testStr = `${etFloor.replace("Floor ", "")}-${testStr.padStart(2, '0')}`;
-                            return testStr === etRoom;
+                    <TouchableOpacity
+                      disabled={isSubmitDisabled}
+                      onPress={async () => {
+                        try {
+                          setUploading(true);
+                          const tenantPhone = await AsyncStorage.getItem("tenantPhone");
+                          if (!tenantPhone) {
+                            Alert.alert("Error", "Tenant phone missing. Please login again.");
+                            return;
+                          }
+                          const ownerContact = property?.contact || property?.ownerPhone || property?.owner_id;
+                          if (!ownerContact) {
+                            Alert.alert("Error", "Owner details missing for this property.");
+                            return;
+                          }
+                          if (!aadharId || !selectedFile || !selectedPaymentScreenshot) {
+                            Alert.alert("Missing Information", "Please enter Aadhaar ID and upload Aadhaar Card Image and Payment Screenshot.");
+                            return;
+                          }
+                          if (aadharId.length !== 12) {
+                            Alert.alert("Invalid Aadhaar", "Aadhaar ID must be exactly 12 numeric digits.");
+                            return;
+                          }
+                          // 1. Upload Identity and Payment Proofs first
+                          const formData = new FormData();
+                          formData.append("phone", tenantPhone);
+                          formData.append("aadhar_id", aadharId);
+                          formData.append("aadhar_image", {
+                            uri: selectedFile.uri,
+                            name: selectedFile.name || "aadhar.jpg",
+                            type: selectedFile.mimeType || "image/jpeg"
                           });
-
-                          if (room && room.beds > 0) {
-                            return Array.from({ length: room.beds }, (_, i) => i + 1).map(b => {
-                              const bKey = `Bed ${b}`;
-                              const bStr = `${t("bed") || "Bed"} ${b}`;
-                              return (
-                                <TouchableOpacity
-                                  key={bKey}
-                                  onPress={() => setEtBed(bKey)}
-                                  style={{
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 10,
-                                    borderRadius: 8,
-                                    backgroundColor: etBed === bKey ? COLORS.PRIMARY : "#f1f5f9",
-                                  }}
-                                >
-                                  <Text style={{ color: etBed === bKey ? "#fff" : "#475569", fontWeight: "700" }}>{bStr}</Text>
-                                </TouchableOpacity>
-                              );
+                          if (selectedBackFile) {
+                            formData.append("aadhar_back_image", {
+                              uri: selectedBackFile.uri,
+                              name: selectedBackFile.name || "aadhar_back.jpg",
+                              type: selectedBackFile.mimeType || "image/jpeg"
                             });
                           }
+                          formData.append("payment_screenshot", {
+                            uri: selectedPaymentScreenshot.uri,
+                            name: selectedPaymentScreenshot.name || "payment_proof.jpg",
+                            type: selectedPaymentScreenshot.mimeType || "image/jpeg"
+                          });
+                          const uploadRes = await fetchWithAuth(`${BASE_URL}/api/tenant/submit_verification/`, {
+                            method: "POST",
+                            body: formData,
+                          });
+                          const uploadData = await uploadRes.json();
+                          if (!uploadRes.ok) {
+                            Alert.alert("Upload Failed", "Failed to upload proofs: " + (uploadData.error || "Unknown error"));
+                            return;
+                          }
+                          // 2. Submit Existing Tenant Request
+                          const reqData = {
+                            tenant_phone: tenantPhone,
+                            owner_id: property.owner_id || "",
+                            owner_phone: property.contact || property.ownerPhone || "",
+                            property_name: property.name,
+                            property_type: property.type,
+                            check_in: new Date().toISOString().split("T")[0],
+                            check_out: "N/A",
+                            sharing: isApartment ? etSharing : "",
+                            flat: isApartment ? etRoom : "",
+                            section: isCommercial ? etRoom : "",
+                            is_existing_tenant: true,
+                            requested_floor: etFloor.replace("Floor ", ""),
+                            requested_room: (isHostel || isCommercial) ? etRoom.replace("Room ", "").replace("Unit ", "") : (isApartment ? etRoom : ""),
+                            requested_bed: isHostel ? etBed.replace("Bed ", "") : "",
+                          };
+                          const response = await fetchWithAuth(
+                            `${BASE_URL}/api/existing_tenant_request/`,
+                            {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify(reqData),
+                            }
+                          );
+                          const textData = await response.text();
+                          let data;
+                          try {
+                            data = JSON.parse(textData);
+                          } catch (e) {
+                            data = { error: textData };
+                          }
+                          if (response.ok) {
+                            Alert.alert("Request Sent! 🎉", `Existing Tenant Request Sent!\nWe will contact you shortly regarding ${property.name}.`);
+                            setRequestStatus("pending");
+                            if (bookingContext?.setRefreshTrigger) {
+                              bookingContext.setRefreshTrigger(prev => prev + 1);
+                            }
+                            setExistingTenantModalVisible(false);
+                            if (typeof setStatusModalVisible === "function") {
+                              setStatusModalVisible(true);
+                            }
+                          } else {
+                            Alert.alert("Booking Failed", data.error || data.message || "Failed to send booking request.");
+                          }
+                        } catch (error) {
+                          console.log("Booking Error:", error);
+                          Alert.alert("Error", "Something went wrong. Please try again.");
+                        } finally {
+                          setUploading(false);
                         }
-                        return <Text style={{ fontSize: 12, color: "#94a3b8" }}>{t("no_beds_available") || "No beds available for this room."}</Text>;
-                      })()}
-                    </View>
-                  </View>
-                )}
-                {etFloor !== "" && etRoom !== "" && property?.type === "Apartment" && (
-                  <View>
-                    <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", marginBottom: 10, textTransform: "uppercase" }}>{t("select_type") || "3. Select Type"}</Text>
-                    <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-                      {["1BHK", "2BHK", "3BHK"].map(t => (
-                        <TouchableOpacity key={t} onPress={() => setEtSharing(t)} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: etSharing === t ? COLORS.PRIMARY : "#f1f5f9" }}>
-                          <Text style={{ color: etSharing === t ? "#fff" : "#475569", fontWeight: "700" }}>{t}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
-                {etFloor !== "" && etRoom !== "" && (
-                  <View style={{ gap: 16, marginTop: 10, borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 20 }}>
-                    <Text style={{ fontSize: 12, color: "#64748b", fontWeight: "800", textTransform: "uppercase" }}>{t("upload_identity_payment") || "4. Upload Identity & Payment Proof"}</Text>
-                    {/* Aadhaar ID */}
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("aadhaar_id") || "Aadhaar ID *"}</Text>
-                    <TextInput
-                      style={{
-                        backgroundColor: "#f8fafc",
-                        borderWidth: 1,
-                        borderColor: "#cbd5e1",
-                        borderRadius: 10,
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        fontSize: 14,
-                        color: "#1e293b",
                       }}
-                      placeholder={t("enter_aadhaar") || "Enter 12-digit Aadhaar ID"}
-                      placeholderTextColor="#94a3b8"
-                      keyboardType="numeric"
-                      maxLength={12}
-                      value={aadharId}
-                      onChangeText={(text) => setAadharId(text.replace(/[^0-9]/g, ''))}
-                    />
-                    {/* Aadhaar Image */}
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("aadhaar_image") || "Aadhaar Card Image *"}</Text>
-                    <TouchableOpacity
-                      onPress={() => handlePickDocument("front")}
                       style={{
-                        backgroundColor: "#f8fafc",
-                        borderWidth: 1,
-                        borderStyle: selectedFile ? "solid" : "dashed",
-                        borderColor: selectedFile ? COLORS.PRIMARY : "#cbd5e1",
-                        borderRadius: 10,
-                        padding: 14,
+                        backgroundColor: COLORS.PRIMARY,
+                        paddingVertical: 16,
+                        borderRadius: 14,
                         alignItems: "center",
+                        marginTop: 20,
+                        opacity: isSubmitDisabled ? 0.5 : 1
                       }}
                     >
-                      {selectedFile ? (
-                        <Text style={{ color: COLORS.PRIMARY, fontWeight: "600" }} numberOfLines={1}>
-                          ✓ {selectedFile.name || t("aadhaar_image_selected") || "Aadhaar Card Image Selected"}
-                        </Text>
+                      {uploading ? (
+                        <ActivityIndicator color="#fff" />
                       ) : (
-                        <Text style={{ color: "#64748b" }}>{t("choose_aadhaar") || "Choose Aadhaar Card Image"}</Text>
-                      )}
-                    </TouchableOpacity>
-                    {/* Payment Screenshot */}
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>{t("payment_proof") || "Payment Proof / Screenshot *"}</Text>
-                    <TouchableOpacity
-                      onPress={() => handlePickDocument("payment")}
-                      style={{
-                        backgroundColor: "#f8fafc",
-                        borderWidth: 1,
-                        borderStyle: selectedPaymentScreenshot ? "solid" : "dashed",
-                        borderColor: selectedPaymentScreenshot ? COLORS.PRIMARY : "#cbd5e1",
-                        borderRadius: 10,
-                        padding: 14,
-                        alignItems: "center",
-                      }}
-                    >
-                      {selectedPaymentScreenshot ? (
-                        <Text style={{ color: COLORS.PRIMARY, fontWeight: "600" }} numberOfLines={1}>
-                          ✓ {selectedPaymentScreenshot.name || "Payment Proof Selected"}
-                        </Text>
-                      ) : (
-                        <Text style={{ color: "#64748b" }}>{t("choose_payment_proof") || "Choose Payment Proof / Screenshot"}</Text>
+                        <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>{buttonText || "Book Now"}</Text>
                       )}
                     </TouchableOpacity>
                   </View>
-                )}
-              </View>
-              <TouchableOpacity
-                disabled={
-                  (property?.type === "Hostel" && (!etFloor || !etRoom || !etBed)) ||
-                  (property?.type === "Apartment" && (!etFloor || !etRoom || !etSharing)) ||
-                  (property?.type === "Commercial" && (!etFloor || !etRoom)) ||
-                  !aadharId || !selectedFile || !selectedPaymentScreenshot
-                }
-                onPress={async () => {
-                  try {
-                    const tenantPhone = await AsyncStorage.getItem("tenantPhone");
-                    if (!tenantPhone) {
-                      alert("Tenant phone missing. Please login again.");
-                      return;
-                    }
-                    if (!property.contact) {
-                      alert("Owner phone missing");
-                      return;
-                    }
-                    if (!aadharId || !selectedFile || !selectedPaymentScreenshot) {
-                      alert("Please enter Aadhaar ID and upload Aadhaar Card Image and Payment Screenshot.");
-                      return;
-                    }
-                    if (aadharId.length !== 12) {
-                      alert("Aadhaar ID must be exactly 12 numeric digits.");
-                      return;
-                    }
-                    // 1. Upload Identity and Payment Proofs first
-                    const formData = new FormData();
-                    formData.append("phone", tenantPhone);
-                    formData.append("aadhar_id", aadharId);
-                    formData.append("aadhar_image", {
-                      uri: selectedFile.uri,
-                      name: selectedFile.name || "aadhar.jpg",
-                      type: selectedFile.mimeType || "image/jpeg"
-                    });
-                    if (selectedBackFile) {
-                      formData.append("aadhar_back_image", {
-                        uri: selectedBackFile.uri,
-                        name: selectedBackFile.name || "aadhar_back.jpg",
-                        type: selectedBackFile.mimeType || "image/jpeg"
-                      });
-                    }
-                    formData.append("payment_screenshot", {
-                      uri: selectedPaymentScreenshot.uri,
-                      name: selectedPaymentScreenshot.name || "payment_proof.jpg",
-                      type: selectedPaymentScreenshot.mimeType || "image/jpeg"
-                    });
-                    const uploadRes = await fetchWithAuth(`${BASE_URL}/api/tenant/submit_verification/`, {
-                      method: "POST",
-                      body: formData,
-                    });
-                    const uploadData = await uploadRes.json();
-                    if (!uploadRes.ok) {
-                      alert("Failed to upload proofs: " + (uploadData.error || "Unknown error"));
-                      return;
-                    }
-                    // 2. Submit Existing Tenant Request
-                    const reqData = {
-                      tenant_phone: tenantPhone,
-                      owner_id: property.owner_id || "",
-                      owner_phone: property.contact,
-                      property_name: property.name,
-                      property_type: property.type,
-                      check_in: new Date().toISOString().split("T")[0],
-                      check_out: "N/A",
-                      sharing: property?.type === "Apartment" ? etSharing : "",
-                      flat: property?.type === "Apartment" ? etRoom : "",
-                      section: "",
-                      is_existing_tenant: true,
-                      requested_floor: etFloor.replace("Floor ", ""),
-                      requested_room: (property?.type === "Hostel" || property?.type === "Commercial") ? etRoom.replace("Room ", "").replace("Unit ", "") : (property?.type === "Apartment" ? etRoom : ""),
-                      requested_bed: property?.type === "Hostel" ? etBed.replace("Bed ", "") : "",
-                    };
-                    const response = await fetchWithAuth(
-                      `${BASE_URL}/api/existing_tenant_request/`,
-                      {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify(reqData),
-                      }
-                    );
-                    const textData = await response.text();
-                    console.log("Raw Response Data:", textData);
-                    let data;
-                    try {
-                      data = JSON.parse(textData);
-                    } catch (e) {
-                      console.log("JSON Parse Error on Response:", e);
-                      data = { error: textData };
-                    }
-                    if (response.ok) {
-                      alert(`Existing Tenant Request Sent! 🎉\nWe will contact you shortly regarding ${property.name}.`);
-                      setRequestStatus("pending");
-                      if (bookingContext?.setRefreshTrigger) {
-                        bookingContext.setRefreshTrigger(prev => prev + 1);
-                      }
-                    } else {
-                      alert("Failed to send booking request: " + (data.error || data.message || "Unknown error"));
-                      console.log("Server Error:", data);
-                    }
-                    setExistingTenantModalVisible(false);
-                    if (typeof setStatusModalVisible === "function") {
-                      setStatusModalVisible(true);
-                    }
-                  } catch (error) {
-                    console.log("Booking Error:", error);
-                    alert("Something went wrong. Please try again.");
-                  }
-                }}
-                style={{
-                  backgroundColor: COLORS.PRIMARY,
-                  paddingVertical: 16,
-                  borderRadius: 14,
-                  alignItems: "center",
-                  marginTop: 30,
-                  opacity: 1
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>{buttonText}</Text>
-              </TouchableOpacity>
+                );
+              })()}
             </ScrollView>
           </View>
         </View>
@@ -4273,12 +3863,14 @@ const homeStyles = StyleSheet.create({
     justifyContent: "space-between",
     width: "100%",
   },
-  myStayCard: {
+  myStayCardWrapper: {
     width: (width - 48) / 2,
-    backgroundColor: "#FFFFFF",
+    marginBottom: 14,
+  },
+  myStayCard: {
+    width: "100%",
     borderRadius: 22,
     padding: 16,
-    marginBottom: 14,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
@@ -4287,7 +3879,8 @@ const homeStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
     justifyContent: "space-between",
-    minHeight: 160,
+    minHeight: 165,
+    overflow: "hidden",
   },
   myStayIconCircle: {
     width: 44,
