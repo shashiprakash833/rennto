@@ -851,177 +851,173 @@ export default function OwnerProfile({ navigation }) {
 
         {/* Manage Accounts Section */}
         <View style={styles.section}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <Text style={styles.sectionTitle}>{t("manage_accounts") || "Manage Accounts"}</Text>
-            {accounts.length > 1 && (
-              <TouchableOpacity
-                onPress={async () => {
-                  await loadAccounts();
-                  setShowAccountSwitcher(true);
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: '#F5F3FF',
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: '#EDE9FE',
-                  gap: 4,
-                }}
-              >
-                <Ionicons name="swap-horizontal" size={14} color="#7C3AED" />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#7C3AED' }}>
-                  {t("switch_account") || "Switch"} ({accounts.length})
-                </Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              onPress={async () => {
+                await loadAccounts();
+                setShowAccountSwitcher(true);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#F5F3FF',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: '#EDE9FE',
+                gap: 5,
+              }}
+            >
+              <Ionicons name="swap-horizontal" size={16} color="#7C3AED" />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#7C3AED' }}>
+                {accounts.length > 1
+                  ? `${t("switch_account") || "Switch Account"} (${accounts.length})`
+                  : (t("switch_account") || "Switch Account")}
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Current Active Property Card */}
+          {/* Single Combined Manage Accounts Card */}
           <View
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: 20,
-              padding: 16,
+              padding: 18,
               borderWidth: 1,
               borderColor: '#EDE9FE',
-              marginBottom: 12,
               shadowColor: '#7C3AED',
-              shadowOffset: { width: 0, height: 3 },
+              shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.08,
-              shadowRadius: 10,
+              shadowRadius: 12,
               elevation: 3,
             }}
           >
-            {/* Header: "Current Property" label + "Active / Currently Managing" Badge */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#7C3AED' }} />
-                <Text style={{ fontSize: 12, fontWeight: '800', color: '#7C3AED', textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                  {t("current_property") || "Current Property"}
-                </Text>
-              </View>
-
-              <View
+            {/* Top Right: ● CURRENT PROPERTY */}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 6 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#7C3AED', marginRight: 5 }} />
+              <Text
                 style={{
-                  backgroundColor: (selectedAccount?.status === 'suspend' || editableOwner?.status === 'suspend')
-                    ? '#FEE2E2'
-                    : '#DCFCE7',
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 12,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4,
+                  fontSize: 11.5,
+                  fontWeight: '800',
+                  color: '#7C3AED',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.6,
                 }}
               >
-                <View
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 3,
-                    backgroundColor: (selectedAccount?.status === 'suspend' || editableOwner?.status === 'suspend')
-                      ? '#EF4444'
-                      : '#16A34A',
-                  }}
-                />
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: '700',
-                    color: (selectedAccount?.status === 'suspend' || editableOwner?.status === 'suspend')
-                      ? '#DC2626'
-                      : '#15803D',
-                  }}
-                >
-                  {(selectedAccount?.status === 'suspend' || editableOwner?.status === 'suspend')
-                    ? "Suspended"
-                    : (t("currently_managing") || "Currently Managing")}
-                </Text>
-              </View>
+                {t("current_property") || "CURRENT PROPERTY"}
+              </Text>
             </View>
 
-            {/* Property Details Row */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {/* Current Active Property Row */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View
                 style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 14,
+                  width: 56,
+                  height: 56,
+                  borderRadius: 16,
                   backgroundColor: '#F5F3FF',
                   justifyContent: 'center',
                   alignItems: 'center',
+                  marginRight: 14,
                   borderWidth: 1,
                   borderColor: '#EDE9FE',
+                  overflow: 'hidden',
                 }}
               >
-                <Ionicons name="business" size={24} color="#7C3AED" />
+                {selectedAccount?.property_image ? (
+                  <Image
+                    source={{ uri: selectedAccount.property_image }}
+                    style={{ width: '100%', height: '100%', borderRadius: 15 }}
+                  />
+                ) : (
+                  <Ionicons name="business" size={28} color="#7C3AED" />
+                )}
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: '#1F2937' }} numberOfLines={1}>
+                <Text
+                  style={{
+                    fontSize: 17,
+                    fontWeight: '800',
+                    color: '#1F2937',
+                    marginBottom: 4,
+                  }}
+                  numberOfLines={1}
+                >
                   {editableOwner.propertyName && editableOwner.propertyName !== "Loading..."
                     ? editableOwner.propertyName
                     : (selectedAccount?.property_name || selectedAccount?.name || "Active Property")}
                 </Text>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
-                  <Ionicons name="location-sharp" size={13} color="#6B7280" />
-                  <Text style={{ fontSize: 12.5, color: '#6B7280', flex: 1 }} numberOfLines={1}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  <Ionicons name="location-sharp" size={14} color="#6B7280" style={{ marginRight: 4 }} />
+                  <Text style={{ fontSize: 13, color: '#6B7280', flex: 1 }} numberOfLines={1}>
                     {editableOwner.location && editableOwner.location !== "Loading..."
                       ? editableOwner.location
                       : (selectedAccount?.location || selectedAccount?.area || "Location not set")}
                   </Text>
                 </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="person-outline" size={13} color="#7C3AED" style={{ marginRight: 4 }} />
+                  <Text style={{ fontSize: 12.5, color: '#7C3AED', fontWeight: '600', flex: 1 }} numberOfLines={1}>
+                    {editableOwner.role || (selectedAccount?.property_type ? `${selectedAccount.property_type.charAt(0).toUpperCase() + selectedAccount.property_type.slice(1)} Owner` : "Property Owner")}
+                  </Text>
+                </View>
               </View>
             </View>
 
-            {/* Type & Stats Pill Footer */}
+            {/* Divider Line */}
             <View
+              style={{
+                height: 1,
+                backgroundColor: '#F1F5F9',
+                marginVertical: 14,
+              }}
+            />
+
+            {/* Add Another Property Action Row */}
+            <TouchableOpacity
+              activeOpacity={0.75}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 8,
-                marginTop: 12,
-                paddingTop: 10,
-                borderTopWidth: 1,
-                borderTopColor: '#F3F4F6',
+              }}
+              onPress={async () => {
+                await loadAccounts();
+                setShowAddAccountModal(true);
               }}
             >
-              <View style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
-                <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#4B5563' }}>
-                  {editableOwner.role || selectedAccount?.property_type || "Hostel"}
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 16,
+                  backgroundColor: '#F5F3FF',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 14,
+                  borderWidth: 1,
+                  borderColor: '#EDE9FE',
+                }}
+              >
+                <Ionicons name="person-add-outline" size={24} color="#7C3AED" />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#1F2937' }}>
+                  {t("add_another_Property") || "Add Another Property"}
+                </Text>
+                <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>
+                  {t("login_with_different") || "Login with Different Account"}
                 </Text>
               </View>
-              {Boolean(property.totalBeds > 0) && (
-                <View style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
-                  <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#4B5563' }}>
-                    {property.occupied}/{property.totalBeds} Beds Occupied
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
 
-          {/* Add Another Property Action Button */}
-          <TouchableOpacity
-            style={[styles.expensesCard, { flexDirection: 'row', alignItems: 'center', padding: 16, marginTop: 0, shadowColor: '#7C3AED' }]}
-            onPress={async () => {
-              await loadAccounts();
-              setShowAccountSwitcher(true);
-            }}
-          >
-            <View style={[styles.expenseIconBox, { backgroundColor: '#F5F3FF' }]}>
-              <Ionicons name="person-add-outline" size={24} color="#7C3AED" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1F2937' }}>{t("add_another_Property") || "Add another property"}</Text>
-              <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>{t("login_with_different") || "Login with a different account"}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
+              <Ionicons name="chevron-forward" size={22} color="#7C3AED" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Account Settings */}
