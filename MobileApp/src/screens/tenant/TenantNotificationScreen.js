@@ -317,14 +317,18 @@ const TenantNotificationScreen = () => {
       };
     }
 
+    const titleL = (item.title || "").toLowerCase();
+    const msgL = (item.message || "").toLowerCase();
+
     if (item.type === "MESSAGE") {
-      const isRemoval = (item.title || "").toLowerCase().includes("removed");
+      const isRemoval = titleL.includes("removed");
+      const isAadhaar = titleL.includes("aadhaar") || msgL.includes("aadhaar");
       return {
         title: item.title || "Notification",
         message: item.message,
-        icon: isRemoval ? "warning-outline" : "notifications",
-        color: isRemoval ? COLORS.ERROR : COLORS.PRIMARY,
-        lightColor: isRemoval ? "#FFEBEE" : "#EDE9FE",
+        icon: isAadhaar ? "shield-checkmark" : isRemoval ? "warning-outline" : "notifications",
+        color: isAadhaar ? COLORS.PRIMARY : isRemoval ? COLORS.ERROR : COLORS.PRIMARY,
+        lightColor: isAadhaar ? "#EDE9FE" : isRemoval ? "#FFEBEE" : "#EDE9FE",
       };
     }
 
@@ -340,11 +344,11 @@ const TenantNotificationScreen = () => {
         };
       }
       return {
-        title: t("booking_approved") || "Booking Approved",
-        message: t("booking_approved_desc") || "Great news! Your booking request has been approved.",
-        icon: "checkmark-circle",
-        color: COLORS.SUCCESS,
-        lightColor: "#E8F5E9",
+        title: "Upload Aadhaar to Join 📄",
+        message: item.message || `Great news! Your booking for ${item.propertyName || item.property_name || 'the property'} has been approved. Please upload your Aadhaar document to complete verification and join.`,
+        icon: "shield-checkmark",
+        color: COLORS.PRIMARY,
+        lightColor: "#EDE9FE",
       };
     }
     if (status === "completed" || status === "joined") {
@@ -433,7 +437,7 @@ const TenantNotificationScreen = () => {
     return `${date.toLocaleDateString("en-US", dateOptions)}, ${timeStr}`;
   };
 
-const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
+  const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
   const filteredRequests = visibleRequests;
   const grouped = groupNotifications(filteredRequests);
  
@@ -441,12 +445,18 @@ const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
     const rawType = (item?.type || "").toLowerCase();
     const title = (item?.title || "").toLowerCase();
     const msg = (item?.message || "").toLowerCase();
-    if (rawType.includes("payment") || title.includes("payment")||title.includes("due") || title.includes("rent") || msg.includes("payment")) {
+    const status = (item?.status || "").toLowerCase();
+
+    if (rawType.includes("payment") || title.includes("payment") || title.includes("due") || title.includes("rent") || msg.includes("payment")) {
       navigation.navigate("TenantNavigation", { screen: "Payment" });
       return;
     }
     if (rawType.includes("issue") || title.includes("issue") || msg.includes("issue")) {
       navigation.navigate("TenantNavigation", { screen: "Issues" });
+      return;
+    }
+    if ((status === "accepted" || status === "allotted" || status === "pending_confirmation" || title.includes("aadhaar") || msg.includes("aadhaar")) && !joiningIds.includes(item.id)) {
+      handleJoinNow(item);
       return;
     }
     navigation.navigate("TenantNavigation", { screen: "Home", params: { screen: "TenantHome" } });
@@ -503,10 +513,11 @@ const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
               ) : (
                 <View style={styles.actionRow}>
                   <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: COLORS.SUCCESS }]}
+                    style={[styles.actionBtn, { backgroundColor: COLORS.PRIMARY }]}
                     onPress={() => handleJoinNow(item)}
                   >
-                    <Text style={styles.actionBtnText}>{t("join_now") || "Join Now"}</Text>
+                    <Ionicons name="document-text-outline" size={16} color={COLORS.WHITE} style={{ marginRight: 6 }} />
+                    <Text style={styles.actionBtnText}>Upload Aadhaar & Join</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: COLORS.ERROR, marginLeft: 10 }]}
@@ -516,6 +527,17 @@ const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
                   </TouchableOpacity>
                 </View>
               )
+            )}
+            {item.type === "MESSAGE" && ((item.title || "").toLowerCase().includes("aadhaar") || (item.message || "").toLowerCase().includes("aadhaar")) && (
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: COLORS.PRIMARY, marginTop: 8 }]}
+                  onPress={() => handleJoinNow(item)}
+                >
+                  <Ionicons name="document-text-outline" size={16} color={COLORS.WHITE} style={{ marginRight: 6 }} />
+                  <Text style={styles.actionBtnText}>Upload Aadhaar</Text>
+                </TouchableOpacity>
+              </View>
             )}
             {(item.status || "").toLowerCase() === "accepted" && (item.id && item.id.toString().startsWith("exreq_")) && (
               <View style={[styles.actionBtn, styles.alreadyJoinedBtn]}>

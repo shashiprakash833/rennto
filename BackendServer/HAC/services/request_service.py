@@ -45,27 +45,40 @@ class RequestService:
 
                 if tenant.push_token:
                     if status_value == "accepted":
-                        NotificationService.send_push_notification(tenant.push_token, "Booking Accepted ✅", f"Congratulations! Your booking for {req.property_name} has been accepted by the owner.")
+                        NotificationService.send_push_notification(tenant.push_token, "Upload Aadhaar to Join 📄", f"Your booking for {req.property_name} has been approved! Please upload Aadhaar verification to finalize your stay.")
                     elif status_value == "allotted":
-                        NotificationService.send_push_notification(tenant.push_token, "Room Allotted 🎉", f"Your room has been allotted in {req.property_name}")
+                        NotificationService.send_push_notification(tenant.push_token, "Room Allotted – Upload Aadhaar 🏠", f"Your room has been allotted in {req.property_name}. Please upload Aadhaar verification to finalize your stay.")
                     elif status_value == "pending_confirmation":
                         NotificationService.send_push_notification(tenant.push_token, "Room Allotted – Action Required 🏠", f"Your room/bed has been allotted in {req.property_name}. Please open the app and confirm to activate your stay.")
                     elif status_value == "rejected":
                         NotificationService.send_push_notification(tenant.push_token, "Booking Rejected ❌", f"Your booking request for {req.property_name} has been rejected by the owner.")
 
+                if status_value in ["accepted", "allotted", "pending_confirmation"]:
+                    try:
+                        from HAC.models import TenantNotification
+                        TenantNotification.objects.create(
+                            tenant_phone=tenant.phone,
+                            title="Upload Aadhaar to Join 📄",
+                            message=f"Your booking for {req.property_name} has been approved! Please upload your Aadhaar document to complete verification and join.",
+                            is_read=False
+                        )
+                    except Exception as ex:
+                        print("Error creating TenantNotification record:", ex)
+
                 try:
                     channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        f"user_notifications_{sanitized_phone}",
-                        {
-                            "type": "send_notification",
-                            "content": {
-                                "type": "status_update",
-                                "message": message,
-                                "status": status_value
+                    for group_name in [f"user_notifications_{sanitized_phone}", f"tenant_notifications_{sanitized_phone}"]:
+                        async_to_sync(channel_layer.group_send)(
+                            group_name,
+                            {
+                                "type": "send_notification",
+                                "content": {
+                                    "type": "status_update",
+                                    "message": message,
+                                    "status": status_value
+                                }
                             }
-                        }
-                    )
+                        )
                 except Exception:
                     pass
 

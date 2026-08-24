@@ -1893,74 +1893,7 @@ export function PropertyDetailsScreen(props) {
     }
   };
 
-  const submitIdentityProof = async () => {
-    if (checkReadOnly()) return;
-    const activePhone = await AsyncStorage.getItem("tenantPhone");
-    if (!activePhone) {
-      Alert.alert("Error", "Tenant details not found. Please log in again.");
-      return;
-    }
 
-    if (!selectedFile || !aadharId) {
-      Alert.alert("Error", "Please enter Aadhaar ID and upload Aadhaar image.");
-      return;
-    }
-
-    if (aadharId.length !== 12) {
-      Alert.alert("Error", "Aadhaar ID must be exactly 12 numeric digits.");
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("phone", activePhone);
-      formData.append("aadhar_id", aadharId);
-      formData.append("aadhar_image", {
-        uri: selectedFile.uri,
-        name: selectedFile.name || "aadhar.jpg",
-        type: selectedFile.mimeType || "image/jpeg"
-      });
-      if (selectedBackFile) {
-        formData.append("aadhar_back_image", {
-          uri: selectedBackFile.uri,
-          name: selectedBackFile.name || "aadhar_back.jpg",
-          type: selectedBackFile.mimeType || "image/jpeg"
-        });
-      }
-      if (selectedPaymentScreenshot) {
-        formData.append("payment_screenshot", {
-          uri: selectedPaymentScreenshot.uri,
-          name: selectedPaymentScreenshot.name || "payment_proof.jpg",
-          type: selectedPaymentScreenshot.mimeType || "image/jpeg"
-        });
-      }
-
-      const res = await fetchWithAuth(`${BASE_URL}/api/tenant/submit_verification/`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const resData = await res.json();
-
-      if (res.ok) {
-        setUploading(false);
-        setShowIdModal(false);
-        Alert.alert("Success", "Identity proof submitted successfully! You are now joined.");
-        if (bookingContext?.setRefreshTrigger) {
-          bookingContext.setRefreshTrigger(prev => prev + 1);
-        }
-      } else {
-        setUploading(false);
-        Alert.alert("Failed to Submit", resData.error || "An unexpected error occurred.");
-      }
-    } catch (err) {
-      setUploading(false);
-      console.log("Error submitting identity proof:", err);
-      Alert.alert("Error", "Could not submit identity proof. Please check your network.");
-    }
-  };
 
   const facilityIcons = {
     WiFi: "wifi",
@@ -2381,12 +2314,8 @@ export function PropertyDetailsScreen(props) {
       }
 
       // 👉 OPEN STATUS MODAL (For Accepted/Joined)
-      if (requestStatus === "accepted" || requestStatus === "completed" || requestStatus === "allotted") {
-        if (requestStatus === "completed") {
-          setStatusModalVisible(true);
-        } else {
-          setShowIdModal(true);
-        }
+      if (requestStatus === "accepted" || requestStatus === "completed" || requestStatus === "allotted" || requestStatus === "joined") {
+        setStatusModalVisible(true);
         return;
       }
     } catch (error) {
@@ -3165,19 +3094,40 @@ export function PropertyDetailsScreen(props) {
             </View>
 
             <View style={{ alignItems: "center", marginVertical: 20 }}>
-              {requestStatus === "accepted" || requestStatus === "completed" || requestStatus === "allotted" ? (
-                <View>
-<MaterialCommunityIcons name="party-popper" size={60} color="#0a9516ff" />
+              {requestStatus === "completed" || requestStatus === "joined" || isJoined ? (
+                <View style={{ alignItems: "center" }}>
+                  <MaterialCommunityIcons name="party-popper" size={60} color="#0a9516ff" />
                   <Text style={[styles.modalTitle, { fontSize: 24, marginTop: 15, textAlign: "center" }]}>
                     Welcome to {property.name}! 🎉
                   </Text>
                   <Text style={{ color: "#666", textAlign: "center", marginTop: 10, fontSize: 16 }}>
-                    {"Your request has been accepted by the owner. We're excited to have you!"}
+                    {"You are an active resident in this property. We're excited to have you!"}
                   </Text>
                 </View>
-) : (
-                <View>
-<Ionicons name="time-outline" size={60} color="#f39c12" />
+              ) : requestStatus === "accepted" || requestStatus === "allotted" ? (
+                <View style={{ alignItems: "center" }}>
+                  <Ionicons name="shield-checkmark" size={60} color={COLORS.PRIMARY} />
+                  <Text style={[styles.modalTitle, { fontSize: 22, marginTop: 15, textAlign: "center" }]}>
+                    Booking Approved! ✅
+                  </Text>
+                  <Text style={{ color: "#666", textAlign: "center", marginTop: 10, fontSize: 15 }}>
+                    Your booking was approved by the owner! Please open your Notifications to upload your Aadhaar verification and finalize your stay.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setStatusModalVisible(false);
+                      navigation.navigate("TenantNavigation", { screen: "Notification" });
+                    }}
+                    style={[styles.submitBtn, { backgroundColor: COLORS.PRIMARY, marginTop: 16, width: "100%" }]}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
+                      Go to Notifications
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={{ alignItems: "center" }}>
+                  <Ionicons name="time-outline" size={60} color="#f39c12" />
                   <Text style={[styles.modalTitle, { fontSize: 22, marginTop: 15, textAlign: "center" }]}>
                     Request Sent! ⏳
                   </Text>
@@ -3185,18 +3135,20 @@ export function PropertyDetailsScreen(props) {
                     The owner has received your request and will review it soon. Please check back later.
                   </Text>
                 </View>
-)}
+              )}
             </View>
 
             <View style={{ gap: 12, marginTop: 10 }}>
-              <TouchableOpacity
-                onPress={performWithdraw}
-                style={[styles.submitBtn, { backgroundColor: "#fff", borderWidth: 1, borderColor: "#ff4d4d" }]}
-              >
-                <Text style={{ color: "#ff4d4d", fontWeight: "bold", fontSize: 16 }}>
-                  Withdraw Request
-                </Text>
-              </TouchableOpacity>
+              {requestStatus !== "completed" && requestStatus !== "joined" && !isJoined && (
+                <TouchableOpacity
+                  onPress={performWithdraw}
+                  style={[styles.submitBtn, { backgroundColor: "#fff", borderWidth: 1, borderColor: "#ff4d4d" }]}
+                >
+                  <Text style={{ color: "#ff4d4d", fontWeight: "bold", fontSize: 16 }}>
+                    Withdraw Request
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 onPress={() => setStatusModalVisible(false)}
@@ -3204,250 +3156,6 @@ export function PropertyDetailsScreen(props) {
               >
                 <Text style={{ color: "#333", fontWeight: "bold", fontSize: 16 }}>
                   Close
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* --- IDENTITY VERIFICATION MODAL --- */}
-      <Modal
-        visible={showIdModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => {
-          if (!uploading) setShowIdModal(false);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={{
-            backgroundColor: "#fff",
-            borderTopLeftRadius: 30,
-            borderTopRightRadius: 30,
-            paddingHorizontal: 20,
-            paddingTop: 24,
-            paddingBottom: 34,
-            maxHeight: "85%",
-          }}>
-            {/* HEADER */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Identity Verification</Text>
-              <TouchableOpacity
-                disabled={uploading}
-                onPress={() => setShowIdModal(false)}
-                style={{
-                  padding: 6,
-                  backgroundColor: "#F5F3FF",
-                  borderRadius: 999,
-                }}
-              >
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 20 }}
-            >
-              {/* INFO BOX */}
-              <View style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: "#F5F3FF",
-                borderRadius: 16,
-                padding: 16,
-                gap: 12,
-                marginBottom: 20,
-                borderWidth: 1,
-                borderColor: "rgba(139, 92, 246, 0.1)",
-              }}>
-                <Ionicons name="shield-checkmark" size={24} color={COLORS.PRIMARY} />
-                <Text style={{ flex: 1, fontSize: 14, color: "#1E293B", lineHeight: 20, fontWeight: "500" }}>
-                  Please enter your 12-digit Aadhaar ID and upload a screenshot proof to verify and join the property.
-                </Text>
-              </View>
-
-              {/* AADHAAR ID INPUT */}
-              <Text style={{ fontSize: 15, fontWeight: "700", color: "#1E293B", marginBottom: 10 }}>
-                Aadhaar ID *
-              </Text>
-              <View style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: "#FAF9FF",
-                borderWidth: 1,
-                borderColor: "rgba(139, 92, 246, 0.15)",
-                borderRadius: 16,
-                paddingHorizontal: 16,
-                marginBottom: 20,
-                height: 52,
-              }}>
-                <Ionicons name="card-outline" size={20} color="#64748B" style={{ marginRight: 10 }} />
-                <TextInput
-                  style={{ flex: 1, fontSize: 15, color: "#1E293B", fontWeight: "600" }}
-                  placeholder="Enter 12-digit Aadhaar ID"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="numeric"
-                  maxLength={12}
-                  value={aadharId}
-                  onChangeText={(text) => setAadharId(text.replace(/[^0-9]/g, ''))}
-                  editable={!uploading}
-                />
-              </View>
-
-              {/* AADHAAR FRONT */}
-              {/* AADHAAR IMAGE */}
-              <Text style={{ fontSize: 15, fontWeight: "700", color: "#1E293B", marginBottom: 10 }}>
-                Aadhaar Card Front Image *
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                disabled={uploading}
-                onPress={() => handlePickDocument("front")}
-                style={{
-                  backgroundColor: "#FAF9FF",
-                  borderWidth: 2,
-                  borderStyle: selectedFile ? "solid" : "dashed",
-                  borderColor: selectedFile ? COLORS.PRIMARY : "rgba(139, 92, 246, 0.3)",
-                  borderRadius: 20,
-                  padding: 20,
-                  minHeight: 100,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginBottom: 20,
-                }}
-              >
-                {selectedFile ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", width: "100%", gap: 12 }}>
-                    <Image source={{ uri: selectedFile.uri }} style={{ width: 60, height: 60, borderRadius: 12 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }} numberOfLines={1}>
-                        {selectedFile.name || "aadhar_front.jpg"}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>Image selected</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={{ padding: 8, backgroundColor: "#FEE2E2", borderRadius: 12 }}
-                      disabled={uploading}
-                      onPress={() => setSelectedFile(null)}
-                    >
-                      <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={{ alignItems: "center" }}>
-                    <Ionicons name="image-outline" size={24} color={COLORS.PRIMARY} />
-                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#1E293B", marginTop: 8 }}>
-                      Choose Aadhaar Front
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {/* AADHAAR BACK */}
-              <Text style={{ fontSize: 15, fontWeight: "700", color: "#1E293B", marginBottom: 10 }}>
-                Aadhaar Card Back Image *
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                disabled={uploading}
-                onPress={() => handlePickDocument("back")}
-                style={{
-                  backgroundColor: "#FAF9FF",
-                  borderWidth: 2,
-                  borderStyle: selectedBackFile ? "solid" : "dashed",
-                  borderColor: selectedBackFile ? COLORS.PRIMARY : "rgba(139, 92, 246, 0.3)",
-                  borderRadius: 20,
-                  padding: 20,
-                  minHeight: 100,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginBottom: 20,
-                }}
-              >
-                {selectedBackFile ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", width: "100%", gap: 12 }}>
-                    <Image source={{ uri: selectedBackFile.uri }} style={{ width: 60, height: 60, borderRadius: 12 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B" }} numberOfLines={1}>
-                        {selectedBackFile.name || "aadhar_back.jpg"}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>Image selected</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={{ padding: 8, backgroundColor: "#FEE2E2", borderRadius: 12 }}
-                      disabled={uploading}
-                      onPress={() => setSelectedBackFile(null)}
-                    >
-                      <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={{ alignItems: "center" }}>
-                    <Ionicons name="image-outline" size={24} color={COLORS.PRIMARY} />
-                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#1E293B", marginTop: 8 }}>
-                      Choose Aadhaar Back
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {/* GUIDELINES */}
-              <View style={{
-                backgroundColor: "#FAF9FF",
-                borderRadius: 16,
-                padding: 16,
-                borderWidth: 1,
-                borderColor: "rgba(139, 92, 246, 0.05)",
-              }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B", marginBottom: 8 }}>
-                  Upload Guidelines:
-                </Text>
-                <Text style={{ fontSize: 13, color: "#64748B", lineHeight: 18, marginBottom: 4 }}>
-                  • Document must be clearly visible and not blurry.
-                </Text>
-                <Text style={{ fontSize: 13, color: "#64748B", lineHeight: 18, marginBottom: 4 }}>
-                  • Ensure all four edges of the document are captured.
-                </Text>
-                <Text style={{ fontSize: 13, color: "#64748B", lineHeight: 18 }}>
-                  • High resolution JPG, PNG formats are accepted.
-                </Text>
-              </View>
-            </ScrollView>
-
-            {/* ACTION BUTTONS */}
-            <View style={{ flexDirection: "row", gap: 12, marginTop: 10 }}>
-              <TouchableOpacity
-                disabled={uploading}
-                style={{
-                  flex: 1,
-                  height: 52,
-                  borderRadius: 16,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: "#F1F5F9",
-                }}
-                onPress={() => setShowIdModal(false)}
-              >
-                <Text style={{ color: "#1E293B", fontWeight: "700", fontSize: 15 }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                disabled={!selectedFile || !selectedBackFile || !aadharId || uploading}
-                style={{
-                  flex: 1,
-                  height: 52,
-                  borderRadius: 16,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: (!selectedFile || !selectedBackFile || !aadharId || uploading)
-                    ? "rgba(139, 92, 246, 0.4)"
-                    : COLORS.PRIMARY,
-                }}
-                onPress={submitIdentityProof}
-              >
-                <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>
-                  {uploading ? "Submitting..." : "Get Started"}
                 </Text>
               </TouchableOpacity>
             </View>
