@@ -43,6 +43,10 @@ class Owners(models.Model):
     id_proof_number = models.CharField(max_length=50, blank=True, null=True)
     owner_img_field = models.ImageField(upload_to='owner_profiles/', null=True, blank=True)
  
+    @property
+    def id(self):
+        return self.owner_id
+
     def __str__(self):
         return self.name
    

@@ -130,7 +130,8 @@ class RequestService:
             if approved_change:
                 target_name = (approved_change.target_hostel.hostelName or "").strip().lower()
                 has_approved_switch = (
-                    approved_change.target_owner_id == owner.id
+                    approved_change.target_owner_id == owner.owner_id
+                    or approved_change.target_owner_id == owner.pk
                     or (property_name or "").strip().lower() == target_name
                 )
 
