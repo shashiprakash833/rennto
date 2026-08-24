@@ -546,6 +546,58 @@ export default function TenantHomeScreen({ route }) {
   const [targetHostelInfo, setTargetHostelInfo] = useState(null);
   const [currentHostelInfo, setCurrentHostelInfo] = useState(null);
   const [availableHostelList, setAvailableHostelList] = useState([]);
+  const [showJoinedProperties, setShowJoinedProperties] = useState(false);
+
+  const handleOpenAdvanceBooking = (targetProp = null) => {
+    setCurrentHostelInfo({
+      id: joinedProperty?.id || joinedProperty?.property_id,
+      name: joinedProperty?.property_name || joinedProperty?.name || "Current Property",
+      location: joinedProperty?.location || joinedProperty?.address || "",
+    });
+    if (targetProp) {
+      setTargetHostelInfo({
+        id: targetProp.id,
+        name: targetProp.name,
+        location: targetProp.address || targetProp.location || "",
+        owner_id: targetProp.owner_id || targetProp.contact || targetProp.ownerPhone,
+      });
+    } else {
+      setTargetHostelInfo(null);
+    }
+    getAvailableHostels()
+      .then((hostels) => {
+        setAvailableHostelList(hostels || []);
+      })
+      .catch((e) => console.log("Error loading available hostels:", e));
+
+    setChangeFormVisible(true);
+  };
+
+  const handleAdvanceBookingSubmit = async (formData) => {
+    try {
+      const storedPhone = bookingCtx?.userPhone || (await AsyncStorage.getItem("tenantPhone"));
+      const targetId = formData.target_hostel_id || targetHostelInfo?.id;
+      const res = await createChangeRequest(
+        storedPhone,
+        targetId,
+        formData.expectedJoiningDate,
+        formData.message,
+        formData
+      );
+      setChangeFormVisible(false);
+      if (res.success) {
+        Alert.alert(
+          "Advance Booking Request Sent! 🎉",
+          "Your advance booking request has been submitted to the property owner. Waiting for owner approval."
+        );
+        bookingCtx?.fetchRequests?.();
+      } else {
+        Alert.alert("Notice", res.message || "Failed to submit request.");
+      }
+    } catch (err) {
+      Alert.alert("Error", err.message || "Could not submit advance booking request.");
+    }
+  };
 
   const formatCheckInDate = (dateStr) => {
     if (!dateStr || dateStr === "N/A") return "12 Jul 2025";
@@ -1114,7 +1166,223 @@ export default function TenantHomeScreen({ route }) {
                     </Text>
                   </View>
                 </View>
+
+                {/* SEARCH BAR (For Existing Tenants) */}
+                <View style={[homeStyles.newSearchBar, { marginTop: 14 }]}>
+                  <Ionicons name="search" size={20} color="#999" />
+                  <TextInput
+                    style={homeStyles.newSearchInput}
+                    placeholder={t("search_location_placeholder") || "Search location, property..."}
+                    placeholderTextColor="#999"
+                    value={mainSearch}
+                    onChangeText={(text) => setMainSearch(text)}
+                    returnKeyType="search"
+                    clearButtonMode="while-editing"
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity
+                    style={homeStyles.filterBtn}
+                    onPress={() => filterSheetRef.current?.present()}
+                  >
+                    <Ionicons name="options-outline" size={20} color="#6C63FF" />
+                    <Text style={homeStyles.filterText}>
+                      {t("filter") || "Filters"}
+                      {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </ImageBackground>
+
+              {/* VIEW PROPERTIES ACTION BUTTON (In between Search Bar and Vacate Property) */}
+              <View style={{ paddingHorizontal: 16, marginTop: 14, marginBottom: 4 }}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setShowJoinedProperties(prev => !prev)}
+                  style={{
+                    backgroundColor: "#FFFFFF",
+                    borderRadius: 18,
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderWidth: 1.5,
+                    borderColor: showJoinedProperties ? "#7C3AED" : "#E2E8F0",
+                    shadowColor: "#7C3AED",
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 8,
+                    elevation: 3,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                    <View style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 14,
+                      backgroundColor: showJoinedProperties ? "#7C3AED" : "#F5F3FF",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      marginRight: 12,
+                    }}>
+                      <Ionicons
+                        name="business"
+                        size={22}
+                        color={showJoinedProperties ? "#FFFFFF" : "#7C3AED"}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: "800", color: "#1E293B" }}>
+                        View Properties
+                      </Text>
+                      <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                        {showJoinedProperties ? "Tap to hide property listings" : "Browse & advance book other properties"}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{
+                    backgroundColor: showJoinedProperties ? "#EDE9FE" : "#F1F5F9",
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 20,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                  }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#7C3AED" }}>
+                      {showJoinedProperties ? "Hide" : "Explore"}
+                    </Text>
+                    <Ionicons
+                      name={showJoinedProperties ? "chevron-up" : "chevron-down"}
+                      size={14}
+                      color="#7C3AED"
+                    />
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* IF VIEW PROPERTIES IS OPEN OR SEARCH IS ACTIVE: SHOW PROPERTIES LIST WITH ADVANCE BOOKING ACTION */}
+              {(showJoinedProperties || mainSearch.trim().length > 0) && (
+                <View style={{ marginTop: 8, marginBottom: 12 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, marginBottom: 12 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A" }}>
+                      Available Properties ({filteredProperties.length})
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => handleOpenAdvanceBooking(null)}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        backgroundColor: "#7C3AED",
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 20,
+                        gap: 4,
+                      }}
+                    >
+                      <Ionicons name="calendar-outline" size={14} color="#FFF" />
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#FFF" }}>Advance Booking</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={homeStyles.propertyGrid}>
+                    {filteredProperties.map((item) => {
+                      const normalize = (str) => (str || "").replace(/\s+/g, '').toLowerCase();
+                      const latestReq = requests.find(r =>
+                        normalize(r.propertyName || r.property_name) === normalize(item.name)
+                      );
+                      const isCurrentProp = normalize(joinedProperty?.property_name || joinedProperty?.name) === normalize(item.name);
+
+                      return (
+                        <TouchableOpacity
+                          key={`joined-prop-${item.id}-${item.type}`}
+                          activeOpacity={0.9}
+                          style={homeStyles.gridItem}
+                          onPress={() => handlePress(item)}
+                        >
+                          <View style={homeStyles.card}>
+                            <Image
+                              source={{ uri: item.image || item.galleryImages?.[0] }}
+                              style={homeStyles.cardImg}
+                              resizeMode="cover"
+                              onError={() => console.log("Card image failed:", item.image)}
+                            />
+
+                            <View style={homeStyles.cardBody}>
+                              <View style={homeStyles.row}>
+                                <Text style={homeStyles.cardName}>{item.name}</Text>
+                                {isCurrentProp ? (
+                                  <View style={[homeStyles.statusBadge, { backgroundColor: "#27ae60" }]}>
+                                    <Text style={homeStyles.statusText}>CURRENT STAY</Text>
+                                  </View>
+                                ) : latestReq && latestReq.status && latestReq.status !== 'none' ? (
+                                  <View style={[
+                                    homeStyles.statusBadge,
+                                    {
+                                      backgroundColor:
+                                        latestReq.status?.toLowerCase() === "completed" ||
+                                        latestReq.status?.toLowerCase() === "joined" ||
+                                        latestReq.status?.toLowerCase() === "active"
+                                          ? "#27ae60"
+                                          : latestReq.status?.toLowerCase() === "accepted" ||
+                                            latestReq.status?.toLowerCase() === "allotted"
+                                            ? "#3498db"
+                                            : latestReq.status?.toLowerCase() === "rejected"
+                                              ? "#e74c3c"
+                                              : "#f39c12"
+                                    }
+                                  ]}>
+                                    <Text style={homeStyles.statusText}>
+                                      {(t(latestReq.status?.toLowerCase()) || latestReq.status)?.toUpperCase()}
+                                    </Text>
+                                  </View>
+                                ) : (
+                                  item.isAvailable && (
+                                    <View style={[homeStyles.statusBadge, { backgroundColor: "#3498db" }]}>
+                                      <Text style={homeStyles.statusText}>{(t("vacant") || "VACANT").toUpperCase()}</Text>
+                                    </View>
+                                  )
+                                )}
+                              </View>
+                              <Text style={homeStyles.cardSub} numberOfLines={2}>
+                                {t(item.type?.toLowerCase()) || item.type} • {item.address}
+                              </Text>
+                              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                                {item.rent ? (
+                                  <Text style={homeStyles.cardRent}>
+                                    ₹{item.rent} / {t("month_suffix") || "month"}
+                                  </Text>
+                                ) : <View />}
+                                {!isCurrentProp && (
+                                  <TouchableOpacity
+                                    onPress={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenAdvanceBooking(item);
+                                    }}
+                                    style={{
+                                      backgroundColor: "#7C3AED",
+                                      paddingHorizontal: 14,
+                                      paddingVertical: 6,
+                                      borderRadius: 14,
+                                      flexDirection: "row",
+                                      alignItems: "center",
+                                      gap: 4,
+                                    }}
+                                  >
+                                    <Ionicons name="calendar-outline" size={13} color="#FFF" />
+                                    <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "700" }}>Advance Book</Text>
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
 
               {/* JOINED TENANT MY STAY DASHBOARD */}
               <View style={homeStyles.myStayContainer}>
@@ -1216,7 +1484,30 @@ export default function TenantHomeScreen({ route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
-                  {/* 2. Change Floor Card (Hostel & Apartment): Light Purple -> Lavender */}
+                  {/* 2. Advance Booking Card: Lavender -> Violet */}
+                  <TouchableOpacity
+                    style={homeStyles.myStayCardWrapper}
+                    activeOpacity={0.85}
+                    onPress={() => handleOpenAdvanceBooking(null)}
+                  >
+                    <LinearGradient
+                      colors={["#FAF5FF", "#F3E8FF"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[homeStyles.myStayCard, { borderColor: "#E9D5FF" }]}
+                    >
+                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#EDE9FE" }]}>
+                        <Ionicons name="calendar-outline" size={24} color="#7C3AED" />
+                      </View>
+                      <Text style={homeStyles.myStayCardTitle}>Advance Booking</Text>
+                      <Text style={homeStyles.myStayCardSub}>Request advance booking for another property.</Text>
+                      <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#EDE9FE" }]}>
+                        <Text style={[homeStyles.myStayRequestBtnText, { color: "#7C3AED" }]}>Book Now</Text>
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  {/* 3. Change Floor Card (Hostel & Apartment): Light Purple -> Lavender */}
                   {((joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") ||
                     (joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("apartment")) && (
                     <TouchableOpacity
@@ -1245,7 +1536,7 @@ export default function TenantHomeScreen({ route }) {
                     </TouchableOpacity>
                   )}
 
-                  {/* 3. Change Room Card (Hostel Only): Light Blue -> Sky Blue */}
+                  {/* 4. Change Room Card (Hostel Only): Light Blue -> Sky Blue */}
                   {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
                     <TouchableOpacity
                       style={homeStyles.myStayCardWrapper}
@@ -1273,7 +1564,7 @@ export default function TenantHomeScreen({ route }) {
                     </TouchableOpacity>
                   )}
 
-                  {/* 4. Change Bed Card (Hostel Only): Light Orange -> Light Peach */}
+                  {/* 5. Change Bed Card (Hostel Only): Light Orange -> Light Peach */}
                   {(joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") && (
                     <TouchableOpacity
                       style={homeStyles.myStayCardWrapper}
@@ -1301,7 +1592,7 @@ export default function TenantHomeScreen({ route }) {
                     </TouchableOpacity>
                   )}
 
-                  {/* 5. Check-in Date Card */}
+                  {/* 6. Check-in Date Card */}
                   <View style={homeStyles.myStayCardWrapper}>
                     <LinearGradient
                       colors={["#F0FDF4", "#DCFCE7"]}
@@ -1319,7 +1610,7 @@ export default function TenantHomeScreen({ route }) {
                     </LinearGradient>
                   </View>
 
-                  {/* 6. Rent Due Card */}
+                  {/* 7. Rent Due Card */}
                   <View style={homeStyles.myStayCardWrapper}>
                     <LinearGradient
                       colors={["#7C3AED", "#6D28D9"]}
@@ -1633,6 +1924,34 @@ export default function TenantHomeScreen({ route }) {
             room: joinedProperty?.room || joinedProperty?.room_no || "204",
             bed: joinedProperty?.bed || joinedProperty?.bed_no || "Bed 2",
           }}
+        />
+
+        {/* ADVANCE BOOKING / HOSTEL CHANGE REQUEST MODALS */}
+        <BookNowModal
+          visible={bookNowModalVisible}
+          onClose={() => setBookNowModalVisible(false)}
+          currentHostel={currentHostelInfo}
+          targetHostel={targetHostelInfo}
+          onBookNowPress={async () => {
+            setBookNowModalVisible(false);
+            try {
+              const hostels = await getAvailableHostels();
+              setAvailableHostelList(hostels || []);
+            } catch (e) {
+              console.log("Error loading hostels:", e);
+            }
+            setChangeFormVisible(true);
+          }}
+        />
+
+        <ChangeHostelRequestForm
+          visible={changeFormVisible}
+          onClose={() => setChangeFormVisible(false)}
+          currentHostel={currentHostelInfo}
+          targetHostel={targetHostelInfo}
+          availableHostels={availableHostelList}
+          loading={hcLoading}
+          onSubmit={handleAdvanceBookingSubmit}
         />
       </SafeAreaView>
     </SafeAreaProvider>
