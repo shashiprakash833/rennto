@@ -783,7 +783,7 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   content: {
-    paddingBottom: 40
+    paddingBottom: 110
   },
   header: {
     paddingTop: 50,

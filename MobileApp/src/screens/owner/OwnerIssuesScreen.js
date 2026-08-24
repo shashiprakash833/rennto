@@ -439,7 +439,7 @@ export default function OwnerIssues() {
           <FlatList
             data={filteredIssues}
             keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
             renderItem={({ item }) => (
               <TouchableOpacity onPress={() => openDetails(item)}>
                 <View style={styles.card}>
