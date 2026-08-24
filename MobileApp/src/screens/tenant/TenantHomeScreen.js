@@ -23,6 +23,7 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 
 import {
+  ActivityIndicator,
   Animated,
   ImageBackground,
   BackHandler,
