@@ -849,14 +849,166 @@ export default function OwnerProfile({ navigation }) {
 
 
 
-        {/* Add Account Section */}
+        {/* Manage Accounts Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("manage_accounts") || "Manage Accounts"}</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <Text style={styles.sectionTitle}>{t("manage_accounts") || "Manage Accounts"}</Text>
+            {accounts.length > 1 && (
+              <TouchableOpacity
+                onPress={async () => {
+                  await loadAccounts();
+                  setShowAccountSwitcher(true);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#F5F3FF',
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: '#EDE9FE',
+                  gap: 4,
+                }}
+              >
+                <Ionicons name="swap-horizontal" size={14} color="#7C3AED" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#7C3AED' }}>
+                  {t("switch_account") || "Switch"} ({accounts.length})
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Current Active Property Card */}
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 20,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: '#EDE9FE',
+              marginBottom: 12,
+              shadowColor: '#7C3AED',
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: 0.08,
+              shadowRadius: 10,
+              elevation: 3,
+            }}
+          >
+            {/* Header: "Current Property" label + "Active / Currently Managing" Badge */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#7C3AED' }} />
+                <Text style={{ fontSize: 12, fontWeight: '800', color: '#7C3AED', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                  {t("current_property") || "Current Property"}
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  backgroundColor: (selectedAccount?.status === 'suspend' || editableOwner?.status === 'suspend')
+                    ? '#FEE2E2'
+                    : '#DCFCE7',
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: (selectedAccount?.status === 'suspend' || editableOwner?.status === 'suspend')
+                      ? '#EF4444'
+                      : '#16A34A',
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    color: (selectedAccount?.status === 'suspend' || editableOwner?.status === 'suspend')
+                      ? '#DC2626'
+                      : '#15803D',
+                  }}
+                >
+                  {(selectedAccount?.status === 'suspend' || editableOwner?.status === 'suspend')
+                    ? "Suspended"
+                    : (t("currently_managing") || "Currently Managing")}
+                </Text>
+              </View>
+            </View>
+
+            {/* Property Details Row */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 14,
+                  backgroundColor: '#F5F3FF',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: '#EDE9FE',
+                }}
+              >
+                <Ionicons name="business" size={24} color="#7C3AED" />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#1F2937' }} numberOfLines={1}>
+                  {editableOwner.propertyName && editableOwner.propertyName !== "Loading..."
+                    ? editableOwner.propertyName
+                    : (selectedAccount?.property_name || selectedAccount?.name || "Active Property")}
+                </Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
+                  <Ionicons name="location-sharp" size={13} color="#6B7280" />
+                  <Text style={{ fontSize: 12.5, color: '#6B7280', flex: 1 }} numberOfLines={1}>
+                    {editableOwner.location && editableOwner.location !== "Loading..."
+                      ? editableOwner.location
+                      : (selectedAccount?.location || selectedAccount?.area || "Location not set")}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Type & Stats Pill Footer */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 12,
+                paddingTop: 10,
+                borderTopWidth: 1,
+                borderTopColor: '#F3F4F6',
+              }}
+            >
+              <View style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#4B5563' }}>
+                  {editableOwner.role || selectedAccount?.property_type || "Hostel"}
+                </Text>
+              </View>
+              {Boolean(property.totalBeds > 0) && (
+                <View style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#4B5563' }}>
+                    {property.occupied}/{property.totalBeds} Beds Occupied
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Add Another Property Action Button */}
           <TouchableOpacity
-            style={[styles.expensesCard, { flexDirection: 'row', alignItems: 'center', padding: 16, marginTop: 10, shadowColor: '#7C3AED' }]}
+            style={[styles.expensesCard, { flexDirection: 'row', alignItems: 'center', padding: 16, marginTop: 0, shadowColor: '#7C3AED' }]}
             onPress={async () => {
-              // Refresh account statuses from server before opening the sheet
-              // so admin suspend/approve changes are visible immediately.
               await loadAccounts();
               setShowAccountSwitcher(true);
             }}
