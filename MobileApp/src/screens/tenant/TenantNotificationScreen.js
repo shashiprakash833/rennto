@@ -528,17 +528,7 @@ const TenantNotificationScreen = () => {
                 </View>
               )
             )}
-            {item.type === "MESSAGE" && ((item.title || "").toLowerCase().includes("aadhaar") || (item.message || "").toLowerCase().includes("aadhaar")) && (
-              <View style={styles.actionRow}>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: COLORS.PRIMARY, marginTop: 8 }]}
-                  onPress={() => handleJoinNow(item)}
-                >
-                  <Ionicons name="document-text-outline" size={16} color={COLORS.WHITE} style={{ marginRight: 6 }} />
-                  <Text style={styles.actionBtnText}>Upload Aadhaar</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+
             {(item.status || "").toLowerCase() === "accepted" && (item.id && item.id.toString().startsWith("exreq_")) && (
               <View style={[styles.actionBtn, styles.alreadyJoinedBtn]}>
                 <Ionicons name="home" size={16} color={COLORS.WHITE} style={{ marginRight: 6 }} />

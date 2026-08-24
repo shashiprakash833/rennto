@@ -53,18 +53,6 @@ class RequestService:
                     elif status_value == "rejected":
                         NotificationService.send_push_notification(tenant.push_token, "Booking Rejected ❌", f"Your booking request for {req.property_name} has been rejected by the owner.")
 
-                if status_value in ["accepted", "allotted", "pending_confirmation"]:
-                    try:
-                        from HAC.models import TenantNotification
-                        TenantNotification.objects.create(
-                            tenant_phone=tenant.phone,
-                            title="Upload Aadhaar to Join 📄",
-                            message=f"Your booking for {req.property_name} has been approved! Please upload your Aadhaar document to complete verification and join.",
-                            is_read=False
-                        )
-                    except Exception as ex:
-                        print("Error creating TenantNotification record:", ex)
-
                 try:
                     channel_layer = get_channel_layer()
                     for group_name in [f"user_notifications_{sanitized_phone}", f"tenant_notifications_{sanitized_phone}"]:
@@ -321,7 +309,8 @@ class RequestService:
         ).order_by('-created_at')
         for n in msg_notifications:
             title_l = (n.title or "").lower()
-            if "vacate" in title_l or "hostel change" in title_l:
+            msg_l = (n.message or "").lower()
+            if any(k in title_l or k in msg_l for k in ["vacate", "hostel change", "aadhaar", "allotted", "booking accepted", "booking approved", "booking rejected"]):
                 continue
             data.append({
                 "id": f"notif_{n.id}",
