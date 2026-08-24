@@ -346,9 +346,10 @@ class RequestService:
         for h in hostel_changes:
             target_name = h.target_hostel.hostelName if h.target_hostel else "hostel"
             if h.status == "approved":
-                message = f"Your hostel change request for {target_name} was approved. Select floor, room, and bed to complete the move."
+                message = f"Owner has accepted your request to move to {target_name}. To join that hostel, first you need to vacate your current hostel."
             elif h.status == "rejected":
-                message = f"Your hostel change request for {target_name} was rejected. You remain in your current hostel."
+                reason = f" (Reason: {h.rejection_reason})" if h.rejection_reason else ""
+                message = f"Your hostel change request for {target_name} was rejected by the owner.{reason}"
             else:
                 message = f"Your hostel change request for {target_name} is pending owner approval."
             data.append({

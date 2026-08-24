@@ -539,21 +539,23 @@ const OwnerNotificationScreen = ({ route }) => {
                 </Text>
               </View>
             </View>
-            <View style={[styles.statusTag, { backgroundColor: "#FEF3C7" }]}>
-              <Text style={[styles.statusTagText, { color: "#D97706" }]}>Pending</Text>
+            <View style={[styles.statusTag, { backgroundColor: config.bg }]}>
+              <Text style={[styles.statusTagText, { color: config.color }]}>{config.label}</Text>
             </View>
           </View>
 
           <View style={{ marginTop: 10, paddingHorizontal: 4 }}>
             <Text style={{ fontSize: 13, color: COLORS.TEXT_SECONDARY, marginBottom: 4 }}>
-              Current: <Text style={{ fontWeight: "700", color: COLORS.TEXT_PRIMARY }}>{item.current_hostel_name}</Text>
+              Current: <Text style={{ fontWeight: "700", color: COLORS.TEXT_PRIMARY }}>{item.current_hostel_name || "Current Hostel"}</Text>
             </Text>
             <Text style={{ fontSize: 13, color: COLORS.TEXT_SECONDARY, marginBottom: 4 }}>
-              Target: <Text style={{ fontWeight: "700", color: "#4F46E5" }}>{item.target_hostel_name}</Text>
+              Target: <Text style={{ fontWeight: "700", color: "#4F46E5" }}>{item.target_hostel_name || "Target Hostel"}</Text>
             </Text>
-            <Text style={{ fontSize: 12, color: COLORS.TEXT_SECONDARY }}>
-              Expected Joining: {item.expected_joining_date}
-            </Text>
+            {item.expected_joining_date ? (
+              <Text style={{ fontSize: 12, color: COLORS.TEXT_SECONDARY }}>
+                Expected Joining: {item.expected_joining_date}
+              </Text>
+            ) : null}
             {item.message_to_owner ? (
               <Text style={{ fontSize: 12, color: "#6B7280", fontStyle: "italic", marginTop: 6 }}>
                 {`"${item.message_to_owner}"`}
@@ -561,21 +563,23 @@ const OwnerNotificationScreen = ({ route }) => {
             ) : null}
           </View>
 
-          <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-            <TouchableOpacity
-              style={{ flex: 1, backgroundColor: "#EF4444", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
-              onPress={() => handleRejectHC(item.id)}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Reject</Text>
-            </TouchableOpacity>
+          {(status === "pending" || !item.status) && (
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: "#F3F4F6", paddingVertical: 10, borderRadius: 8, alignItems: "center", borderWidth: 1, borderColor: "#E5E7EB" }}
+                onPress={() => handleRejectHC(item.id || item.request_id)}
+              >
+                <Text style={{ color: "#4B5563", fontWeight: "700", fontSize: 13 }}>Reject</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={{ flex: 1, backgroundColor: "#10B981", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
-              onPress={() => handleApproveHC(item.id)}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Approve</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: "#10B981", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
+                onPress={() => handleApproveHC(item.id || item.request_id)}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Accept</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       );
     }

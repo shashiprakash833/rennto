@@ -317,8 +317,34 @@ const TenantNotificationScreen = () => {
       };
     }
 
-    const titleL = (item.title || "").toLowerCase();
-    const msgL = (item.message || "").toLowerCase();
+    if (item.type === "hostel_change_request" || item.notification_type === "hostel_change_request" || titleL.includes("hostel change")) {
+      const hStatus = (item.status || "pending").toLowerCase();
+      if (hStatus === "approved" || hStatus === "accepted" || titleL.includes("approved") || titleL.includes("accepted")) {
+        return {
+          title: "Hostel Change Request Accepted ✅",
+          message: item.message || "Owner has accepted your request to move to the new hostel. To join that hostel, first you need to vacate your current hostel.",
+          icon: "checkmark-circle",
+          color: "#10B981",
+          lightColor: "#DCFCE7",
+        };
+      }
+      if (hStatus === "rejected" || hStatus === "declined" || titleL.includes("rejected") || titleL.includes("declined")) {
+        return {
+          title: "Hostel Change Request Rejected ❌",
+          message: item.message || "Your hostel change request was rejected by the owner.",
+          icon: "close-circle",
+          color: "#EF4444",
+          lightColor: "#FEE2E2",
+        };
+      }
+      return {
+        title: "Hostel Change Request Submitted 📩",
+        message: item.message || "Your request to change hostel has been submitted to the owner.",
+        icon: "git-compare-outline",
+        color: "#F59E0B",
+        lightColor: "#FEF3C7",
+      };
+    }
 
     if (item.type === "MESSAGE") {
       const isRemoval = titleL.includes("removed");

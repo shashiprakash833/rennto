@@ -175,22 +175,8 @@ class HostelChangeService:
             recipient_phone=owner.phone,
             title="Hostel Change Request 📩",
             message=notification_message,
-            type='JOIN_REQUEST',
+            type='HOSTEL_CHANGE',
             related_id=change_request.id,
-        )
-
-        Issue.objects.create(
-            tenant=tenant,
-            owner=owner,
-            property_type="hostel",
-            title=f"Hostel Change Request - {tenant.name}",
-            description=(
-                f"{tenant.name} requested to move from {current_hostel.hostelName} "
-                f"to {target_hostel.hostelName} on {joining_date.isoformat()}. "
-                f"Message: {message_to_owner or 'None'}"
-            ),
-            severity="Medium",
-            status="Pending",
         )
 
         TenantNotification.objects.create(
@@ -255,28 +241,21 @@ class HostelChangeService:
         change_request.status = 'approved'
         change_request.save()
 
-        Issue.objects.filter(
-            tenant=change_request.tenant,
-            title__icontains="Hostel Change Request",
-            owner=change_request.target_owner,
-            status="Pending",
-        ).update(status="Completed")
-
         tenant = change_request.tenant
         tenant_message = (
-            f"Your hostel change request for {change_request.target_hostel.hostelName} "
-            "has been approved. You can now select floor, room, and bed."
+            f"Owner has accepted your request to move to {change_request.target_hostel.hostelName}. "
+            "To join that hostel, first you need to vacate your current hostel."
         )
         TenantNotification.objects.create(
             tenant_phone=tenant.phone,
-            title="Hostel Change Request Approved",
+            title="Hostel Change Request Accepted ✅",
             message=tenant_message,
             is_read=False,
         )
         if tenant.push_token:
             NotificationService.send_push_notification(
                 tenant.push_token,
-                "Request Approved ✅",
+                "Request Accepted ✅",
                 tenant_message
             )
 
@@ -316,22 +295,15 @@ class HostelChangeService:
         change_request.rejection_reason = rejection_reason or ""
         change_request.save()
 
-        Issue.objects.filter(
-            tenant=change_request.tenant,
-            title__icontains="Hostel Change Request",
-            owner=change_request.target_owner,
-            status="Pending",
-        ).update(status="Completed")
-
         tenant = change_request.tenant
         reason_text = f" Reason: {rejection_reason}" if rejection_reason else ""
         tenant_message = (
             f"Your hostel change request for {change_request.target_hostel.hostelName} "
-            f"has been rejected.{reason_text} You remain in your current hostel."
+            f"has been rejected by the owner.{reason_text} You remain in your current hostel."
         )
         TenantNotification.objects.create(
             tenant_phone=tenant.phone,
-            title="Hostel Change Request Rejected",
+            title="Hostel Change Request Rejected ❌",
             message=tenant_message,
             is_read=False,
         )
@@ -363,8 +335,17 @@ class HostelChangeService:
         if not owner:
             raise Exception("Owner not found")
 
+        phone_variants = [owner.phone]
+        if hasattr(owner, 'phone') and owner.phone:
+            cleaned = CommonService._clean_phone(owner.phone)
+            phone_variants.extend([cleaned, f"+91{cleaned}", f"91{cleaned}"])
+
+        q = Q(target_owner=owner) | Q(target_owner__phone__in=phone_variants)
+        if getattr(owner, 'owner_master_id', None):
+            q |= Q(target_owner__owner_master_id=owner.owner_master_id)
+
         requests = HostelChangeRequest.objects.filter(
-            target_owner=owner,
+            q,
             status='pending'
         ).select_related('tenant', 'current_hostel', 'target_hostel')
 
