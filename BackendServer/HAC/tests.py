@@ -119,3 +119,33 @@ class OwnerIsolationTestCase(TestCase):
 
         response = update_request_status(request)
         self.assertEqual(response.status_code, 200)
+
+    def test_vacate_request_multi_account_owner_approval(self):
+        from HAC.views import vacate_request_approve
+        from HAC.models import VacateRequest, Tenent
+        from django.test import RequestFactory
+        from HAC.jwt_utils import generate_jwt_token
+
+        tenant = Tenent.objects.create(name="Tenant Vacate", phone="9999999994", owner=self.owner2, is_vacant=False)
+        vacate_req = VacateRequest.objects.create(
+            tenant=tenant,
+            owner=self.owner2,
+            property_name="Vasavi",
+            status="Pending"
+        )
+
+        # Logged in with owner1 token (same phone 6304192151, different owner_id)
+        token = generate_jwt_token(user_id=self.owner1.owner_id, role="owner", phone=self.owner1.phone)
+        factory = RequestFactory()
+        request = factory.post(f'/api/vacate/request/{vacate_req.id}/approve/', {}, content_type='application/json', HTTP_AUTHORIZATION=f'Bearer {token}')
+        request.jwt_payload = {"role": "owner", "user_id": self.owner1.owner_id, "phone": self.owner1.phone}
+        request.custom_user = self.owner1
+
+        response = vacate_request_approve(request, pk=vacate_req.id)
+        self.assertEqual(response.status_code, 200)
+
+        vacate_req.refresh_from_db()
+        self.assertEqual(vacate_req.status, "Approved")
+        tenant.refresh_from_db()
+        self.assertTrue(tenant.is_vacant)
+        self.assertIsNone(tenant.owner)

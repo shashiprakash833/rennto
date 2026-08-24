@@ -1,5 +1,6 @@
 import logging
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from HAC.models import (
@@ -248,9 +249,19 @@ class VacateService:
         if owner_identifier:
             owner = CommonService.get_owner(owner_identifier)
             if owner:
-                qs = qs.filter(owner=owner)
+                if str(owner_identifier).isdigit() or owner_identifier == owner.phone or len(str(owner_identifier)) > 10:
+                    qs = qs.filter(
+                        Q(owner__phone=owner.phone) |
+                        Q(owner=owner) |
+                        Q(owner__owner_master=owner.owner_master)
+                    )
+                else:
+                    qs = qs.filter(owner=owner)
             else:
-                qs = qs.filter(owner__phone=owner_identifier)
+                qs = qs.filter(
+                    Q(owner__phone=owner_identifier) |
+                    Q(owner__owner_master__phone_number=owner_identifier)
+                )
 
         if tenant_phone:
             qs = qs.filter(tenant__phone=tenant_phone)
@@ -364,9 +375,7 @@ class VacateService:
         tenant = vacate_req.tenant
         owner = vacate_req.owner
 
-        acting_owner_pk = getattr(acting_owner, 'owner_id', getattr(acting_owner, 'pk', None))
-        owner_pk = getattr(owner, 'owner_id', getattr(owner, 'pk', None))
-        if acting_owner and owner and acting_owner_pk != owner_pk:
+        if acting_owner and owner and not CommonService.is_same_or_authorized_owner(acting_owner, owner):
             raise ValueError("You are not authorized to approve this vacate request.")
 
         # Locate property
@@ -384,6 +393,14 @@ class VacateService:
             tenant=tenant,
             status__in=['completed', 'joined', 'active', 'allotted', 'pending_confirmation']
         ).update(status='vacated')
+
+        # Update any pending Issues related to this vacate request
+        Issue.objects.filter(
+            tenant=tenant,
+            title__icontains="Vacate",
+            owner=owner,
+            status="Pending",
+        ).update(status="Completed")
 
         if prop:
             prop.building_layout = building_layout
@@ -443,8 +460,7 @@ class VacateService:
             raise ValueError(f"Vacate request is already {vacate_req.status}.")
 
         tenant = vacate_req.tenant
-        acting_owner_pk = getattr(acting_owner, 'owner_id', getattr(acting_owner, 'pk', None))
-        if acting_owner and vacate_req.owner_id and acting_owner_pk != vacate_req.owner_id:
+        if acting_owner and vacate_req.owner and not CommonService.is_same_or_authorized_owner(acting_owner, vacate_req.owner):
             raise ValueError("You are not authorized to decline this vacate request.")
 
         vacate_req.status = "Declined"

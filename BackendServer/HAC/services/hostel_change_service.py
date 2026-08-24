@@ -246,8 +246,7 @@ class HostelChangeService:
         except HostelChangeRequest.DoesNotExist:
             raise Exception("Hostel change request not found")
 
-        acting_owner_pk = getattr(acting_owner, 'owner_id', getattr(acting_owner, 'pk', None))
-        if acting_owner and change_request.target_owner_id != acting_owner_pk:
+        if acting_owner and change_request.target_owner and not CommonService.is_same_or_authorized_owner(acting_owner, change_request.target_owner):
             raise ValueError("You are not authorized to approve this request.")
 
         if change_request.status != 'pending':
@@ -307,8 +306,7 @@ class HostelChangeService:
         except HostelChangeRequest.DoesNotExist:
             raise Exception("Hostel change request not found")
 
-        acting_owner_pk = getattr(acting_owner, 'owner_id', getattr(acting_owner, 'pk', None))
-        if acting_owner and change_request.target_owner_id != acting_owner_pk:
+        if acting_owner and change_request.target_owner and not CommonService.is_same_or_authorized_owner(acting_owner, change_request.target_owner):
             raise ValueError("You are not authorized to reject this request.")
 
         if change_request.status != 'pending':

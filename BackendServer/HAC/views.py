@@ -2395,10 +2395,10 @@ def vacate_request_approve(request, pk):
         role = request.jwt_payload.get('role')
         if role != 'owner':
             return Response({"error": "Only owners can approve vacate requests"}, status=status.HTTP_403_FORBIDDEN)
-        acting_owner = getattr(request, 'custom_user', None)
+        acting_owner = getattr(request, 'owner_account', None) or getattr(request, 'custom_user', None)
         if acting_owner is None or not getattr(acting_owner, 'owner_id', getattr(acting_owner, 'id', getattr(acting_owner, 'pk', None))):
             from HAC.services.common_service import CommonService
-            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone'))
+            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone') or request.jwt_payload.get('user_id'))
         result = VacateService.approve_request(pk, acting_owner=acting_owner)
         return Response(result, status=status.HTTP_200_OK)
     except ValueError as ve:
@@ -2418,10 +2418,10 @@ def vacate_request_decline(request, pk):
         role = request.jwt_payload.get('role')
         if role != 'owner':
             return Response({"error": "Only owners can decline vacate requests"}, status=status.HTTP_403_FORBIDDEN)
-        acting_owner = getattr(request, 'custom_user', None)
+        acting_owner = getattr(request, 'owner_account', None) or getattr(request, 'custom_user', None)
         if acting_owner is None or not getattr(acting_owner, 'owner_id', getattr(acting_owner, 'id', getattr(acting_owner, 'pk', None))):
             from HAC.services.common_service import CommonService
-            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone'))
+            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone') or request.jwt_payload.get('user_id'))
         result = VacateService.decline_request(pk, acting_owner=acting_owner)
         return Response(result, status=status.HTTP_200_OK)
     except ValueError as ve:
@@ -2492,10 +2492,10 @@ def approve_hostel_change_request(request, request_id):
         if role != 'owner':
             return Response({"error": "Only owners can approve requests"}, status=status.HTTP_403_FORBIDDEN)
         
-        acting_owner = getattr(request, 'custom_user', None)
+        acting_owner = getattr(request, 'owner_account', None) or getattr(request, 'custom_user', None)
         if acting_owner is None or not getattr(acting_owner, 'owner_id', getattr(acting_owner, 'id', getattr(acting_owner, 'pk', None))):
             from HAC.services.common_service import CommonService
-            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone'))
+            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone') or request.jwt_payload.get('user_id'))
         result = HostelChangeService.approve_change_request(
             request_id, acting_owner=acting_owner
         )
@@ -2517,10 +2517,10 @@ def reject_hostel_change_request(request, request_id):
             return Response({"error": "Only owners can reject requests"}, status=status.HTTP_403_FORBIDDEN)
         
         rejection_reason = request.data.get('rejection_reason', '')
-        acting_owner = getattr(request, 'custom_user', None)
+        acting_owner = getattr(request, 'owner_account', None) or getattr(request, 'custom_user', None)
         if acting_owner is None or not getattr(acting_owner, 'owner_id', getattr(acting_owner, 'id', getattr(acting_owner, 'pk', None))):
             from HAC.services.common_service import CommonService
-            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone'))
+            acting_owner = CommonService.get_owner(request.jwt_payload.get('phone') or request.jwt_payload.get('user_id'))
         result = HostelChangeService.reject_change_request(
             request_id, rejection_reason, acting_owner=acting_owner
         )
