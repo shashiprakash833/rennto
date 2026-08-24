@@ -1489,30 +1489,7 @@ export default function TenantHomeScreen({ route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
-                  {/* 2. Advance Booking Card: Lavender -> Violet */}
-                  <TouchableOpacity
-                    style={homeStyles.myStayCardWrapper}
-                    activeOpacity={0.85}
-                    onPress={() => handleOpenAdvanceBooking(null)}
-                  >
-                    <LinearGradient
-                      colors={["#FAF5FF", "#F3E8FF"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={[homeStyles.myStayCard, { borderColor: "#E9D5FF" }]}
-                    >
-                      <View style={[homeStyles.myStayIconCircle, { backgroundColor: "#EDE9FE" }]}>
-                        <Ionicons name="calendar-outline" size={24} color="#7C3AED" />
-                      </View>
-                      <Text style={homeStyles.myStayCardTitle}>Advance Booking</Text>
-                      <Text style={homeStyles.myStayCardSub}>Request advance booking for another property.</Text>
-                      <View style={[homeStyles.myStayRequestBtn, { backgroundColor: "#EDE9FE" }]}>
-                        <Text style={[homeStyles.myStayRequestBtnText, { color: "#7C3AED" }]}>Book Now</Text>
-                      </View>
-                    </LinearGradient>
-                  </TouchableOpacity>
-
-                  {/* 3. Change Floor Card (Hostel & Apartment): Light Purple -> Lavender */}
+                  {/* 2. Change Floor Card (Hostel & Apartment): Light Purple -> Lavender */}
                   {((joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("hostel") ||
                     (joinedProperty?.property_type || joinedProperty?.type || "").toLowerCase().includes("apartment")) && (
                     <TouchableOpacity
