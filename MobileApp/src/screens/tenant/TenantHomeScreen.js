@@ -1999,8 +1999,21 @@ export function PropertyDetailsScreen(props) {
     }
   }, [property, isJoined]);
 
+  const isJoinedThisProp = Boolean(
+    isJoined &&
+    joinedProperty &&
+    !joinedProperty.is_vacant &&
+    joinedProperty.status !== "Vacated" &&
+    ((joinedProperty.property_name || joinedProperty.name || "").replace(/\s+/g, '').toLowerCase() === (property?.name || "").replace(/\s+/g, '').toLowerCase())
+  );
+
   // Find initial status from context to avoid flickering
-  const initialStatus = requests.find(r => r.propertyName === property.name)?.status || "none";
+  const initialReq = requests.find(
+    r =>
+      (r.propertyName || r.property_name)?.replace(/\s+/g, '').toLowerCase() === property?.name?.replace(/\s+/g, '').toLowerCase() &&
+      !['none', 'withdrawn', 'vacated', 'removed'].includes(r.status?.toLowerCase())
+  );
+  const initialStatus = initialReq?.status || "none";
   const [requestStatus, setRequestStatus] = useState(initialStatus);
 
   useEffect(() => {
@@ -2059,7 +2072,7 @@ export function PropertyDetailsScreen(props) {
     buttonColor = "#e74c3c"; // Red color for withdraw
   }
   else if (
-    ["completed", "joined", "active", "occupied"].includes(normalizedStatus)
+    ["completed", "joined", "active", "occupied"].includes(normalizedStatus) && isJoinedThisProp
   ) {
     buttonText = t("joined") || "Joined";
     buttonAction = "none";
@@ -2707,7 +2720,7 @@ export function PropertyDetailsScreen(props) {
               styles.statusBadge,
               (requestStatus === "completed" ||
                 requestStatus === "joined" ||
-                requestStatus === "active") && {
+                requestStatus === "active") && isJoinedThisProp && {
                 backgroundColor: "#27ae60"
               },
 
@@ -2720,12 +2733,12 @@ export function PropertyDetailsScreen(props) {
             ]}>
               <Text style={[
                 styles.statusText,
-                (requestStatus === "accepted" || requestStatus === "completed" || requestStatus === "allotted" || requestStatus === "pending" || requestStatus === "rejected") && { color: "#fff" }
+                (((requestStatus === "completed" || requestStatus === "joined" || requestStatus === "active") && isJoinedThisProp) || requestStatus === "accepted" || requestStatus === "allotted" || requestStatus === "pending" || requestStatus === "rejected") && { color: "#fff" }
               ]}>
                 {
-                  requestStatus === "completed" ||
+                  (requestStatus === "completed" ||
                     requestStatus === "joined" ||
-                    requestStatus === "active"
+                    requestStatus === "active") && isJoinedThisProp
                     ? (t("joined") || "Joined")
 
                     : requestStatus === "accepted" ||

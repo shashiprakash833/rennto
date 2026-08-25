@@ -284,11 +284,19 @@ class RequestService:
             })
             
         for r in existing_requests:
+            status_val = r.status
+            if tenant.owner and tenant.owner != r.owner:
+                if status_val in ['completed', 'accepted', 'allotted', 'joined', 'active']:
+                    status_val = 'withdrawn'
+            elif tenant.is_vacant or not tenant.owner:
+                if status_val in ['completed', 'joined', 'active']:
+                    status_val = 'withdrawn'
+
             data.append({
                 "id": f"exreq_{r.id}",
                 "type": "JOIN_REQUEST",
                 "propertyName": r.property_name,
-                "status": r.status,
+                "status": status_val,
                 "owner_phone": r.owner.phone if r.owner else None,
                 "owner_id": r.owner.owner_id if r.owner and r.owner.owner_id else None,
                 "ownerPhone": r.owner.phone if r.owner else None,
@@ -399,12 +407,10 @@ class RequestService:
 
         if latest_req:
             status_val = latest_req.status
-            if tenant.owner and tenant.owner != owner:
-                if status_val in ['completed', 'accepted', 'allotted', 'joined', 'active']:
-                    status_val = 'none'
-            elif tenant.is_vacant:
-                if status_val in ['completed', 'joined', 'active']:
-                    status_val = 'none'
+            if (tenant.is_vacant or not tenant.owner) and status_val in ['completed', 'joined', 'active', 'accepted', 'allotted']:
+                status_val = 'none'
+            elif tenant.owner and tenant.owner != owner and status_val in ['completed', 'accepted', 'allotted', 'joined', 'active']:
+                status_val = 'none'
             return {"status": status_val}
 
         return {"status": "none"}
