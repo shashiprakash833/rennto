@@ -385,7 +385,7 @@ export default function TenantProfile({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true}/>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
@@ -786,6 +786,7 @@ const styles = StyleSheet.create({
     paddingBottom: 110
   },
   header: {
+
     paddingTop: 50,
     paddingBottom: 40,
     paddingHorizontal: 20,

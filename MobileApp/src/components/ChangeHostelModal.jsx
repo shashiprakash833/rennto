@@ -35,7 +35,7 @@ const HostelSearchField = ({
       <Text style={styles.label}>
         <MaterialCommunityIcons name={iconName} size={13} color={COLORS.primary} /> {label}
       </Text>
-      
+
       {selectedHostel ? (
         <TouchableOpacity
           style={styles.readOnlyField}
@@ -184,7 +184,7 @@ export const BookNowModal = ({
           </ScrollView>
 
           {/* Footer Buttons */}
-          <View style={styles.footer}>
+          <View style={styles.bookNowFooter}>
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
               onPress={onClose}
@@ -333,7 +333,7 @@ export const ChangeHostelRequestForm = ({
 
           {/* Form Content */}
           <ScrollView style={styles.content}>
-            
+
             {/* Current Hostel with Search and Auto-save */}
             <HostelSearchField
               label="Current Hostel"
@@ -614,6 +614,20 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   footer: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#e8ecf1",
+    backgroundColor: "#f8fafb",
+    paddingBottom: 20,
+    gap: 12,
+  },
+  bookNowFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderTopWidth: 1,
@@ -626,6 +640,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    width: "100%",
+    gap: 12,
   },
   button: {
     paddingVertical: 14,
@@ -687,6 +703,7 @@ const styles = StyleSheet.create({
     shadowColor: COLORS.primary,
     shadowOpacity: 0.4,
     shadowRadius: 6,
+    width: "48%",
   },
   bookNowButtonText: {
     color: "#fff",
@@ -695,9 +712,9 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   submitButton: {
-    backgroundColor: "#3b82f6",
+    backgroundColor: COLORS.primary,
     elevation: 6,
-    shadowColor: "#3b82f6",
+    shadowColor: COLORS.primary,
     shadowOpacity: 0.5,
     shadowRadius: 10,
     paddingVertical: 18,

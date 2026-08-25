@@ -13,7 +13,7 @@ const getDevBaseUrl = () => {
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:8000';
   }
-  return 'http://192.168.88.42:8000';
+  return 'http://192.168.88.36:8000';
 };
 
 const BASE_URL = __DEV__
