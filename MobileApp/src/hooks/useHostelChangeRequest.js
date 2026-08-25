@@ -280,6 +280,80 @@ export const useHostelChangeRequest = () => {
     []
   );
 
+  /**
+   * Cancel an advance booking request (Tenant action)
+   */
+  const cancelRequest = useCallback(
+    async (requestId) => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetchWithAuth(
+          `${BASE_URL}/api/hostel-change/cancel/${requestId}/`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to cancel request');
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (err) {
+        console.log('Error cancelling request:', err);
+        setError(err.message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  /**
+   * Get all advance booking requests for an owner (with optional status filter)
+   */
+  const getOwnerAllRequests = useCallback(
+    async (ownerId, statusFilter = 'all') => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetchWithAuth(
+          `${BASE_URL}/api/hostel-change/all/${ownerId}/?status=${encodeURIComponent(statusFilter)}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch owner advance booking requests');
+        }
+
+        const data = await response.json();
+        return data.requests || [];
+      } catch (err) {
+        console.log('Error fetching all owner advance requests:', err);
+        setError(err.message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   return {
     loading,
     error,
@@ -288,8 +362,10 @@ export const useHostelChangeRequest = () => {
     createChangeRequest,
     getTenantChangeRequests,
     getOwnerPendingRequests,
+    getOwnerAllRequests,
     approveRequest,
     rejectRequest,
+    cancelRequest,
     getAvailableHostels,
   };
 };

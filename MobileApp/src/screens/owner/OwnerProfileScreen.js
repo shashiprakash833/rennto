@@ -1203,6 +1203,12 @@ export default function OwnerProfile({ navigation }) {
           <Text style={styles.sectionTitle}>{t("account_settings") || "Account Settings"}</Text>
           <View style={styles.settingsCard}>
             <SettingsRow
+              icon="calendar-outline"
+              label="Advance Booking Requests"
+              color="#7C3AED"
+              onPress={() => navigation.navigate('OwnerAdvanceBookingRequests')}
+            />
+            <SettingsRow
               icon="exit-outline"
               label={t("vacate_requests") || "Vacate Requests"}
               color="#F59E0B"

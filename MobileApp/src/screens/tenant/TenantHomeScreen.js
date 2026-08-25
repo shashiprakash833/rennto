@@ -569,27 +569,51 @@ export default function TenantHomeScreen({ route }) {
     });
   };
 
-  const handleOpenAdvanceBooking = (targetProp = null) => {
+  const handleOpenAdvanceBooking = async (targetProp = null) => {
+    if (!targetProp) {
+      Alert.alert("Advance Booking", "Please select a property from the list below to book in advance.");
+      return;
+    }
+
+    try {
+      const storedPhone = bookingCtx?.userPhone || (await AsyncStorage.getItem("tenantPhone"));
+      if (storedPhone && targetProp?.id) {
+        const statusRes = await checkBookingStatus(storedPhone, targetProp.id);
+        if (statusRes.status === "pending_request") {
+          Alert.alert("Request Pending ⏳", "You already have a pending advance booking request for this property.");
+          return;
+        }
+        if (statusRes.status === "pending_other_property") {
+          Alert.alert("Advance Booking Restricted", "You already have a pending advance booking request.");
+          return;
+        }
+        if (statusRes.status === "approved_request") {
+          Alert.alert("Booking Accepted ✅", "Your advance booking request for this property has already been accepted.");
+          return;
+        }
+        if (statusRes.status === "accepted_other_property") {
+          Alert.alert("Advance Booking Restricted", "You have already secured an advance booking for another property.");
+          return;
+        }
+      }
+    } catch (err) {
+      console.log("Error checking status before advance booking modal:", err);
+    }
+
     setCurrentHostelInfo({
-      id: joinedProperty?.id || joinedProperty?.property_id,
-      name: joinedProperty?.property_name || joinedProperty?.name || "Current Property",
+      id: joinedProperty?.id || joinedProperty?.property_id || null,
+      name: joinedProperty?.property_name || joinedProperty?.name || "None (New Tenant)",
       location: joinedProperty?.location || joinedProperty?.address || "",
     });
-    if (targetProp) {
-      setTargetHostelInfo({
-        id: targetProp.id,
-        name: targetProp.name,
-        location: targetProp.address || targetProp.location || "",
-        owner_id: targetProp.owner_id || targetProp.contact || targetProp.ownerPhone,
-      });
-    } else {
-      setTargetHostelInfo(null);
-    }
-    getAvailableHostels()
-      .then((hostels) => {
-        setAvailableHostelList(hostels || []);
-      })
-      .catch((e) => console.log("Error loading available hostels:", e));
+
+    setTargetHostelInfo({
+      id: targetProp.id,
+      name: targetProp.name || targetProp.hostelName,
+      location: targetProp.address || targetProp.location || "",
+      owner_id: targetProp.owner_id || targetProp.contact || targetProp.ownerPhone,
+      ownerName: targetProp.ownerName || targetProp.owner?.name || "Owner",
+      rent: targetProp.rent || targetProp.rent_amount || null,
+    });
 
     setChangeFormVisible(true);
   };
@@ -612,6 +636,7 @@ export default function TenantHomeScreen({ route }) {
           "Your advance booking request has been submitted to the property owner. Waiting for owner approval."
         );
         bookingCtx?.fetchRequests?.();
+        bookingCtx?.fetchUnreadCount?.();
       } else {
         Alert.alert("Notice", res.message || "Failed to submit request.");
       }
@@ -1984,7 +2009,7 @@ export function PropertyDetailsScreen(props) {
   const refreshHcBookingStatus = async () => {
     try {
       const storedPhone = await AsyncStorage.getItem("tenantPhone");
-      if (storedPhone && property?.id && isJoined) {
+      if (storedPhone && property?.id) {
         const statusRes = await checkBookingStatus(storedPhone, property.id);
         setHcBookingStatus(statusRes);
       }
@@ -1994,10 +2019,55 @@ export function PropertyDetailsScreen(props) {
   };
 
   useEffect(() => {
-    if (isJoined && property?.id) {
+    if (property?.id) {
       refreshHcBookingStatus();
     }
-  }, [property, isJoined]);
+  }, [property]);
+
+  const handleOpenAdvanceBookingModal = async () => {
+    try {
+      const storedPhone = await AsyncStorage.getItem("tenantPhone");
+      if (storedPhone && property?.id) {
+        const statusRes = await checkBookingStatus(storedPhone, property.id);
+        setHcBookingStatus(statusRes);
+        if (statusRes.status === "pending_request") {
+          Alert.alert("Request Pending ⏳", "You already have a pending advance booking request for this property.");
+          return;
+        }
+        if (statusRes.status === "pending_other_property") {
+          Alert.alert("Advance Booking Restricted", "You already have a pending advance booking request.");
+          return;
+        }
+        if (statusRes.status === "approved_request") {
+          Alert.alert("Booking Accepted ✅", "Your advance booking request for this property has already been accepted.");
+          return;
+        }
+        if (statusRes.status === "accepted_other_property") {
+          Alert.alert("Advance Booking Restricted", "You have already secured an advance booking for another property.");
+          return;
+        }
+      }
+    } catch (e) {
+      console.log("Error checking status:", e);
+    }
+
+    setCurrentHostelInfo({
+      id: joinedProperty?.id || joinedProperty?.property_id || null,
+      name: joinedProperty?.property_name || joinedProperty?.name || "None (New Tenant)",
+      location: joinedProperty?.location || joinedProperty?.address || "",
+    });
+
+    setTargetHostelInfo({
+      id: property.id,
+      name: property.name,
+      location: property.address || property.location || "",
+      owner_id: property.owner_id || property.contact,
+      ownerName: property.ownerName || property.owner?.name || "Owner",
+      rent: property.rent || property.rent_amount || null,
+    });
+
+    setChangeFormVisible(true);
+  };
 
   // Find initial status from context to avoid flickering
   const initialStatus = requests.find(r => r.propertyName === property.name)?.status || "none";
@@ -2752,11 +2822,38 @@ export function PropertyDetailsScreen(props) {
             Owned by {property.ownerName || "Owner"}
           </Text>
 
-          {property.rent ? (
-            <Text style={{ fontSize: 18, color: COLORS.PRIMARY, marginTop: 10, fontWeight: "800" }}>
-              ₹{property.rent} / month
-            </Text>
-          ) : null}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+            {property.rent ? (
+              <Text style={{ fontSize: 18, color: COLORS.PRIMARY, fontWeight: "800" }}>
+                ₹{property.rent} / month
+              </Text>
+            ) : <View />}
+
+            {(!joinedProperty || joinedProperty.property_name?.trim() !== property.name?.trim()) && (
+              <TouchableOpacity
+                onPress={handleOpenAdvanceBookingModal}
+                style={{
+                  backgroundColor: "#7C3AED",
+                  paddingHorizontal: 14,
+                  paddingVertical: 7,
+                  borderRadius: 14,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  elevation: 2,
+                  shadowColor: "#7C3AED",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 4,
+                }}
+              >
+                <Ionicons name="calendar-outline" size={14} color="#FFF" />
+                <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "700" }}>
+                  Advance Book
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
           {property.type === "Apartment" && property.floors && property.floors.length > 0 && (
             <View style={{ marginTop: 20 }}>
               <Text style={styles.sectionTitle}>{t("available_units") || "Available Units"}</Text>
@@ -4029,8 +4126,10 @@ export function PropertyDetailsScreen(props) {
             );
             setChangeFormVisible(false);
             if (res.success) {
-              Alert.alert("Request Sent! 🎉", "Your hostel change request has been sent successfully. Waiting for owner approval.");
+              Alert.alert("Advance Booking Request Sent! 🎉", "Your advance booking request has been submitted to the property owner. Waiting for owner approval.");
               refreshHcBookingStatus();
+              bookingContext?.fetchRequests?.();
+              bookingContext?.fetchUnreadCount?.();
             } else {
               Alert.alert("Notice", res.message || "Failed to send request.");
             }

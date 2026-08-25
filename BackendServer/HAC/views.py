@@ -2548,3 +2548,37 @@ def get_tenant_hostel_change_requests(request, tenant_phone):
         return Response({"requests": serializer.data}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@jwt_required()
+def cancel_hostel_change_request(request, request_id):
+    """Tenant cancels their pending advance booking request"""
+    try:
+        role = request.jwt_payload.get('role')
+        if role != 'tenant':
+            return Response({"error": "Only tenants can cancel their requests"}, status=status.HTTP_403_FORBIDDEN)
+
+        tenant_phone = request.jwt_payload.get('phone')
+        result = HostelChangeService.cancel_change_request(request_id, tenant_phone=tenant_phone)
+        return Response(result, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@jwt_required()
+def get_all_owner_hostel_change_requests(request, owner_id):
+    """Get all advance booking requests for an owner with optional status query param"""
+    try:
+        role = request.jwt_payload.get('role')
+        if role != 'owner':
+            return Response({"error": "Only owners can view advance booking requests"}, status=status.HTTP_403_FORBIDDEN)
+
+        status_filter = request.query_params.get('status', 'all')
+        requests_list = HostelChangeService.get_all_requests_for_owner(owner_id, status_filter=status_filter)
+        from HAC.serializers import HostelChangeRequestSerializer
+        serializer = HostelChangeRequestSerializer(requests_list, many=True)
+        return Response({"requests": serializer.data}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -147,7 +147,7 @@ def run_audit():
     app_res = HostelChangeService.approve_change_request(hc_req.id, acting_owner=owner2)
     print("Approve response:", app_res)
     hc_req.refresh_from_db()
-    assert hc_req.status == "approved", "Status should be approved"
+    assert hc_req.status in ["accepted", "approved"], "Status should be accepted or approved"
 
     # Status check should now allow booking / bed selection
     status_approved = HostelChangeService.check_can_book_hostel(t_phone, h2.id)

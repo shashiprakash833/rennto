@@ -462,29 +462,32 @@ const OwnerNotificationScreen = ({ route }) => {
     if (item.type === "hostel_change_request") {
       const handleApproveHC = async (reqId) => {
         Alert.alert(
-          "Approve Hostel Change",
-          "Approve this hostel change request?",
+          "Accept Advance Booking",
+          `Accept advance booking request from ${item.tenant_name}?`,
           [
             { text: "Cancel", style: "cancel" },
             {
-              text: "Approve",
+              text: "Accept",
               onPress: async () => {
                 try {
+                  setRequests(prev => prev.map(r => (r.id === reqId && r.type === "hostel_change_request") ? { ...r, status: "accepted" } : r));
                   const response = await fetchWithAuth(`${BASE_URL}/api/hostel-change/approve/${reqId}/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({}),
                   });
                   if (response.ok) {
-                    Alert.alert("Approved ✅", "Hostel change request approved.");
+                    Alert.alert("Accepted ✅", "Advance booking request accepted.");
                     fetchRequests();
                     fetchUnreadCount?.();
                   } else {
                     const errJson = await response.json();
-                    Alert.alert("Error", errJson.error || "Failed to approve.");
+                    Alert.alert("Error", errJson.error || "Failed to accept.");
+                    fetchRequests();
                   }
                 } catch (e) {
                   Alert.alert("Error", e.message);
+                  fetchRequests();
                 }
               }
             }
@@ -494,30 +497,33 @@ const OwnerNotificationScreen = ({ route }) => {
 
       const handleRejectHC = async (reqId) => {
         Alert.alert(
-          "Reject Hostel Change",
-          "Reject this hostel change request?",
+          "Decline Advance Booking",
+          `Decline advance booking request from ${item.tenant_name}?`,
           [
             { text: "Cancel", style: "cancel" },
             {
-              text: "Reject",
+              text: "Decline",
               style: "destructive",
               onPress: async () => {
                 try {
+                  setRequests(prev => prev.map(r => (r.id === reqId && r.type === "hostel_change_request") ? { ...r, status: "declined" } : r));
                   const response = await fetchWithAuth(`${BASE_URL}/api/hostel-change/reject/${reqId}/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ rejection_reason: "Owner rejected request" }),
+                    body: JSON.stringify({ rejection_reason: "Owner declined request" }),
                   });
                   if (response.ok) {
-                    Alert.alert("Rejected ❌", "Hostel change request rejected.");
+                    Alert.alert("Declined ✖", "Advance booking request declined.");
                     fetchRequests();
                     fetchUnreadCount?.();
                   } else {
                     const errJson = await response.json();
-                    Alert.alert("Error", errJson.error || "Failed to reject.");
+                    Alert.alert("Error", errJson.error || "Failed to decline.");
+                    fetchRequests();
                   }
                 } catch (e) {
                   Alert.alert("Error", e.message);
+                  fetchRequests();
                 }
               }
             }
@@ -525,57 +531,110 @@ const OwnerNotificationScreen = ({ route }) => {
         );
       };
 
+      const isPending = (item.status || "pending").toLowerCase() === "pending";
+
       return (
         <View key={`hostel-change-${item.id}`} style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.userInfo}>
-              <View style={[styles.avatar, { backgroundColor: "#EEF2FF" }]}>
-                <Ionicons name="git-compare-outline" size={20} color="#4F46E5" />
+              <View style={[styles.avatar, { backgroundColor: "#F3E8FF" }]}>
+                <Ionicons name="calendar" size={20} color="#7C3AED" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.userName}>Hostel Change Request 📩</Text>
+                <Text style={styles.userName}>Advance Booking Request 📩</Text>
                 <Text style={[styles.userPhone, { color: COLORS.TEXT_PRIMARY, marginTop: 4 }]}>
                   {item.tenant_name} ({item.tenant_phone})
                 </Text>
               </View>
             </View>
-            <View style={[styles.statusTag, { backgroundColor: "#FEF3C7" }]}>
-              <Text style={[styles.statusTagText, { color: "#D97706" }]}>Pending</Text>
+            <View style={[
+              styles.statusTag,
+              {
+                backgroundColor:
+                  item.status?.toLowerCase() === "accepted" || item.status?.toLowerCase() === "approved"
+                    ? "#DCFCE7"
+                    : item.status?.toLowerCase() === "declined" || item.status?.toLowerCase() === "rejected"
+                    ? "#FEE2E2"
+                    : "#FEF3C7"
+              }
+            ]}>
+              <Text style={[
+                styles.statusTagText,
+                {
+                  color:
+                    item.status?.toLowerCase() === "accepted" || item.status?.toLowerCase() === "approved"
+                      ? "#16A34A"
+                      : item.status?.toLowerCase() === "declined" || item.status?.toLowerCase() === "rejected"
+                      ? "#DC2626"
+                      : "#D97706"
+                }
+              ]}>
+                {item.status ? item.status.toUpperCase() : "PENDING"}
+              </Text>
             </View>
           </View>
 
           <View style={{ marginTop: 10, paddingHorizontal: 4 }}>
+            {item.current_hostel_name && item.current_hostel_name !== "None (New Tenant)" && (
+              <Text style={{ fontSize: 13, color: COLORS.TEXT_SECONDARY, marginBottom: 4 }}>
+                Current Property: <Text style={{ fontWeight: "700", color: COLORS.TEXT_PRIMARY }}>{item.current_hostel_name}</Text>
+              </Text>
+            )}
             <Text style={{ fontSize: 13, color: COLORS.TEXT_SECONDARY, marginBottom: 4 }}>
-              Current: <Text style={{ fontWeight: "700", color: COLORS.TEXT_PRIMARY }}>{item.current_hostel_name}</Text>
+              Requested Property: <Text style={{ fontWeight: "700", color: "#7C3AED" }}>{item.target_hostel_name}</Text>
             </Text>
-            <Text style={{ fontSize: 13, color: COLORS.TEXT_SECONDARY, marginBottom: 4 }}>
-              Target: <Text style={{ fontWeight: "700", color: "#4F46E5" }}>{item.target_hostel_name}</Text>
+            <Text style={{ fontSize: 12, color: COLORS.TEXT_SECONDARY, marginBottom: 4 }}>
+              Expected Joining Date: <Text style={{ fontWeight: "600", color: "#0F172A" }}>{item.expected_joining_date}</Text>
             </Text>
-            <Text style={{ fontSize: 12, color: COLORS.TEXT_SECONDARY }}>
-              Expected Joining: {item.expected_joining_date}
-            </Text>
+            {item.created_at ? (
+              <Text style={{ fontSize: 11, color: "#94A3B8", marginBottom: 4 }}>
+                Request Time: {new Date(item.created_at).toLocaleString()}
+              </Text>
+            ) : null}
             {item.message_to_owner ? (
-              <Text style={{ fontSize: 12, color: "#6B7280", fontStyle: "italic", marginTop: 6 }}>
+              <Text style={{ fontSize: 12, color: "#475569", fontStyle: "italic", marginTop: 4, backgroundColor: "#F8FAFC", padding: 8, borderRadius: 8 }}>
                 {`"${item.message_to_owner}"`}
               </Text>
             ) : null}
           </View>
 
-          <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-            <TouchableOpacity
-              style={{ flex: 1, backgroundColor: "#EF4444", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
-              onPress={() => handleRejectHC(item.id)}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Reject</Text>
-            </TouchableOpacity>
+          {isPending && (
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: "#EF4444",
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  alignItems: "center",
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  gap: 6
+                }}
+                onPress={() => handleRejectHC(item.id)}
+              >
+                <Ionicons name="close-circle" size={16} color="#FFF" />
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>✖ Decline</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={{ flex: 1, backgroundColor: "#10B981", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
-              onPress={() => handleApproveHC(item.id)}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Approve</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: "#10B981",
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  alignItems: "center",
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  gap: 6
+                }}
+                onPress={() => handleApproveHC(item.id)}
+              >
+                <Ionicons name="checkmark-circle" size={16} color="#FFF" />
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>✔ Accept</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       );
     }
