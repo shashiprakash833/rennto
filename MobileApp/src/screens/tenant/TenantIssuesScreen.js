@@ -22,7 +22,6 @@ import {
   TouchableWithoutFeedback,
   UIManager,
   View,
-  StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -348,11 +347,6 @@ export default function IssuesScreen() {
   }
 
   return (
-    <>
-    <StatusBar
-      backgroundColor={COLORS.BACKGROUND}
-      barStyle="dark-content"
-    />
     <SafeAreaView style={styles.safeArea}>
       {/* HEADER */}
       <View style={styles.header}>
@@ -756,7 +750,6 @@ export default function IssuesScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
-    </>
   );
 }
 

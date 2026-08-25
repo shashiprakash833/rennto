@@ -178,6 +178,7 @@ const OwnerNotificationScreen = ({ route }) => {
       markAllAsSeen?.();
     }, [phone, refreshTrigger])
   );
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchRequests();
@@ -926,12 +927,7 @@ const styles = StyleSheet.create({
     color: COLORS.ERROR,
   },
   scrollContent: {
-
     paddingBottom: 110,
-
-    paddingTop: 20,
-    paddingBottom: 40,
-
   },
   section: {
     marginTop: 20,
