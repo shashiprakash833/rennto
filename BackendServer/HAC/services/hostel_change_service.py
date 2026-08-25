@@ -108,25 +108,28 @@ class HostelChangeService:
             raise Exception("Target hostel not found")
 
         # Get the current hostel (where tenant is currently staying)
-        current_hostel_bed = TenantBeds.objects.filter(
-            phone=tenant.phone
-        ).first()
-
-        if not current_hostel_bed:
-            raise ValueError("Tenant is not currently staying in any hostel")
-
-        # Get the current hostel owner
-        current_owner = current_hostel_bed.owner or CommonService.get_owner(current_hostel_bed.owner_phone)
-        if not current_owner:
-            raise Exception("Current hostel owner not found")
-
-        # Find the current hostel by floor/room/bed info
-        current_hostel = StayHostelDetails.objects.filter(
-            owner=current_owner
-        ).first()
+        current_hostel = None
+        current_hostel_id = data.get("current_hostel_id")
+        if current_hostel_id:
+            current_hostel = StayHostelDetails.objects.filter(id=current_hostel_id).first()
 
         if not current_hostel:
-            raise Exception("Current hostel details not found")
+            current_hostel_bed = TenantBeds.objects.filter(phone=tenant.phone).first()
+            if current_hostel_bed:
+                current_owner = current_hostel_bed.owner or CommonService.get_owner(current_hostel_bed.owner_phone)
+                if current_owner:
+                    current_hostel = StayHostelDetails.objects.filter(owner=current_owner).first()
+
+        if not current_hostel and tenant.owner:
+            current_hostel = StayHostelDetails.objects.filter(owner=tenant.owner).first()
+
+        if not current_hostel:
+            last_jr = JoinRequest.objects.filter(tenant=tenant).order_by('-created_at').first()
+            if last_jr and last_jr.owner:
+                current_hostel = StayHostelDetails.objects.filter(owner=last_jr.owner).first()
+
+        if not current_hostel:
+            raise ValueError("Tenant is not currently staying in any hostel")
 
         if current_hostel.id == target_hostel_id:
             raise ValueError("You cannot request to move to the same hostel you are currently in")

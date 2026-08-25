@@ -169,8 +169,25 @@ class NotificationService:
         if role == 'owner':
             owner = CommonService.get_owner(clean_phone)
             if owner:
+                owner_phone_variants = [owner.phone, owner.phone.lstrip('+')] if owner.phone else [clean_phone]
+                if owner.owner_id and owner.owner_id not in owner_phone_variants:
+                    owner_phone_variants.append(owner.owner_id)
+                if owner.phone:
+                    if not owner.phone.startswith('+'):
+                        owner_phone_variants.extend(['+' + owner.phone, '+91' + owner.phone, '91' + owner.phone])
+                    elif owner.phone.startswith('+91'):
+                        owner_phone_variants.append(owner.phone.replace('+91', ''))
+                    elif owner.phone.startswith('91'):
+                        owner_phone_variants.append(owner.phone[2:])
+
+                owner_objs = list(Owners.objects.filter(Q(phone__in=owner_phone_variants) | Q(owner_id__in=owner_phone_variants)))
+                if getattr(owner, 'owner_master_id', None):
+                    owner_objs.extend(list(Owners.objects.filter(owner_master_id=owner.owner_master_id)))
+                if owner not in owner_objs:
+                    owner_objs.append(owner)
+
                 notifications = Notification.objects.filter(
-                    Q(owner_account=owner) | Q(recipient_phone__iexact=clean_phone)
+                    Q(owner_account__in=owner_objs) | Q(recipient_phone__in=owner_phone_variants)
                 ).order_by('-created_at')
             else:
                 notifications = Notification.objects.filter(recipient_phone__iexact=clean_phone).order_by('-created_at')
