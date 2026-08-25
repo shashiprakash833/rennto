@@ -794,15 +794,19 @@ class SystemSettings(models.Model):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# HOSTEL CHANGE REQUEST MODEL
+# HOSTEL CHANGE / ADVANCE BOOKING REQUEST MODEL
 # ─────────────────────────────────────────────────────────────────────
 class HostelChangeRequest(models.Model):
     """
-    Stores requests from existing hostel tenants who want to move to another hostel.
-    Allows users currently staying in Hostel A to request booking Hostel B.
+    Stores advance booking and hostel change requests from tenants.
+    Supports tenants staying in a property wanting to move or new tenants booking in advance.
     """
     STATUS_CHOICES = [
         ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('declined', 'Declined'),
+        ('cancelled', 'Cancelled'),
+        ('completed', 'Completed'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
     ]
@@ -816,7 +820,9 @@ class HostelChangeRequest(models.Model):
     current_hostel = models.ForeignKey(
         StayHostelDetails,
         on_delete=models.CASCADE,
-        related_name='current_hostel_requests'
+        related_name='current_hostel_requests',
+        null=True,
+        blank=True
     )
     
     target_hostel = models.ForeignKey(
@@ -833,7 +839,7 @@ class HostelChangeRequest(models.Model):
     
     # Request details
     expected_joining_date = models.DateField()
-    days_remaining_in_current_hostel = models.IntegerField()
+    days_remaining_in_current_hostel = models.IntegerField(default=0, null=True, blank=True)
     tenant_email = models.EmailField(blank=True, null=True)
     requested_room_preference = models.CharField(max_length=120, blank=True, null=True)
     additional_details = models.TextField(blank=True, null=True)
@@ -855,4 +861,8 @@ class HostelChangeRequest(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.tenant.name}: {self.current_hostel.hostelName} → {self.target_hostel.hostelName} ({self.status})"
+        curr_name = self.current_hostel.hostelName if self.current_hostel else "No Current Property"
+        target_name = self.target_hostel.hostelName if self.target_hostel else "Target Property"
+        tenant_name = self.tenant.name if self.tenant else "Tenant"
+        return f"{tenant_name}: {curr_name} → {target_name} ({self.status})"
+

@@ -117,6 +117,40 @@ const TenantNotificationScreen = () => {
     );
   };
 
+  const handleCancelAdvanceBooking = async (item) => {
+    Alert.alert(
+      "Cancel Advance Booking",
+      "Are you sure you want to cancel your advance booking request? You can submit another request afterwards.",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const res = await fetchWithAuth(`${BASE_URL}/api/hostel-change/cancel/${item.id}/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+              });
+              if (res.ok) {
+                Alert.alert("Cancelled", "Your advance booking request has been cancelled.");
+                setRequests(prev => prev.map(r => r.id === item.id ? { ...r, status: "cancelled" } : r));
+                setRefreshTrigger((prev) => prev + 1);
+                fetchUnreadCount?.();
+              } else {
+                const err = await res.json();
+                Alert.alert("Error", err.error || "Failed to cancel request.");
+              }
+            } catch (e) {
+              Alert.alert("Error", e.message || "Something went wrong.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleJoinNow = (item) => {
     if (joiningIds.includes(item.id)) return;
     setSelectedItem(item);
@@ -259,32 +293,41 @@ const TenantNotificationScreen = () => {
       };
     }
 
-    if (item.type === "hostel_change_request") {
+    if (item.type === "hostel_change_request" || (item.title || "").toLowerCase().includes("advance booking") || (item.message || "").toLowerCase().includes("advance booking")) {
       const hcStatus = (item.status || "pending").toLowerCase();
-      if (hcStatus === "approved") {
+      if (hcStatus === "accepted" || hcStatus === "approved" || (item.title || "").toLowerCase().includes("accepted")) {
         return {
-          title: "Hostel Change Approved",
-          message: item.message || "Your hostel change request was approved. Select floor, room, and bed.",
+          title: "Advance Booking Accepted 🎉",
+          message: item.message || `Your advance booking request for ${item.target_hostel_name || item.propertyName || 'the property'} has been accepted.`,
           icon: "checkmark-circle",
           color: "#10B981",
           lightColor: "#DCFCE7",
         };
       }
-      if (hcStatus === "rejected") {
+      if (hcStatus === "declined" || hcStatus === "rejected" || (item.title || "").toLowerCase().includes("declined") || (item.title || "").toLowerCase().includes("rejected")) {
         return {
-          title: "Hostel Change Rejected",
-          message: item.message || "Your hostel change request was rejected. You remain in your current hostel.",
+          title: "Advance Booking Declined",
+          message: item.message || `Your advance booking request for ${item.target_hostel_name || item.propertyName || 'the property'} has been declined.`,
           icon: "close-circle",
           color: "#EF4444",
           lightColor: "#FEE2E2",
         };
       }
+      if (hcStatus === "cancelled") {
+        return {
+          title: "Advance Booking Cancelled",
+          message: item.message || "You cancelled your advance booking request.",
+          icon: "ban",
+          color: "#64748B",
+          lightColor: "#F1F5F9",
+        };
+      }
       return {
-        title: "Hostel Change Request Submitted",
-        message: item.message || "Your hostel change request is waiting for owner approval.",
-        icon: "git-compare-outline",
-        color: "#4F46E5",
-        lightColor: "#EEF2FF",
+        title: item.title || "Advance Booking Request Submitted",
+        message: item.message || `Your advance booking request for ${item.target_hostel_name || item.propertyName || 'the property'} is waiting for owner approval.`,
+        icon: "calendar-outline",
+        color: "#7C3AED",
+        lightColor: "#F3E8FF",
       };
     }
 
@@ -527,6 +570,18 @@ const TenantNotificationScreen = () => {
                   </TouchableOpacity>
                 </View>
               )
+            )}
+
+            {item.type === "hostel_change_request" && (item.status || "pending").toLowerCase() === "pending" && (
+              <View style={[styles.actionRow, { marginTop: 10 }]}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: "#EF4444" }]}
+                  onPress={() => handleCancelAdvanceBooking(item)}
+                >
+                  <Ionicons name="close-circle-outline" size={16} color={COLORS.WHITE} style={{ marginRight: 6 }} />
+                  <Text style={styles.actionBtnText}>Cancel Booking Request</Text>
+                </TouchableOpacity>
+              </View>
             )}
 
             {(item.status || "").toLowerCase() === "accepted" && (item.id && item.id.toString().startsWith("exreq_")) && (

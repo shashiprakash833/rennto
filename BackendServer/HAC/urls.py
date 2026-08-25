@@ -87,20 +87,25 @@ urlpatterns = [
     path('update_request_status/', views.update_request_status),
     path('clear_owner_request/<int:request_id>/', views.clear_owner_request),
 
-    # Hostel Change Requests
+    # Hostel Change / Advance Booking Requests
     path('hostel-change/create/', views.create_hostel_change_request),
     path('hostel-change/check-status/<str:tenant_phone>/<int:target_hostel_id>/', views.check_hostel_booking_status),
     path('hostel-change/pending/<str:owner_id>/', views.get_pending_hostel_change_requests),
+    path('hostel-change/all/<str:owner_id>/', views.get_all_owner_hostel_change_requests),
     path('hostel-change/approve/<int:request_id>/', views.approve_hostel_change_request),
     path('hostel-change/reject/<int:request_id>/', views.reject_hostel_change_request),
+    path('hostel-change/cancel/<int:request_id>/', views.cancel_hostel_change_request),
     path('hostel-change/my-requests/<str:tenant_phone>/', views.get_tenant_hostel_change_requests),
 
     path('api/hostel-change/create/', views.create_hostel_change_request),
     path('api/hostel-change/check-status/<str:tenant_phone>/<int:target_hostel_id>/', views.check_hostel_booking_status),
     path('api/hostel-change/pending/<str:owner_id>/', views.get_pending_hostel_change_requests),
+    path('api/hostel-change/all/<str:owner_id>/', views.get_all_owner_hostel_change_requests),
     path('api/hostel-change/approve/<int:request_id>/', views.approve_hostel_change_request),
     path('api/hostel-change/reject/<int:request_id>/', views.reject_hostel_change_request),
+    path('api/hostel-change/cancel/<int:request_id>/', views.cancel_hostel_change_request),
     path('api/hostel-change/my-requests/<str:tenant_phone>/', views.get_tenant_hostel_change_requests),
+
 
     # =====================================================
     # VACATE REQUESTS

@@ -16,6 +16,7 @@ import OwnerTenantsScreen from "../screens/owner/OwnerTenantsScreen";
 import OwnerPaymentHistoryScreen from "../screens/owner/OwnerPaymentHistoryScreen";
 import OwnerExpenseHistoryScreen from "../screens/owner/OwnerExpenseHistoryScreen";
 import OwnerVacateRequestsScreen from "../screens/owner/OwnerVacateRequestsScreen";
+import OwnerAdvanceBookingRequestsScreen from "../screens/owner/OwnerAdvanceBookingRequestsScreen";
 import RoleSection from "../screens/auth/RoleSection";
 import OnboardingScreen from "../screens/onboarding/OnboardingScreen";
 import TenantNavigation from "./TenantNavigation";
@@ -135,6 +136,7 @@ const checkSession = async () => {
 <Stack.Screen name="OwnerPaymentHistory" component={OwnerPaymentHistoryScreen} />
 <Stack.Screen name="OwnerExpenseHistory" component={OwnerExpenseHistoryScreen} />
 <Stack.Screen name="OwnerVacateRequests" component={OwnerVacateRequestsScreen} />
+<Stack.Screen name="OwnerAdvanceBookingRequests" component={OwnerAdvanceBookingRequestsScreen} />
 <Stack.Screen
   name="TenantNotification"
   component={TenantNotificationScreen}

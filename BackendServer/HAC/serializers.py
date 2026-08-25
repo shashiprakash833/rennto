@@ -333,16 +333,22 @@ class ExistingTenantRequestSerializer(serializers.ModelSerializer):
 
 
 class HostelChangeRequestSerializer(serializers.ModelSerializer):
-    """Serializer for hostel change requests"""
+    """Serializer for hostel change and advance booking requests"""
+    tenant_id = serializers.ReadOnlyField(source='tenant.id')
     tenant_name = serializers.ReadOnlyField(source='tenant.name')
     tenant_phone = serializers.ReadOnlyField(source='tenant.phone')
     tenant_email = serializers.SerializerMethodField()
-    current_hostel_name = serializers.ReadOnlyField(source='current_hostel.hostelName')
+    current_hostel_name = serializers.SerializerMethodField()
+    current_property_name = serializers.SerializerMethodField()
     requested_room_preference = serializers.ReadOnlyField()
     additional_details = serializers.ReadOnlyField()
     target_hostel_name = serializers.ReadOnlyField(source='target_hostel.hostelName')
+    target_property_name = serializers.ReadOnlyField(source='target_hostel.hostelName')
+    target_property_location = serializers.ReadOnlyField(source='target_hostel.location')
+    target_property_rent = serializers.ReadOnlyField(source='target_hostel.rent_amount')
     target_owner_name = serializers.ReadOnlyField(source='target_owner.name')
     target_owner_phone = serializers.ReadOnlyField(source='target_owner.phone')
+    target_owner_id = serializers.ReadOnlyField(source='target_owner.owner_id')
     days_until_joining = serializers.SerializerMethodField()
 
     class Meta:
@@ -350,14 +356,20 @@ class HostelChangeRequestSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'tenant',
+            'tenant_id',
             'tenant_name',
             'tenant_phone',
             'tenant_email',
             'current_hostel',
             'current_hostel_name',
+            'current_property_name',
             'target_hostel',
             'target_hostel_name',
+            'target_property_name',
+            'target_property_location',
+            'target_property_rent',
             'target_owner',
+            'target_owner_id',
             'target_owner_name',
             'target_owner_phone',
             'expected_joining_date',
@@ -375,11 +387,24 @@ class HostelChangeRequestSerializer(serializers.ModelSerializer):
     def get_tenant_email(self, obj):
         return obj.tenant_email or getattr(obj.tenant, 'email', None)
 
+    def get_current_hostel_name(self, obj):
+        if obj.current_hostel:
+            return obj.current_hostel.hostelName
+        return "None (New Tenant)"
+
+    def get_current_property_name(self, obj):
+        if obj.current_hostel:
+            return obj.current_hostel.hostelName
+        return "None (New Tenant)"
+
     def get_days_until_joining(self, obj):
         from datetime import date
+        if not obj.expected_joining_date:
+            return 0
         today = date.today()
         delta = obj.expected_joining_date - today
         return delta.days
+
 
 
 class IssueSerializer(serializers.ModelSerializer):
