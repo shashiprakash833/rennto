@@ -1972,37 +1972,6 @@ export function PropertyDetailsScreen(props) {
   const bookingContext = useContext(BookingContext);
   const { requests = [], setRequests, isJoined, joinedProperty } = bookingContext || {};
 
-  // Current user identity and role resolution
-  const [currentUserRole, setCurrentUserRole] = useState(bookingContext?.userRole || "tenant");
-  const [activeTenantPhone, setActiveTenantPhone] = useState(tenantPhone || null);
-  const [activeOwnerPhone, setActiveOwnerPhone] = useState(null);
-
-  useEffect(() => {
-    const loadUserIdentity = async () => {
-      try {
-        const role = (await AsyncStorage.getItem("userRole")) || bookingContext?.userRole || "tenant";
-        const tPhone = (await AsyncStorage.getItem("tenantPhone")) || tenantPhone || bookingContext?.userPhone;
-        const oPhone = await AsyncStorage.getItem("ownerPhone");
-        setCurrentUserRole(role);
-        setActiveTenantPhone(tPhone);
-        setActiveOwnerPhone(oPhone);
-      } catch (e) {}
-    };
-    loadUserIdentity();
-  }, [bookingContext?.userRole, bookingContext?.userPhone, tenantPhone]);
-
-  const isPropertyOwner = Boolean(
-    currentUserRole === "owner" ||
-    (activeOwnerPhone && (activeOwnerPhone === property?.contact || activeOwnerPhone === property?.owner_id || activeOwnerPhone === property?.ownerPhone)) ||
-    (activeTenantPhone && activeTenantPhone === property?.contact && currentUserRole === "owner")
-  );
-
-  const isRequester = Boolean(
-    !isPropertyOwner &&
-    currentUserRole === "tenant" &&
-    activeTenantPhone
-  );
-
   // Hostel Change Request States & Hook for PropertyDetailsScreen
   const { checkBookingStatus, createChangeRequest, getAvailableHostels, loading: hcLoading } = useHostelChangeRequest();
   const [bookNowModalVisible, setBookNowModalVisible] = useState(false);
@@ -2084,17 +2053,10 @@ export function PropertyDetailsScreen(props) {
   const normalizedStatus = (requestStatus || "").toLowerCase();
 
   if (normalizedStatus === "pending") {
-    if (isRequester && !isPropertyOwner) {
-      buttonText = t("withdraw_request") || "Withdraw Request";
-      buttonAction = "withdraw";
-      buttonDisabled = false;
-      buttonColor = "#e74c3c"; // Red color for withdraw
-    } else {
-      buttonText = t("pending") || "Pending";
-      buttonAction = "none";
-      buttonDisabled = true;
-      buttonColor = "#f39c12";
-    }
+    buttonText = t("withdraw_request") || "Withdraw Request";
+    buttonAction = "withdraw";
+    buttonDisabled = false;
+    buttonColor = "#e74c3c"; // Red color for withdraw
   }
   else if (
     ["completed", "joined", "active", "occupied"].includes(normalizedStatus)
@@ -2505,7 +2467,6 @@ export function PropertyDetailsScreen(props) {
 
   const performWithdraw = async () => {
     if (checkReadOnly()) return;
-    if (!isRequester || isPropertyOwner) return;
     try {
       const activePhone = await AsyncStorage.getItem("tenantPhone");
       if (!activePhone) {
@@ -2641,7 +2602,6 @@ export function PropertyDetailsScreen(props) {
 
       // 👉 WITHDRAW REQUEST
       if (buttonAction === "withdraw") {
-        if (!isRequester || isPropertyOwner) return;
         Alert.alert(
           "Withdraw Request",
           "Are you sure you want to withdraw your booking request?",
@@ -3358,7 +3318,7 @@ export function PropertyDetailsScreen(props) {
           <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
         </TouchableOpacity>
 
-        {normalizedStatus === "pending" && isRequester && !isPropertyOwner ? (
+        {normalizedStatus === "pending" ? (
           <View style={{ flex: 1, paddingLeft: 12, justifyContent: "center" }}>
             <View style={{ marginBottom: 6 }}>
               <Text style={{ color: "#f39c12", fontSize: 13, fontWeight: "700", textAlign: "center", textTransform: "uppercase" }}>
@@ -3479,7 +3439,7 @@ export function PropertyDetailsScreen(props) {
             </View>
 
             <View style={{ gap: 12, marginTop: 10 }}>
-              {isRequester && !isPropertyOwner && requestStatus !== "completed" && requestStatus !== "joined" && !isJoined && (
+              {requestStatus !== "completed" && requestStatus !== "joined" && !isJoined && (
                 <TouchableOpacity
                   onPress={performWithdraw}
                   style={[styles.submitBtn, { backgroundColor: "#fff", borderWidth: 1, borderColor: "#ff4d4d" }]}
