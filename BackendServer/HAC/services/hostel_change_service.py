@@ -138,34 +138,50 @@ class HostelChangeService:
         existing = HostelChangeRequest.objects.filter(
             tenant=tenant,
             target_hostel=target_hostel,
-            status__in=['pending', 'approved']
+            status='pending'
         ).first()
 
-        if existing:
-            return {
-                "success": False,
-                "message": "You already have a pending or approved request for this hostel",
-                "existing": True
-            }
-
-        # Calculate days remaining
         today = date.today()
         days_remaining = (joining_date - today).days
 
-        # Create the request
-        change_request = HostelChangeRequest.objects.create(
-            tenant=tenant,
-            current_hostel=current_hostel,
-            target_hostel=target_hostel,
-            target_owner=target_hostel.owner,
-            expected_joining_date=joining_date,
-            days_remaining_in_current_hostel=days_remaining,
-            tenant_email=tenant_email or getattr(tenant, 'email', '') or '',
-            requested_room_preference=requested_room_preference,
-            additional_details=additional_details or message_to_owner,
-            message_to_owner=message_to_owner,
-            status='pending'
-        )
+        if existing:
+            # Update existing pending request with new date and details
+            existing.current_hostel = current_hostel
+            existing.target_owner = target_hostel.owner
+            existing.expected_joining_date = joining_date
+            existing.days_remaining_in_current_hostel = days_remaining
+            existing.message_to_owner = message_to_owner
+            existing.requested_room_preference = requested_room_preference
+            existing.additional_details = additional_details or message_to_owner
+            existing.save()
+            change_request = existing
+        else:
+            approved_req = HostelChangeRequest.objects.filter(
+                tenant=tenant,
+                target_hostel=target_hostel,
+                status='approved'
+            ).first()
+            if approved_req:
+                return {
+                    "success": False,
+                    "message": "Your request for this hostel is already approved.",
+                    "existing": True
+                }
+
+            # Create the request
+            change_request = HostelChangeRequest.objects.create(
+                tenant=tenant,
+                current_hostel=current_hostel,
+                target_hostel=target_hostel,
+                target_owner=target_hostel.owner,
+                expected_joining_date=joining_date,
+                days_remaining_in_current_hostel=days_remaining,
+                tenant_email=tenant_email or getattr(tenant, 'email', '') or '',
+                requested_room_preference=requested_room_preference,
+                additional_details=additional_details or message_to_owner,
+                message_to_owner=message_to_owner,
+                status='pending'
+            )
 
         # Send notifications to owner
         owner = target_hostel.owner

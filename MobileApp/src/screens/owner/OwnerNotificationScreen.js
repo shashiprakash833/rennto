@@ -78,11 +78,18 @@ const OwnerNotificationScreen = ({ route }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchRequests = async () => {
-    if (!phone) return;
+    let targetPhone = phone;
+    if (!targetPhone) {
+      targetPhone = (await AsyncStorage.getItem("ownerPhone")) || (await AsyncStorage.getItem("tenantPhone"));
+    }
+    if (!targetPhone) {
+      setLoading(false);
+      return;
+    }
     // Only show full-screen loading on initial fetch to prevent UI flicker
     if (!refreshing && requests.length === 0) setLoading(true);
     try {
-      const res = await fetchWithAuth(`${BASE_URL}/api/owner_requests/${encodeURIComponent(phone)}/`);
+      const res = await fetchWithAuth(`${BASE_URL}/api/owner_requests/${encodeURIComponent(targetPhone)}/`);
       const data = await res.json();
 
       const mappedData = (Array.isArray(data) ? data : []).map(item => {
@@ -109,7 +116,7 @@ const OwnerNotificationScreen = ({ route }) => {
 
       let vacateData = [];
       try {
-        const vRes = await fetchWithAuth(`${BASE_URL}/api/vacate/requests/?owner_phone=${encodeURIComponent(phone)}`);
+        const vRes = await fetchWithAuth(`${BASE_URL}/api/vacate/requests/?owner_phone=${encodeURIComponent(targetPhone)}`);
         if (vRes.ok) {
           const vJson = await vRes.json();
           vacateData = (Array.isArray(vJson) ? vJson : []).map(v => ({
@@ -126,7 +133,7 @@ const OwnerNotificationScreen = ({ route }) => {
 
       let hostelChangeData = [];
       try {
-        const hcRes = await fetchWithAuth(`${BASE_URL}/api/hostel-change/pending/${encodeURIComponent(phone)}/`);
+        const hcRes = await fetchWithAuth(`${BASE_URL}/api/hostel-change/pending/${encodeURIComponent(targetPhone)}/`);
         if (hcRes.ok) {
           const hcJson = await hcRes.json();
           hostelChangeData = (Array.isArray(hcJson.requests) ? hcJson.requests : []).map(hc => ({
@@ -147,7 +154,7 @@ const OwnerNotificationScreen = ({ route }) => {
 
       let generalNotifs = [];
       try {
-        const notifRes = await fetchWithAuth(`${BASE_URL}/api/notifications/?phone=${encodeURIComponent(phone)}&role=owner`);
+        const notifRes = await fetchWithAuth(`${BASE_URL}/api/notifications/?phone=${encodeURIComponent(targetPhone)}&role=owner`);
         if (notifRes.ok) {
           const notifJson = await notifRes.json();
           generalNotifs = (Array.isArray(notifJson.notifications) ? notifJson.notifications : []).map(n => {
@@ -856,8 +863,8 @@ const OwnerNotificationScreen = ({ route }) => {
     );
   };
 
-  // Filter out cleared notifications
-  const visibleRequests = requests.filter(r => !clearedIds.includes(r.id) && !clearedIds.includes(r.db_id));
+  // Filter out cleared notifications (keep pending requests always visible so owner can act)
+  const visibleRequests = requests.filter(r => (r.status || "pending").toLowerCase() === "pending" || (!clearedIds.includes(r.id) && !clearedIds.includes(r.db_id)));
   const grouped = groupRequests(visibleRequests);
 
   if (loading && !refreshing) {

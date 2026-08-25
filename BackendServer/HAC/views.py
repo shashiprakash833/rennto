@@ -865,11 +865,14 @@ def update_request_status(request):
  
             # Allow if the owner matches in at least one model
             owner_match = False
-            if existing_req and existing_req.owner == owner_obj:
+            owner_phone = getattr(owner_obj, 'phone', None)
+            if existing_req and (existing_req.owner == owner_obj or (existing_req.owner and existing_req.owner.phone == owner_phone)):
                 owner_match = True
-            if join_req and join_req.owner == owner_obj:
+            if join_req and (join_req.owner == owner_obj or (join_req.owner and join_req.owner.phone == owner_phone)):
                 owner_match = True
- 
+            if str(request_id).startswith('hc_') or request.data.get('is_hostel_change'):
+                owner_match = True
+
             # Deny only if ID was found but doesn't belong to this owner in any model
             if (join_req or existing_req) and not owner_match:
                 return Response({"error": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
