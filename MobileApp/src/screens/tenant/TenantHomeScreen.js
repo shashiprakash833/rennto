@@ -1375,7 +1375,7 @@ export default function TenantHomeScreen({ route }) {
                                   <View style={[homeStyles.statusBadge, { backgroundColor: "#27ae60" }]}>
                                     <Text style={homeStyles.statusText}>CURRENT STAY</Text>
                                   </View>
-                                ) : latestReq && latestReq.status && !['none', 'withdrawn', 'vacated', 'removed'].includes(latestReq.status?.toLowerCase()) ? (
+                                ) : latestReq && latestReq.status && latestReq.status !== 'none' ? (
                                   <View style={[
                                     homeStyles.statusBadge,
                                     {
@@ -1786,7 +1786,7 @@ export default function TenantHomeScreen({ route }) {
                     const latestReq = requests.find(r =>
                       normalize(r.propertyName || r.property_name) === normalize(item.name)
                     );
-                    const showBadge = latestReq && latestReq.status && !['none', 'withdrawn', 'vacated', 'removed'].includes(latestReq.status?.toLowerCase());
+                    const showBadge = latestReq && latestReq.status && latestReq.status !== 'none';
 
                     return (
                       <TouchableOpacity
@@ -1999,21 +1999,8 @@ export function PropertyDetailsScreen(props) {
     }
   }, [property, isJoined]);
 
-  const isJoinedThisProp = Boolean(
-    isJoined &&
-    joinedProperty &&
-    !joinedProperty.is_vacant &&
-    joinedProperty.status !== "Vacated" &&
-    ((joinedProperty.property_name || joinedProperty.name || "").replace(/\s+/g, '').toLowerCase() === (property?.name || "").replace(/\s+/g, '').toLowerCase())
-  );
-
   // Find initial status from context to avoid flickering
-  const initialReq = requests.find(
-    r =>
-      (r.propertyName || r.property_name)?.replace(/\s+/g, '').toLowerCase() === property?.name?.replace(/\s+/g, '').toLowerCase() &&
-      !['none', 'withdrawn', 'vacated', 'removed'].includes(r.status?.toLowerCase())
-  );
-  const initialStatus = initialReq?.status || "none";
+  const initialStatus = requests.find(r => r.propertyName === property.name)?.status || "none";
   const [requestStatus, setRequestStatus] = useState(initialStatus);
 
   useEffect(() => {
@@ -2072,7 +2059,7 @@ export function PropertyDetailsScreen(props) {
     buttonColor = "#e74c3c"; // Red color for withdraw
   }
   else if (
-    ["completed", "joined", "active", "occupied"].includes(normalizedStatus) && isJoinedThisProp
+    ["completed", "joined", "active", "occupied"].includes(normalizedStatus)
   ) {
     buttonText = t("joined") || "Joined";
     buttonAction = "none";
@@ -2720,7 +2707,7 @@ export function PropertyDetailsScreen(props) {
               styles.statusBadge,
               (requestStatus === "completed" ||
                 requestStatus === "joined" ||
-                requestStatus === "active") && isJoinedThisProp && {
+                requestStatus === "active") && {
                 backgroundColor: "#27ae60"
               },
 
@@ -2733,12 +2720,12 @@ export function PropertyDetailsScreen(props) {
             ]}>
               <Text style={[
                 styles.statusText,
-                (((requestStatus === "completed" || requestStatus === "joined" || requestStatus === "active") && isJoinedThisProp) || requestStatus === "accepted" || requestStatus === "allotted" || requestStatus === "pending" || requestStatus === "rejected") && { color: "#fff" }
+                (requestStatus === "accepted" || requestStatus === "completed" || requestStatus === "allotted" || requestStatus === "pending" || requestStatus === "rejected") && { color: "#fff" }
               ]}>
                 {
-                  (requestStatus === "completed" ||
+                  requestStatus === "completed" ||
                     requestStatus === "joined" ||
-                    requestStatus === "active") && isJoinedThisProp
+                    requestStatus === "active"
                     ? (t("joined") || "Joined")
 
                     : requestStatus === "accepted" ||

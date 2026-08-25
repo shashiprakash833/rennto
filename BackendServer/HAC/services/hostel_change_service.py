@@ -18,7 +18,6 @@ from HAC.models import (
     Notification,
     TenantNotification,
     Issue,
-    JoinRequest,
 )
 from .common_service import CommonService
 from .notification_service import NotificationService
@@ -108,28 +107,25 @@ class HostelChangeService:
             raise Exception("Target hostel not found")
 
         # Get the current hostel (where tenant is currently staying)
-        current_hostel = None
-        current_hostel_id = data.get("current_hostel_id")
-        if current_hostel_id:
-            current_hostel = StayHostelDetails.objects.filter(id=current_hostel_id).first()
+        current_hostel_bed = TenantBeds.objects.filter(
+            phone=tenant.phone
+        ).first()
 
-        if not current_hostel:
-            current_hostel_bed = TenantBeds.objects.filter(phone=tenant.phone).first()
-            if current_hostel_bed:
-                current_owner = current_hostel_bed.owner or CommonService.get_owner(current_hostel_bed.owner_phone)
-                if current_owner:
-                    current_hostel = StayHostelDetails.objects.filter(owner=current_owner).first()
-
-        if not current_hostel and tenant.owner:
-            current_hostel = StayHostelDetails.objects.filter(owner=tenant.owner).first()
-
-        if not current_hostel:
-            last_jr = JoinRequest.objects.filter(tenant=tenant).order_by('-created_at').first()
-            if last_jr and last_jr.owner:
-                current_hostel = StayHostelDetails.objects.filter(owner=last_jr.owner).first()
-
-        if not current_hostel:
+        if not current_hostel_bed:
             raise ValueError("Tenant is not currently staying in any hostel")
+
+        # Get the current hostel owner
+        current_owner = current_hostel_bed.owner or CommonService.get_owner(current_hostel_bed.owner_phone)
+        if not current_owner:
+            raise Exception("Current hostel owner not found")
+
+        # Find the current hostel by floor/room/bed info
+        current_hostel = StayHostelDetails.objects.filter(
+            owner=current_owner
+        ).first()
+
+        if not current_hostel:
+            raise Exception("Current hostel details not found")
 
         if current_hostel.id == target_hostel_id:
             raise ValueError("You cannot request to move to the same hostel you are currently in")
@@ -138,50 +134,34 @@ class HostelChangeService:
         existing = HostelChangeRequest.objects.filter(
             tenant=tenant,
             target_hostel=target_hostel,
-            status='pending'
+            status__in=['pending', 'approved']
         ).first()
 
+        if existing:
+            return {
+                "success": False,
+                "message": "You already have a pending or approved request for this hostel",
+                "existing": True
+            }
+
+        # Calculate days remaining
         today = date.today()
         days_remaining = (joining_date - today).days
 
-        if existing:
-            # Update existing pending request with new date and details
-            existing.current_hostel = current_hostel
-            existing.target_owner = target_hostel.owner
-            existing.expected_joining_date = joining_date
-            existing.days_remaining_in_current_hostel = days_remaining
-            existing.message_to_owner = message_to_owner
-            existing.requested_room_preference = requested_room_preference
-            existing.additional_details = additional_details or message_to_owner
-            existing.save()
-            change_request = existing
-        else:
-            approved_req = HostelChangeRequest.objects.filter(
-                tenant=tenant,
-                target_hostel=target_hostel,
-                status='approved'
-            ).first()
-            if approved_req:
-                return {
-                    "success": False,
-                    "message": "Your request for this hostel is already approved.",
-                    "existing": True
-                }
-
-            # Create the request
-            change_request = HostelChangeRequest.objects.create(
-                tenant=tenant,
-                current_hostel=current_hostel,
-                target_hostel=target_hostel,
-                target_owner=target_hostel.owner,
-                expected_joining_date=joining_date,
-                days_remaining_in_current_hostel=days_remaining,
-                tenant_email=tenant_email or getattr(tenant, 'email', '') or '',
-                requested_room_preference=requested_room_preference,
-                additional_details=additional_details or message_to_owner,
-                message_to_owner=message_to_owner,
-                status='pending'
-            )
+        # Create the request
+        change_request = HostelChangeRequest.objects.create(
+            tenant=tenant,
+            current_hostel=current_hostel,
+            target_hostel=target_hostel,
+            target_owner=target_hostel.owner,
+            expected_joining_date=joining_date,
+            days_remaining_in_current_hostel=days_remaining,
+            tenant_email=tenant_email or getattr(tenant, 'email', '') or '',
+            requested_room_preference=requested_room_preference,
+            additional_details=additional_details or message_to_owner,
+            message_to_owner=message_to_owner,
+            status='pending'
+        )
 
         # Send notifications to owner
         owner = target_hostel.owner
@@ -195,8 +175,22 @@ class HostelChangeService:
             recipient_phone=owner.phone,
             title="Hostel Change Request 📩",
             message=notification_message,
-            type='HOSTEL_CHANGE',
+            type='JOIN_REQUEST',
             related_id=change_request.id,
+        )
+
+        Issue.objects.create(
+            tenant=tenant,
+            owner=owner,
+            property_type="hostel",
+            title=f"Hostel Change Request - {tenant.name}",
+            description=(
+                f"{tenant.name} requested to move from {current_hostel.hostelName} "
+                f"to {target_hostel.hostelName} on {joining_date.isoformat()}. "
+                f"Message: {message_to_owner or 'None'}"
+            ),
+            severity="Medium",
+            status="Pending",
         )
 
         TenantNotification.objects.create(
@@ -261,21 +255,28 @@ class HostelChangeService:
         change_request.status = 'approved'
         change_request.save()
 
+        Issue.objects.filter(
+            tenant=change_request.tenant,
+            title__icontains="Hostel Change Request",
+            owner=change_request.target_owner,
+            status="Pending",
+        ).update(status="Completed")
+
         tenant = change_request.tenant
         tenant_message = (
-            f"Owner has accepted your request to move to {change_request.target_hostel.hostelName}. "
-            "To join that hostel, first you need to vacate your current hostel."
+            f"Your hostel change request for {change_request.target_hostel.hostelName} "
+            "has been approved. You can now select floor, room, and bed."
         )
         TenantNotification.objects.create(
             tenant_phone=tenant.phone,
-            title="Hostel Change Request Accepted ✅",
+            title="Hostel Change Request Approved",
             message=tenant_message,
             is_read=False,
         )
         if tenant.push_token:
             NotificationService.send_push_notification(
                 tenant.push_token,
-                "Request Accepted ✅",
+                "Request Approved ✅",
                 tenant_message
             )
 
@@ -315,15 +316,22 @@ class HostelChangeService:
         change_request.rejection_reason = rejection_reason or ""
         change_request.save()
 
+        Issue.objects.filter(
+            tenant=change_request.tenant,
+            title__icontains="Hostel Change Request",
+            owner=change_request.target_owner,
+            status="Pending",
+        ).update(status="Completed")
+
         tenant = change_request.tenant
         reason_text = f" Reason: {rejection_reason}" if rejection_reason else ""
         tenant_message = (
             f"Your hostel change request for {change_request.target_hostel.hostelName} "
-            f"has been rejected by the owner.{reason_text} You remain in your current hostel."
+            f"has been rejected.{reason_text} You remain in your current hostel."
         )
         TenantNotification.objects.create(
             tenant_phone=tenant.phone,
-            title="Hostel Change Request Rejected ❌",
+            title="Hostel Change Request Rejected",
             message=tenant_message,
             is_read=False,
         )
@@ -355,22 +363,8 @@ class HostelChangeService:
         if not owner:
             raise Exception("Owner not found")
 
-        phone_variants = [owner.phone]
-        if hasattr(owner, 'phone') and owner.phone:
-            cleaned = CommonService._clean_phone(owner.phone)
-            phone_variants.extend([cleaned, f"+91{cleaned}", f"91{cleaned}"])
-
-        q = (
-            Q(target_owner=owner) |
-            Q(target_owner__phone__in=phone_variants) |
-            Q(target_hostel__owner=owner) |
-            Q(target_hostel__owner__phone__in=phone_variants)
-        )
-        if getattr(owner, 'owner_master_id', None):
-            q |= Q(target_owner__owner_master_id=owner.owner_master_id) | Q(target_hostel__owner__owner_master_id=owner.owner_master_id)
-
         requests = HostelChangeRequest.objects.filter(
-            q,
+            target_owner=owner,
             status='pending'
         ).select_related('tenant', 'current_hostel', 'target_hostel')
 
@@ -422,94 +416,54 @@ class HostelChangeService:
                 "message": "Tenant not found"
             }
 
-        # 1. Check if tenant is ACTUALLY staying in a property (not vacant and has an owner with active bed/stay)
-        is_staying = False
-        current_hostel = None
-
-        if not tenant.is_vacant and tenant.owner:
-            owner_vars = [tenant.owner.phone, tenant.owner.owner_id] if getattr(tenant.owner, 'owner_id', None) else [tenant.owner.phone]
-            current_bed = TenantBeds.objects.filter(
-                Q(phone__iexact=tenant.phone) & (Q(owner=tenant.owner) | Q(owner_phone__in=owner_vars))
-            ).first()
-            
-            active_jr = JoinRequest.objects.filter(
+        # Check if tenant has any active stays (not vacant)
+        if not tenant.is_vacant:
+            # Check if there's an approved change request for this hostel
+            approved_request = HostelChangeRequest.objects.filter(
                 tenant=tenant,
-                owner=tenant.owner,
-                status__in=['completed', 'joined', 'active']
-            ).order_by('-created_at').first()
-
-            if current_bed or active_jr:
-                current_hostel = StayHostelDetails.objects.filter(owner=tenant.owner).first()
-                if current_hostel:
-                    is_staying = True
-
-        # 2. Check pending or approved hostel change requests for this target hostel
-        approved_request = HostelChangeRequest.objects.filter(
-            tenant=tenant,
-            target_hostel_id=target_hostel_id,
-            status='approved'
-        ).first()
-
-        if approved_request:
-            return {
-                "status": "approved_request",
-                "message": "Your request has been approved. You can now select your room and bed.",
-                "request_id": approved_request.id
-            }
-
-        pending_request = HostelChangeRequest.objects.filter(
-            tenant=tenant,
-            target_hostel_id=target_hostel_id,
-            status='pending'
-        ).first()
-
-        if pending_request:
-            return {
-                "status": "pending_request",
-                "message": "You have a pending request for this hostel. Please wait for the owner to respond.",
-                "request_id": pending_request.id
-            }
-
-        # Check pending JoinRequest for this target hostel
-        target_hostel = StayHostelDetails.objects.filter(id=target_hostel_id).first()
-        if target_hostel:
-            pending_join = JoinRequest.objects.filter(
-                tenant=tenant,
-                property_name__iexact=target_hostel.hostelName,
-                status__in=['pending', 'pending_confirmation']
+                target_hostel_id=target_hostel_id,
+                status='approved'
             ).first()
-            if pending_join:
+
+            if approved_request:
                 return {
-                    "status": "pending_request",
-                    "message": "You have a pending request for this property.",
-                    "request_id": pending_join.id
+                    "status": "approved_request",
+                    "message": "Your request has been approved. You can now select your room and bed.",
+                    "request_id": approved_request.id
                 }
 
-        # 3. If tenant is actually staying in another property -> Already Staying
-        if is_staying and current_hostel:
-            if str(current_hostel.id) == str(target_hostel_id):
+            # Check if there's a pending request
+            pending_request = HostelChangeRequest.objects.filter(
+                tenant=tenant,
+                target_hostel_id=target_hostel_id,
+                status='pending'
+            ).first()
+
+            if pending_request:
+                return {
+                    "status": "pending_request",
+                    "message": "You have a pending request for this hostel. Please wait for the owner to respond.",
+                    "request_id": pending_request.id
+                }
+
+            # Tenant is staying somewhere else and can request to move
+            current_bed = TenantBeds.objects.filter(phone=tenant.phone).first()
+            if current_bed:
+                current_hostel = StayHostelDetails.objects.filter(
+                    owner=current_bed.owner or CommonService.get_owner(current_bed.owner_phone)
+                ).first()
+                
                 return {
                     "status": "already_staying",
-                    "message": f"You are already staying in {current_hostel.hostelName}.",
+                    "message": "You are already staying in a property. Please vacate or contact the owner before requesting another property.",
                     "current_hostel": {
                         "id": current_hostel.id,
                         "name": current_hostel.hostelName,
                         "location": current_hostel.location
-                    },
-                    "can_request_change": False
+                    } if current_hostel else None,
+                    "can_request_change": True
                 }
-            return {
-                "status": "already_staying",
-                "message": "You are currently registered in a property. You can request a hostel change to this property below.",
-                "current_hostel": {
-                    "id": current_hostel.id,
-                    "name": current_hostel.hostelName,
-                    "location": current_hostel.location
-                },
-                "can_request_change": True
-            }
 
-        # 4. Otherwise tenant is not in any property (vacant) -> Can book directly
         return {
             "status": "can_book",
             "message": "You can book this hostel"

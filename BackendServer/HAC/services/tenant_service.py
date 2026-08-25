@@ -38,24 +38,28 @@ class TenantService:
                 image_url = tenant.selfie.url
  
         # ── ACTIVE ALLOCATION SYNC ──
-        owner_vars = [tenant.owner.phone, tenant.owner.owner_id] if (tenant.owner and getattr(tenant.owner, 'owner_id', None)) else ([tenant.owner.phone] if tenant.owner else [])
-        hostel_bed = TenantBeds.objects.filter(Q(phone__iexact=tenant.phone) & (Q(owner=tenant.owner) | Q(owner_phone__in=owner_vars))).first() if tenant.owner else None
-        apt_bed = ApartmentTenantBeds.objects.filter(Q(phone__iexact=tenant.phone) & (Q(owner=tenant.owner) | Q(owner_phone__in=owner_vars))).first() if tenant.owner else None
-        comm_bed = CommercialTenantBeds.objects.filter(Q(phone__iexact=tenant.phone) & (Q(owner=tenant.owner) | Q(owner_phone__in=owner_vars))).first() if tenant.owner else None
+        hostel_bed = TenantBeds.objects.filter(phone__iexact=tenant.phone).first()
+        apt_bed = ApartmentTenantBeds.objects.filter(phone__iexact=tenant.phone).first()
+        comm_bed = CommercialTenantBeds.objects.filter(phone__iexact=tenant.phone).first()
         active_bed = hostel_bed or apt_bed or comm_bed
 
-        jr_active = None
-        if tenant.owner and not tenant.is_vacant:
+        if active_bed:
+            if not tenant.owner:
+                if active_bed.owner:
+                    tenant.owner = active_bed.owner
+                elif active_bed.owner_phone:
+                    tenant.owner = CommonService.get_owner(active_bed.owner_phone)
+            tenant.is_vacant = False
+            tenant.save()
+        elif not tenant.owner:
             jr_active = JoinRequest.objects.filter(
                 tenant=tenant,
-                owner=tenant.owner,
                 status__in=['completed', 'joined', 'active']
             ).order_by('-created_at').first()
-
-        if not active_bed and not jr_active:
-            tenant.is_vacant = True
-            tenant.owner = None
-            tenant.save(update_fields=['is_vacant', 'owner'])
+            if jr_active and jr_active.owner:
+                tenant.owner = jr_active.owner
+                tenant.is_vacant = False
+                tenant.save()
 
         # PROPERTY DETAILS
         property_name = "N/A"

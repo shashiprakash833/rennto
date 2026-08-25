@@ -169,25 +169,8 @@ class NotificationService:
         if role == 'owner':
             owner = CommonService.get_owner(clean_phone)
             if owner:
-                owner_phone_variants = [owner.phone, owner.phone.lstrip('+')] if owner.phone else [clean_phone]
-                if owner.owner_id and owner.owner_id not in owner_phone_variants:
-                    owner_phone_variants.append(owner.owner_id)
-                if owner.phone:
-                    if not owner.phone.startswith('+'):
-                        owner_phone_variants.extend(['+' + owner.phone, '+91' + owner.phone, '91' + owner.phone])
-                    elif owner.phone.startswith('+91'):
-                        owner_phone_variants.append(owner.phone.replace('+91', ''))
-                    elif owner.phone.startswith('91'):
-                        owner_phone_variants.append(owner.phone[2:])
-
-                owner_objs = list(Owners.objects.filter(Q(phone__in=owner_phone_variants) | Q(owner_id__in=owner_phone_variants)))
-                if getattr(owner, 'owner_master_id', None):
-                    owner_objs.extend(list(Owners.objects.filter(owner_master_id=owner.owner_master_id)))
-                if owner not in owner_objs:
-                    owner_objs.append(owner)
-
                 notifications = Notification.objects.filter(
-                    Q(owner_account__in=owner_objs) | Q(recipient_phone__in=owner_phone_variants)
+                    Q(owner_account=owner) | Q(recipient_phone__iexact=clean_phone)
                 ).order_by('-created_at')
             else:
                 notifications = Notification.objects.filter(recipient_phone__iexact=clean_phone).order_by('-created_at')
@@ -212,16 +195,13 @@ class NotificationService:
                         item_dict["status"] = v_req.status
                         item_dict["request_id"] = v_req.id
                         item_dict["request_type"] = "Vacate Property Request"
-                elif n.type in ["HOSTEL_CHANGE", "HOSTEL_CHANGE_REQUEST", "hostel_change_request"] and n.related_id:
+                elif n.type in ["HOSTEL_CHANGE", "hostel_change_request"] and n.related_id:
                     hc_req = HostelChangeRequest.objects.filter(id=n.related_id).select_related('tenant', 'target_hostel', 'current_hostel').first()
                     if hc_req:
-                        item_dict["type"] = "hostel_change_request"
                         item_dict["tenant_name"] = hc_req.tenant.name if hc_req.tenant else "Tenant"
                         item_dict["tenant_phone"] = hc_req.tenant.phone if hc_req.tenant else ""
                         item_dict["current_hostel_name"] = hc_req.current_hostel.hostelName if hc_req.current_hostel else ""
                         item_dict["target_hostel_name"] = hc_req.target_hostel.hostelName if hc_req.target_hostel else ""
-                        item_dict["expected_joining_date"] = hc_req.expected_joining_date.isoformat() if hc_req.expected_joining_date else ""
-                        item_dict["message_to_owner"] = hc_req.message_to_owner or ""
                         item_dict["status"] = hc_req.status
                         item_dict["request_id"] = hc_req.id
                         item_dict["request_type"] = "Hostel Change Request"

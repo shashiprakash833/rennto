@@ -13,16 +13,6 @@ class RequestService:
         request_id = data.get("id")
         status_value = data.get("status")
         is_existing = data.get("is_existing_tenant", None)
-        is_hostel_change = data.get("is_hostel_change", None) or str(request_id).startswith('hc_')
-
-        # ── Delegate to HostelChangeService if this is a hostel change request ──
-        if is_hostel_change:
-            from .hostel_change_service import HostelChangeService
-            clean_id = int(str(request_id).replace('hc_', ''))
-            if status_value in ['accepted', 'approved']:
-                return HostelChangeService.approve_change_request(clean_id)
-            else:
-                return HostelChangeService.reject_change_request(clean_id, data.get("rejection_reason", ""))
 
         # ── Delegate to ExistingTenantService if this is an existing tenant request ──
         if is_existing is True:
@@ -213,25 +203,16 @@ class RequestService:
         if not owner:
             raise Exception("Owner not found")
 
-        phone_variants = [owner.phone] if owner.phone else [phone]
-        cleaned = CommonService._clean_phone(phone)
-        phone_variants.extend([cleaned, f"+91{cleaned}", f"91{cleaned}"])
-        owner_objs = list(Owners.objects.filter(Q(phone__in=phone_variants) | Q(owner_id__in=phone_variants)))
-        if getattr(owner, 'owner_master_id', None):
-            owner_objs.extend(list(Owners.objects.filter(owner_master_id=owner.owner_master_id)))
-        if owner not in owner_objs:
-            owner_objs.append(owner)
-
         data = []
 
         # ── Regular JoinRequests ──
-        requests = JoinRequest.objects.filter(owner__in=owner_objs).select_related('tenant').order_by('-created_at')
+        requests = JoinRequest.objects.filter(owner=owner).order_by('-created_at')
         for r in requests:
             data.append({
                 "id": r.id,
                 "db_id": r.id,
-                "name": r.tenant.name if r.tenant else "Tenant",
-                "phone": r.tenant.phone if r.tenant else "",
+                "name": r.tenant.name,
+                "phone": r.tenant.phone,
                 "status": r.status,
                 "propertyName": r.property_name,
                 "propertyType": r.property_type,
@@ -244,13 +225,13 @@ class RequestService:
             })
 
         # ── Existing Tenant Requests ──
-        existing_requests = ExistingTenantRequest.objects.filter(owner__in=owner_objs).select_related('tenant').order_by('-created_at')
+        existing_requests = ExistingTenantRequest.objects.filter(owner=owner).order_by('-created_at')
         for r in existing_requests:
             data.append({
                 "id": r.id,
                 "db_id": r.id,
-                "name": r.tenant.name if r.tenant else "Tenant",
-                "phone": r.tenant.phone if r.tenant else "",
+                "name": r.tenant.name,
+                "phone": r.tenant.phone,
                 "status": r.status,
                 "propertyName": r.property_name,
                 "propertyType": r.property_type,
@@ -266,33 +247,6 @@ class RequestService:
                 "checkIn": None,
                 "created_at": r.created_at,
                 "is_existing_tenant": True,
-            })
-
-        # ── Hostel Change / Prebooking Requests ──
-        hc_requests = HostelChangeRequest.objects.filter(
-            Q(target_owner__in=owner_objs) | Q(target_hostel__owner__in=owner_objs)
-        ).select_related('tenant', 'current_hostel', 'target_hostel').order_by('-created_at')
-        for hc in hc_requests:
-            data.append({
-                "id": f"hc_{hc.id}",
-                "db_id": hc.id,
-                "type": "hostel_change_request",
-                "name": hc.tenant.name if hc.tenant else "Tenant",
-                "tenant_name": hc.tenant.name if hc.tenant else "Tenant",
-                "phone": hc.tenant.phone if hc.tenant else "",
-                "tenant_phone": hc.tenant.phone if hc.tenant else "",
-                "status": hc.status,
-                "propertyName": hc.target_hostel.hostelName if hc.target_hostel else "Target Hostel",
-                "property_name": hc.target_hostel.hostelName if hc.target_hostel else "Target Hostel",
-                "current_hostel_name": hc.current_hostel.hostelName if hc.current_hostel else "Current Hostel",
-                "target_hostel_name": hc.target_hostel.hostelName if hc.target_hostel else "Target Hostel",
-                "propertyType": "hostel",
-                "property_type": "hostel",
-                "expected_joining_date": hc.expected_joining_date.isoformat() if hc.expected_joining_date else None,
-                "checkIn": hc.expected_joining_date.isoformat() if hc.expected_joining_date else None,
-                "message_to_owner": hc.message_to_owner or "",
-                "created_at": hc.created_at,
-                "is_hostel_change": True,
             })
 
         # Sort combined list by created_at descending
@@ -330,19 +284,11 @@ class RequestService:
             })
             
         for r in existing_requests:
-            status_val = r.status
-            if tenant.owner and tenant.owner != r.owner:
-                if status_val in ['completed', 'accepted', 'allotted', 'joined', 'active']:
-                    status_val = 'withdrawn'
-            elif tenant.is_vacant or not tenant.owner:
-                if status_val in ['completed', 'joined', 'active']:
-                    status_val = 'withdrawn'
-
             data.append({
                 "id": f"exreq_{r.id}",
                 "type": "JOIN_REQUEST",
                 "propertyName": r.property_name,
-                "status": status_val,
+                "status": r.status,
                 "owner_phone": r.owner.phone if r.owner else None,
                 "owner_id": r.owner.owner_id if r.owner and r.owner.owner_id else None,
                 "ownerPhone": r.owner.phone if r.owner else None,
@@ -400,10 +346,9 @@ class RequestService:
         for h in hostel_changes:
             target_name = h.target_hostel.hostelName if h.target_hostel else "hostel"
             if h.status == "approved":
-                message = f"Owner has accepted your request to move to {target_name}. To join that hostel, first you need to vacate your current hostel."
+                message = f"Your hostel change request for {target_name} was approved. Select floor, room, and bed to complete the move."
             elif h.status == "rejected":
-                reason = f" (Reason: {h.rejection_reason})" if h.rejection_reason else ""
-                message = f"Your hostel change request for {target_name} was rejected by the owner.{reason}"
+                message = f"Your hostel change request for {target_name} was rejected. You remain in your current hostel."
             else:
                 message = f"Your hostel change request for {target_name} is pending owner approval."
             data.append({
@@ -453,10 +398,12 @@ class RequestService:
 
         if latest_req:
             status_val = latest_req.status
-            if (tenant.is_vacant or not tenant.owner) and status_val in ['completed', 'joined', 'active', 'accepted', 'allotted']:
-                status_val = 'none'
-            elif tenant.owner and tenant.owner != owner and status_val in ['completed', 'accepted', 'allotted', 'joined', 'active']:
-                status_val = 'none'
+            if tenant.owner and tenant.owner != owner:
+                if status_val in ['completed', 'accepted', 'allotted', 'joined', 'active']:
+                    status_val = 'none'
+            elif tenant.is_vacant:
+                if status_val in ['completed', 'joined', 'active']:
+                    status_val = 'none'
             return {"status": status_val}
 
         return {"status": "none"}

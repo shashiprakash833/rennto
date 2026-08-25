@@ -344,8 +344,6 @@ class HostelChangeRequestSerializer(serializers.ModelSerializer):
     target_owner_name = serializers.ReadOnlyField(source='target_owner.name')
     target_owner_phone = serializers.ReadOnlyField(source='target_owner.phone')
     days_until_joining = serializers.SerializerMethodField()
-    property_type = serializers.CharField(default='hostel', read_only=True)
-    propertyType = serializers.CharField(default='hostel', read_only=True)
 
     class Meta:
         model = HostelChangeRequest
@@ -368,8 +366,6 @@ class HostelChangeRequestSerializer(serializers.ModelSerializer):
             'requested_room_preference',
             'additional_details',
             'message_to_owner',
-            'property_type',
-            'propertyType',
             'status',
             'rejection_reason',
             'created_at',

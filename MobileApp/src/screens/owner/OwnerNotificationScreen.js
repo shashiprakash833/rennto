@@ -78,18 +78,11 @@ const OwnerNotificationScreen = ({ route }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchRequests = async () => {
-    let targetPhone = phone;
-    if (!targetPhone) {
-      targetPhone = (await AsyncStorage.getItem("ownerPhone")) || (await AsyncStorage.getItem("tenantPhone"));
-    }
-    if (!targetPhone) {
-      setLoading(false);
-      return;
-    }
+    if (!phone) return;
     // Only show full-screen loading on initial fetch to prevent UI flicker
     if (!refreshing && requests.length === 0) setLoading(true);
     try {
-      const res = await fetchWithAuth(`${BASE_URL}/api/owner_requests/${encodeURIComponent(targetPhone)}/`);
+      const res = await fetchWithAuth(`${BASE_URL}/api/owner_requests/${encodeURIComponent(phone)}/`);
       const data = await res.json();
 
       const mappedData = (Array.isArray(data) ? data : []).map(item => {
@@ -116,7 +109,7 @@ const OwnerNotificationScreen = ({ route }) => {
 
       let vacateData = [];
       try {
-        const vRes = await fetchWithAuth(`${BASE_URL}/api/vacate/requests/?owner_phone=${encodeURIComponent(targetPhone)}`);
+        const vRes = await fetchWithAuth(`${BASE_URL}/api/vacate/requests/?owner_phone=${encodeURIComponent(phone)}`);
         if (vRes.ok) {
           const vJson = await vRes.json();
           vacateData = (Array.isArray(vJson) ? vJson : []).map(v => ({
@@ -133,15 +126,12 @@ const OwnerNotificationScreen = ({ route }) => {
 
       let hostelChangeData = [];
       try {
-        const hcRes = await fetchWithAuth(`${BASE_URL}/api/hostel-change/pending/${encodeURIComponent(targetPhone)}/`);
+        const hcRes = await fetchWithAuth(`${BASE_URL}/api/hostel-change/pending/${encodeURIComponent(phone)}/`);
         if (hcRes.ok) {
           const hcJson = await hcRes.json();
           hostelChangeData = (Array.isArray(hcJson.requests) ? hcJson.requests : []).map(hc => ({
             ...hc,
-            id: `hc_${hc.id}`,
-            db_id: hc.id,
             type: "hostel_change_request",
-            property_type: "hostel",
             title: "Hostel Change Request 📩",
             tenant_name: hc.tenant_name || "Tenant",
             tenant_phone: hc.tenant_phone || "",
@@ -152,49 +142,10 @@ const OwnerNotificationScreen = ({ route }) => {
         console.log("Could not fetch hostel change requests:", hcErr);
       }
 
-      let generalNotifs = [];
-      try {
-        const notifRes = await fetchWithAuth(`${BASE_URL}/api/notifications/?phone=${encodeURIComponent(targetPhone)}&role=owner`);
-        if (notifRes.ok) {
-          const notifJson = await notifRes.json();
-          generalNotifs = (Array.isArray(notifJson.notifications) ? notifJson.notifications : []).map(n => {
-            if (n.type === "hostel_change_request" || n.type === "HOSTEL_CHANGE" || n.type === "HOSTEL_CHANGE_REQUEST") {
-              return {
-                ...n,
-                id: `hc_${n.request_id || n.related_id || n.id}`,
-                db_id: n.request_id || n.related_id || n.id,
-                type: "hostel_change_request",
-                property_type: "hostel",
-                title: n.title || "Hostel Change Request 📩",
-                tenant_name: n.tenant_name || "Tenant",
-                tenant_phone: n.tenant_phone || "",
-                current_hostel_name: n.current_hostel_name || "Current Hostel",
-                target_hostel_name: n.target_hostel_name || "Target Hostel",
-                message: n.message || `${n.tenant_name || "Tenant"} requested to move to ${n.target_hostel_name || 'Target Hostel'}.`,
-              };
-            }
-            if (n.type === "VACATE_REQUEST" || n.type === "VACATE") {
-              return {
-                ...n,
-                id: `vacate_${n.request_id || n.related_id || n.id}`,
-                db_id: n.request_id || n.related_id || n.id,
-                type: "vacate_request",
-                title: "Vacate Request",
-                tenant_name: n.tenant_name || "Tenant",
-                message: n.message || `${n.tenant_name || "Tenant"} has requested to vacate the property.`,
-              };
-            }
-            return n;
-          });
-        }
-      } catch (notifErr) {
-        console.log("Could not fetch owner general notifications:", notifErr);
-      }
-
-      const rawCombined = [...hostelChangeData, ...generalNotifs, ...vacateData, ...mappedData];
+      const rawCombined = [...hostelChangeData, ...vacateData, ...mappedData];
       const seenMap = new Map();
       rawCombined.forEach(item => {
-        const key = `${item.type || 'req'}_${item.db_id || item.id}`;
+        const key = `${item.type || 'req'}_${item.id}`;
         if (!seenMap.has(key)) {
           seenMap.set(key, item);
         }
@@ -509,8 +460,7 @@ const OwnerNotificationScreen = ({ route }) => {
     }
 
     if (item.type === "hostel_change_request") {
-      const handleApproveHC = async (rawId) => {
-        const reqId = String(rawId || "").replace(/^hc_/, "");
+      const handleApproveHC = async (reqId) => {
         Alert.alert(
           "Approve Hostel Change",
           "Approve this hostel change request?",
@@ -542,8 +492,7 @@ const OwnerNotificationScreen = ({ route }) => {
         );
       };
 
-      const handleRejectHC = async (rawId) => {
-        const reqId = String(rawId || "").replace(/^hc_/, "");
+      const handleRejectHC = async (reqId) => {
         Alert.alert(
           "Reject Hostel Change",
           "Reject this hostel change request?",
@@ -590,23 +539,21 @@ const OwnerNotificationScreen = ({ route }) => {
                 </Text>
               </View>
             </View>
-            <View style={[styles.statusTag, { backgroundColor: config.bg }]}>
-              <Text style={[styles.statusTagText, { color: config.color }]}>{config.label}</Text>
+            <View style={[styles.statusTag, { backgroundColor: "#FEF3C7" }]}>
+              <Text style={[styles.statusTagText, { color: "#D97706" }]}>Pending</Text>
             </View>
           </View>
 
           <View style={{ marginTop: 10, paddingHorizontal: 4 }}>
             <Text style={{ fontSize: 13, color: COLORS.TEXT_SECONDARY, marginBottom: 4 }}>
-              Current: <Text style={{ fontWeight: "700", color: COLORS.TEXT_PRIMARY }}>{item.current_hostel_name || "Current Hostel"}</Text>
+              Current: <Text style={{ fontWeight: "700", color: COLORS.TEXT_PRIMARY }}>{item.current_hostel_name}</Text>
             </Text>
             <Text style={{ fontSize: 13, color: COLORS.TEXT_SECONDARY, marginBottom: 4 }}>
-              Target: <Text style={{ fontWeight: "700", color: "#4F46E5" }}>{item.target_hostel_name || "Target Hostel"}</Text>
+              Target: <Text style={{ fontWeight: "700", color: "#4F46E5" }}>{item.target_hostel_name}</Text>
             </Text>
-            {item.expected_joining_date ? (
-              <Text style={{ fontSize: 12, color: COLORS.TEXT_SECONDARY }}>
-                Expected Joining: {item.expected_joining_date}
-              </Text>
-            ) : null}
+            <Text style={{ fontSize: 12, color: COLORS.TEXT_SECONDARY }}>
+              Expected Joining: {item.expected_joining_date}
+            </Text>
             {item.message_to_owner ? (
               <Text style={{ fontSize: 12, color: "#6B7280", fontStyle: "italic", marginTop: 6 }}>
                 {`"${item.message_to_owner}"`}
@@ -614,23 +561,21 @@ const OwnerNotificationScreen = ({ route }) => {
             ) : null}
           </View>
 
-          {(status === "pending" || !item.status) && (
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-              <TouchableOpacity
-                style={{ flex: 1, backgroundColor: "#F3F4F6", paddingVertical: 10, borderRadius: 8, alignItems: "center", borderWidth: 1, borderColor: "#E5E7EB" }}
-                onPress={() => handleRejectHC(item.db_id || item.request_id || item.id)}
-              >
-                <Text style={{ color: "#4B5563", fontWeight: "700", fontSize: 13 }}>Reject</Text>
-              </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: "#EF4444", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
+              onPress={() => handleRejectHC(item.id)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Reject</Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                style={{ flex: 1, backgroundColor: "#10B981", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
-                onPress={() => handleApproveHC(item.db_id || item.request_id || item.id)}
-              >
-                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Accept</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: "#10B981", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
+              onPress={() => handleApproveHC(item.id)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Approve</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       );
     }
@@ -863,8 +808,8 @@ const OwnerNotificationScreen = ({ route }) => {
     );
   };
 
-  // Filter out cleared notifications (keep pending requests always visible so owner can act)
-  const visibleRequests = requests.filter(r => (r.status || "pending").toLowerCase() === "pending" || (!clearedIds.includes(r.id) && !clearedIds.includes(r.db_id)));
+  // Filter out cleared notifications
+  const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
   const grouped = groupRequests(visibleRequests);
 
   if (loading && !refreshing) {
