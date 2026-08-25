@@ -230,6 +230,9 @@ const TenantNotificationScreen = () => {
   }, [phone, tenantPhone]);
 
   const getData = (item) => {
+    const titleL = (item.title || "").toLowerCase();
+    const msgL = (item.message || "").toLowerCase();
+
     if (item.type === "PAYMENT") {
       const pStatus = (item.status || "PENDING").toUpperCase();
       if (pStatus === "SUCCESS") {
@@ -259,64 +262,6 @@ const TenantNotificationScreen = () => {
       };
     }
 
-    if (item.type === "hostel_change_request") {
-      const hcStatus = (item.status || "pending").toLowerCase();
-      if (hcStatus === "approved") {
-        return {
-          title: "Hostel Change Approved",
-          message: item.message || "Your hostel change request was approved. Select floor, room, and bed.",
-          icon: "checkmark-circle",
-          color: "#10B981",
-          lightColor: "#DCFCE7",
-        };
-      }
-      if (hcStatus === "rejected") {
-        return {
-          title: "Hostel Change Rejected",
-          message: item.message || "Your hostel change request was rejected. You remain in your current hostel.",
-          icon: "close-circle",
-          color: "#EF4444",
-          lightColor: "#FEE2E2",
-        };
-      }
-      return {
-        title: "Hostel Change Request Submitted",
-        message: item.message || "Your hostel change request is waiting for owner approval.",
-        icon: "git-compare-outline",
-        color: "#4F46E5",
-        lightColor: "#EEF2FF",
-      };
-    }
-
-    if (item.type === "vacate_request" || item.notification_type === "vacate_request" || (item.title || "").toLowerCase().includes("vacate")) {
-      const vStatus = (item.status || "pending").toLowerCase();
-      if (vStatus === "approved" || vStatus === "accepted") {
-        return {
-          title: "Vacate Request Approved",
-          message: item.message || "Your vacate request has been approved.",
-          icon: "checkmark-circle",
-          color: "#10B981",
-          lightColor: "#DCFCE7",
-        };
-      }
-      if (vStatus === "declined" || vStatus === "rejected") {
-        return {
-          title: "Vacate Request Declined",
-          message: item.message || "Your vacate request has been declined.",
-          icon: "close-circle",
-          color: "#EF4444",
-          lightColor: "#FEE2E2",
-        };
-      }
-      return {
-        title: "Vacate Request Submitted",
-        message: item.message || "Your vacate request has been submitted to the property owner.",
-        icon: "log-out-outline",
-        color: "#F59E0B",
-        lightColor: "#FEF3C7",
-      };
-    }
-
     if (item.type === "hostel_change_request" || item.notification_type === "hostel_change_request" || titleL.includes("hostel change")) {
       const hStatus = (item.status || "pending").toLowerCase();
       if (hStatus === "approved" || hStatus === "accepted" || titleL.includes("approved") || titleL.includes("accepted")) {
@@ -341,6 +286,35 @@ const TenantNotificationScreen = () => {
         title: "Hostel Change Request Submitted 📩",
         message: item.message || "Your request to change hostel has been submitted to the owner.",
         icon: "git-compare-outline",
+        color: "#F59E0B",
+        lightColor: "#FEF3C7",
+      };
+    }
+
+    if (item.type === "vacate_request" || item.notification_type === "vacate_request" || titleL.includes("vacate")) {
+      const vStatus = (item.status || "pending").toLowerCase();
+      if (vStatus === "approved" || vStatus === "accepted") {
+        return {
+          title: "Vacate Request Approved",
+          message: item.message || "Your vacate request has been approved.",
+          icon: "checkmark-circle",
+          color: "#10B981",
+          lightColor: "#DCFCE7",
+        };
+      }
+      if (vStatus === "declined" || vStatus === "rejected") {
+        return {
+          title: "Vacate Request Declined",
+          message: item.message || "Your vacate request has been declined.",
+          icon: "close-circle",
+          color: "#EF4444",
+          lightColor: "#FEE2E2",
+        };
+      }
+      return {
+        title: "Vacate Request Submitted",
+        message: item.message || "Your vacate request has been submitted to the property owner.",
+        icon: "log-out-outline",
         color: "#F59E0B",
         lightColor: "#FEF3C7",
       };
