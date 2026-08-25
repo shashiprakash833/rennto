@@ -330,7 +330,7 @@ class AuthService:
         raise ValueError("Invalid role")
 
     ADMIN_PHONES = ["6281808454", "9347074726", "8919326265"]
-    ADMIN_PHONE = "8919326265"
+    ADMIN_PHONE = "6304601921"
 
     @classmethod
     def _normalize_phone(cls, phone):
@@ -349,8 +349,13 @@ class AuthService:
     def is_admin_phone(cls, phone):
         if not phone:
             return False
+ sagarika
         clean_phone = cls._normalize_phone(phone)
         if clean_phone in cls.ADMIN_PHONES:
+
+        clean_phone = str(phone).strip()
+        if clean_phone in cls.ADMIN_PHONES or clean_phone == cls.ADMIN_PHONE:
+ajay
             return True
         return AdminPassword.objects.filter(
             Q(phone=clean_phone) | Q(phone=str(phone).strip()) | Q(phone__endswith=clean_phone)
