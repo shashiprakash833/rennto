@@ -341,9 +341,14 @@ class HostelChangeService:
             cleaned = CommonService._clean_phone(owner.phone)
             phone_variants.extend([cleaned, f"+91{cleaned}", f"91{cleaned}"])
 
-        q = Q(target_owner=owner) | Q(target_owner__phone__in=phone_variants)
+        q = (
+            Q(target_owner=owner) |
+            Q(target_owner__phone__in=phone_variants) |
+            Q(target_hostel__owner=owner) |
+            Q(target_hostel__owner__phone__in=phone_variants)
+        )
         if getattr(owner, 'owner_master_id', None):
-            q |= Q(target_owner__owner_master_id=owner.owner_master_id)
+            q |= Q(target_owner__owner_master_id=owner.owner_master_id) | Q(target_hostel__owner__owner_master_id=owner.owner_master_id)
 
         requests = HostelChangeRequest.objects.filter(
             q,

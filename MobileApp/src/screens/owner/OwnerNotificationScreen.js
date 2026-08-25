@@ -131,7 +131,10 @@ const OwnerNotificationScreen = ({ route }) => {
           const hcJson = await hcRes.json();
           hostelChangeData = (Array.isArray(hcJson.requests) ? hcJson.requests : []).map(hc => ({
             ...hc,
+            id: `hc_${hc.id}`,
+            db_id: hc.id,
             type: "hostel_change_request",
+            property_type: "hostel",
             title: "Hostel Change Request 📩",
             tenant_name: hc.tenant_name || "Tenant",
             tenant_phone: hc.tenant_phone || "",
@@ -142,10 +145,49 @@ const OwnerNotificationScreen = ({ route }) => {
         console.log("Could not fetch hostel change requests:", hcErr);
       }
 
-      const rawCombined = [...hostelChangeData, ...vacateData, ...mappedData];
+      let generalNotifs = [];
+      try {
+        const notifRes = await fetchWithAuth(`${BASE_URL}/api/notifications/?phone=${encodeURIComponent(phone)}&role=owner`);
+        if (notifRes.ok) {
+          const notifJson = await notifRes.json();
+          generalNotifs = (Array.isArray(notifJson.notifications) ? notifJson.notifications : []).map(n => {
+            if (n.type === "hostel_change_request" || n.type === "HOSTEL_CHANGE" || n.type === "HOSTEL_CHANGE_REQUEST") {
+              return {
+                ...n,
+                id: `hc_${n.request_id || n.related_id || n.id}`,
+                db_id: n.request_id || n.related_id || n.id,
+                type: "hostel_change_request",
+                property_type: "hostel",
+                title: n.title || "Hostel Change Request 📩",
+                tenant_name: n.tenant_name || "Tenant",
+                tenant_phone: n.tenant_phone || "",
+                current_hostel_name: n.current_hostel_name || "Current Hostel",
+                target_hostel_name: n.target_hostel_name || "Target Hostel",
+                message: n.message || `${n.tenant_name || "Tenant"} requested to move to ${n.target_hostel_name || 'Target Hostel'}.`,
+              };
+            }
+            if (n.type === "VACATE_REQUEST" || n.type === "VACATE") {
+              return {
+                ...n,
+                id: `vacate_${n.request_id || n.related_id || n.id}`,
+                db_id: n.request_id || n.related_id || n.id,
+                type: "vacate_request",
+                title: "Vacate Request",
+                tenant_name: n.tenant_name || "Tenant",
+                message: n.message || `${n.tenant_name || "Tenant"} has requested to vacate the property.`,
+              };
+            }
+            return n;
+          });
+        }
+      } catch (notifErr) {
+        console.log("Could not fetch owner general notifications:", notifErr);
+      }
+
+      const rawCombined = [...hostelChangeData, ...generalNotifs, ...vacateData, ...mappedData];
       const seenMap = new Map();
       rawCombined.forEach(item => {
-        const key = `${item.type || 'req'}_${item.id}`;
+        const key = `${item.type || 'req'}_${item.db_id || item.id}`;
         if (!seenMap.has(key)) {
           seenMap.set(key, item);
         }
@@ -460,7 +502,8 @@ const OwnerNotificationScreen = ({ route }) => {
     }
 
     if (item.type === "hostel_change_request") {
-      const handleApproveHC = async (reqId) => {
+      const handleApproveHC = async (rawId) => {
+        const reqId = String(rawId || "").replace(/^hc_/, "");
         Alert.alert(
           "Approve Hostel Change",
           "Approve this hostel change request?",
@@ -492,7 +535,8 @@ const OwnerNotificationScreen = ({ route }) => {
         );
       };
 
-      const handleRejectHC = async (reqId) => {
+      const handleRejectHC = async (rawId) => {
+        const reqId = String(rawId || "").replace(/^hc_/, "");
         Alert.alert(
           "Reject Hostel Change",
           "Reject this hostel change request?",
@@ -567,14 +611,14 @@ const OwnerNotificationScreen = ({ route }) => {
             <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
               <TouchableOpacity
                 style={{ flex: 1, backgroundColor: "#F3F4F6", paddingVertical: 10, borderRadius: 8, alignItems: "center", borderWidth: 1, borderColor: "#E5E7EB" }}
-                onPress={() => handleRejectHC(item.id || item.request_id)}
+                onPress={() => handleRejectHC(item.db_id || item.request_id || item.id)}
               >
                 <Text style={{ color: "#4B5563", fontWeight: "700", fontSize: 13 }}>Reject</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={{ flex: 1, backgroundColor: "#10B981", paddingVertical: 10, borderRadius: 8, alignItems: "center" }}
-                onPress={() => handleApproveHC(item.id || item.request_id)}
+                onPress={() => handleApproveHC(item.db_id || item.request_id || item.id)}
               >
                 <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Accept</Text>
               </TouchableOpacity>
@@ -813,7 +857,7 @@ const OwnerNotificationScreen = ({ route }) => {
   };
 
   // Filter out cleared notifications
-  const visibleRequests = requests.filter(r => !clearedIds.includes(r.id));
+  const visibleRequests = requests.filter(r => !clearedIds.includes(r.id) && !clearedIds.includes(r.db_id));
   const grouped = groupRequests(visibleRequests);
 
   if (loading && !refreshing) {
