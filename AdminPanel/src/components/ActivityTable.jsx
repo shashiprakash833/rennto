@@ -43,7 +43,6 @@ function ActivityTable() {
           id: item.id || index + 1,
           name: item.owner_name || "No Name",
           phone: item.phone || "N/A",
-          phone: item.phone || "N/A",
           property: item.property_type || "N/A",
           status: item.status || "pending",
           date_time: formatDateTime(item.date),

@@ -424,6 +424,7 @@ export default function OwnerIssues() {
 
         <TextInput
           placeholder={t('search by name')}
+          placeholderTextColor={COLORS.TEXT_LIGHT}
           style={styles.search}
           value={search}
           onChangeText={handleSearch}
@@ -438,7 +439,7 @@ export default function OwnerIssues() {
           <FlatList
             data={filteredIssues}
             keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
             renderItem={({ item }) => (
               <TouchableOpacity onPress={() => openDetails(item)}>
                 <View style={styles.card}>
@@ -580,6 +581,7 @@ export default function OwnerIssues() {
 
                   <TextInput
                     placeholder="Write a comment for tenant..."
+                    placeholderTextColor={COLORS.TEXT_LIGHT}
                     multiline
                     value={ownerComment}
                     onChangeText={setOwnerComment}

@@ -496,6 +496,12 @@ export default function TenantProfile({ navigation }) {
               onPress={() => setShowLangModal(true)}
             />
             <ActionItem
+              icon="document-text-outline"
+              label={t("request_history") || "Request History"}
+              color="#3B82F6"
+              onPress={() => navigation.navigate("TenantRequestHistory")}
+            />
+            <ActionItem
               icon="notifications-outline"
               label={t("notifications") || "Notifications"}
               color="#F59E0B"
@@ -777,7 +783,7 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   content: {
-    paddingBottom: 40
+    paddingBottom: 110
   },
   header: {
 

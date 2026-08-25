@@ -80,11 +80,11 @@ export default function OwnerProfile({ navigation }) {
 
 
   const initialOwner = {
-    name: "Loading...",
+    name: "",
     role: "Property Owner",
-    phone: "Loading...",
-    propertyName: "Loading...",
-    location: "Loading..."
+    phone: "",
+    propertyName: "",
+    location: ""
   };
 
   const [editableOwner, setEditableOwner] = useState(initialOwner);
@@ -134,212 +134,214 @@ export default function OwnerProfile({ navigation }) {
     return () => scrollY.removeListener(id);
   }, [scrollY]);
 
-  // --- Animation State & Refs ---
-  const [coords, setCoords] = useState(null);
+  // --- Guided Financial Flow Animation State & Refs ---
+  const [financeRowLayout, setFinanceRowLayout] = useState(null);
+  const [incomeLayout, setIncomeLayout] = useState(null);
+  const [expensesLayout, setExpensesLayout] = useState(null);
+  const [profitLayout, setProfitLayout] = useState(null);
   const [animationFinished, setAnimationFinished] = useState(false);
-  const numCoins = 8;
+
+  const profitPulseAnim = useRef(new Animated.Value(1)).current;
+  const profitGlowOpacity = useRef(new Animated.Value(0)).current;
+
+  const numCoins = 6;
   const coinsAnim = useRef(Array.from({ length: numCoins }).map(() => ({
     anim: new Animated.ValueXY({ x: 0, y: 0 }),
     opacity: new Animated.Value(0),
-    scale: new Animated.Value(1),
+    scale: new Animated.Value(0.3),
     rot: new Animated.Value(0),
   }))).current;
 
-  const avatarRef = useRef(null);
-  const incomeRef = useRef(null);
-  const expensesRef = useRef(null);
-  const profitRef = useRef(null);
+  const isAnimatingRef = useRef(false);
 
   React.useEffect(() => {
-    if (!loading) {
-      if (totalIncome <= 0 && totalExpenses <= 0) {
-        setCoords(null);
-        return;
-      }
-      const timer = setTimeout(() => {
-        if (avatarRef.current && incomeRef.current && expensesRef.current && profitRef.current) {
-          const getPos = (ref) => new Promise(resolve => {
-            if (!ref) {
-              resolve({ x: 0, y: 0 });
-              return;
-            }
-            ref.measure((x, y, w, h, pageX, pageY) => {
-              if (pageX || pageY) {
-                resolve({ x: pageX + w / 2 - 15, y: pageY + scrollYVal.current + h / 2 - 15 });
-              } else {
-                ref.measureInWindow((winX, winY, winW, winH) => {
-                  resolve({ x: (winX || 0) + (winW || 0) / 2 - 15, y: (winY || 0) + scrollYVal.current + (winH || 0) / 2 - 15 });
-                });
-              }
-            });
-          });
+    // Check if layouts and financial data are ready and animation has not yet finished
+    if (
+      incomeLayout &&
+      expensesLayout &&
+      profitLayout &&
+      financeRowLayout &&
+      !animationFinished &&
+      !isAnimatingRef.current &&
+      (totalIncome > 0 || totalExpenses > 0)
+    ) {
+      isAnimatingRef.current = true;
 
-          Promise.all([
-            getPos(avatarRef.current),
-            getPos(incomeRef.current),
-            getPos(expensesRef.current),
-            getPos(profitRef.current)
-          ]).then(([avatar, income, expenses, profit]) => {
-            if (avatar && income && expenses && profit) {
-              setCoords({ avatar, income, expenses, profit });
-            }
-          });
-        }
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, [loading, totalIncome, totalExpenses]);
+      const pIncome = {
+        x: incomeLayout.x + incomeLayout.width / 2 - 20,
+        y: financeRowLayout.y + incomeLayout.y + incomeLayout.height / 2 - 12
+      };
+      const pExpenses = {
+        x: expensesLayout.x + expensesLayout.width / 2 - 20,
+        y: financeRowLayout.y + expensesLayout.y + expensesLayout.height / 2 - 12
+      };
+      const pProfit = {
+        x: profitLayout.x + profitLayout.width / 2 - 20,
+        y: profitLayout.y + profitLayout.height / 2 - 12
+      };
 
-  React.useEffect(() => {
-    // Play animation whenever we have any financial data (income or expenses)
-    if (coords && !animationFinished && (totalIncome > 0 || totalExpenses > 0)) {
+      const peak1Y = Math.min(pIncome.y, pExpenses.y) - 20;
+      const peak2Y = Math.min(pExpenses.y, pProfit.y) - 15;
+
       const animations = coinsAnim.map((coin, i) => {
-        coin.anim.setValue({ x: coords.avatar.x, y: coords.avatar.y });
+        coin.anim.setValue({ x: pIncome.x, y: pIncome.y });
         coin.scale.setValue(0.3);
+        coin.opacity.setValue(0);
         coin.rot.setValue(0);
 
-        // Physics-based randomized offsets to create natural clusters on landing
-        const rx1 = (Math.random() - 0.5) * 45;
-        const ry1 = (Math.random() - 0.5) * 20;
+        const startDelay = i * 95;
+        const isExpenseDeduction = i < 2; // First 2 particles represent deducted expenses
 
-        const rx2 = (Math.random() - 0.5) * 45;
-        const ry2 = (Math.random() - 0.5) * 20;
+        if (isExpenseDeduction) {
+          // --- EXPENSE DEDUCTION FLOW: Income ➡️ Expenses ➡️ Dissolve into Expenses ---
+          return Animated.sequence([
+            Animated.delay(startDelay),
 
-        const rx3 = (Math.random() - 0.5) * 55;
-        const ry3 = (Math.random() - 0.5) * 20;
-
-        const pAvatar = { x: coords.avatar.x, y: coords.avatar.y };
-        const pIncome = { x: coords.income.x + rx1, y: coords.income.y + ry1 };
-        const pExpenses = { x: coords.expenses.x + rx2, y: coords.expenses.y + ry2 };
-        const pProfit = { x: coords.profit.x + rx3, y: coords.profit.y + ry3 };
-
-        // Parabolic arc peak heights (simulating gravity and jumping)
-        const peak1Y = Math.min(pAvatar.y, pIncome.y) - 130;
-        const peak2Y = Math.min(pIncome.y, pExpenses.y) - 75;
-        const peak3Y = Math.min(pExpenses.y, pProfit.y) - 100;
-
-        return Animated.sequence([
-          Animated.delay(i * 135), // Staggered stream delay
-
-          // --- Avatar ➡️ Income ---
-          Animated.parallel([
-            Animated.timing(coin.opacity, { toValue: 1, duration: 80, useNativeDriver: true }),
-            Animated.timing(coin.scale, { toValue: 1.15, duration: 250, useNativeDriver: true }),
-            Animated.timing(coin.rot, { toValue: 0.35, duration: 800, useNativeDriver: true, easing: Easing.linear }),
-            Animated.timing(coin.anim.x, {
-              toValue: pIncome.x,
-              duration: 800,
-              useNativeDriver: true,
-              easing: Easing.out(Easing.ease),
-            }),
-            Animated.sequence([
-              Animated.timing(coin.anim.y, {
-                toValue: peak1Y,
-                duration: 350,
-                useNativeDriver: true,
-                easing: Easing.out(Easing.quad),
-              }),
-              Animated.timing(coin.anim.y, {
-                toValue: pIncome.y,
-                duration: 450,
-                useNativeDriver: true,
-                easing: Easing.in(Easing.quad),
-              }),
+            // 1. Emerge at Income Card
+            Animated.parallel([
+              Animated.timing(coin.opacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+              Animated.timing(coin.scale, { toValue: 1.0, duration: 250, useNativeDriver: true }),
+              Animated.timing(coin.rot, { toValue: 0.2, duration: 250, useNativeDriver: true }),
             ]),
-          ]),
 
-          // landing bounce on Income
-          Animated.parallel([
-            Animated.sequence([
-              Animated.timing(coin.scale, { toValue: 1.35, duration: 80, useNativeDriver: true }),
-              Animated.spring(coin.scale, { toValue: 1.0, friction: 6, tension: 40, useNativeDriver: true }),
-            ]),
-            Animated.timing(coin.rot, { toValue: 0.45, duration: 150, useNativeDriver: true }),
-          ]),
-
-          Animated.delay(2000), // Stay 2 seconds
-
-          // --- Income ➡️ Expenses ---
-          Animated.parallel([
-            Animated.timing(coin.rot, { toValue: 0.8, duration: 700, useNativeDriver: true, easing: Easing.linear }),
-            Animated.timing(coin.anim.x, {
-              toValue: pExpenses.x,
-              duration: 700,
-              useNativeDriver: true,
-              easing: Easing.out(Easing.ease),
-            }),
-            Animated.sequence([
-              Animated.timing(coin.anim.y, {
-                toValue: peak2Y,
-                duration: 300,
+            // 2. Smooth Arc to Expenses Card
+            Animated.parallel([
+              Animated.timing(coin.anim.x, {
+                toValue: pExpenses.x + (Math.random() - 0.5) * 16,
+                duration: 650,
+                easing: Easing.bezier(0.25, 0.1, 0.25, 1),
                 useNativeDriver: true,
-                easing: Easing.out(Easing.quad),
               }),
-              Animated.timing(coin.anim.y, {
-                toValue: pExpenses.y,
-                duration: 400,
-                useNativeDriver: true,
-                easing: Easing.in(Easing.quad),
-              }),
-            ]),
-          ]),
-
-          // landing bounce on Expenses
-          Animated.parallel([
-            Animated.sequence([
-              Animated.timing(coin.scale, { toValue: 1.35, duration: 80, useNativeDriver: true }),
-              Animated.spring(coin.scale, { toValue: 1.0, friction: 6, tension: 40, useNativeDriver: true }),
-            ]),
-            Animated.timing(coin.rot, { toValue: 0.9, duration: 150, useNativeDriver: true }),
-          ]),
-
-          Animated.delay(300),
-
-          // --- Expenses ➡️ Net Profit ---
-          Animated.parallel([
-            Animated.timing(coin.rot, { toValue: 1.3, duration: 700, useNativeDriver: true, easing: Easing.linear }),
-            Animated.timing(coin.anim.x, {
-              toValue: pProfit.x,
-              duration: 700,
-              useNativeDriver: true,
-              easing: Easing.out(Easing.ease),
-            }),
-            Animated.sequence([
-              Animated.timing(coin.anim.y, {
-                toValue: peak3Y,
-                duration: 300,
-                useNativeDriver: true,
-                easing: Easing.out(Easing.quad),
-              }),
-              Animated.timing(coin.anim.y, {
-                toValue: pProfit.y,
-                duration: 400,
-                useNativeDriver: true,
-                easing: Easing.in(Easing.quad),
-              }),
-            ]),
-          ]),
-
-          // Landing bounce and graceful fade-out on Net Profit
-          Animated.parallel([
-            Animated.sequence([
-              Animated.timing(coin.scale, { toValue: 1.4, duration: 90, useNativeDriver: true }),
-              Animated.parallel([
-                Animated.timing(coin.opacity, { toValue: 0, duration: 350, useNativeDriver: true }),
-                Animated.timing(coin.scale, { toValue: 0.1, duration: 350, useNativeDriver: true }),
+              Animated.sequence([
+                Animated.timing(coin.anim.y, {
+                  toValue: peak1Y,
+                  duration: 280,
+                  easing: Easing.out(Easing.quad),
+                  useNativeDriver: true,
+                }),
+                Animated.timing(coin.anim.y, {
+                  toValue: pExpenses.y + (Math.random() - 0.5) * 10,
+                  duration: 370,
+                  easing: Easing.in(Easing.quad),
+                  useNativeDriver: true,
+                }),
               ]),
+              Animated.timing(coin.rot, { toValue: 0.7, duration: 650, useNativeDriver: true }),
             ]),
-            Animated.timing(coin.rot, { toValue: 1.5, duration: 400, useNativeDriver: true }),
-          ]),
-        ]);
+
+            // 3. Land on Expenses & Dissolve (Expenses Deducted)
+            Animated.parallel([
+              Animated.timing(coin.scale, { toValue: 1.25, duration: 80, useNativeDriver: true }),
+              Animated.timing(coin.rot, { toValue: 0.85, duration: 80, useNativeDriver: true }),
+            ]),
+            Animated.parallel([
+              Animated.timing(coin.opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+              Animated.timing(coin.scale, { toValue: 0.15, duration: 300, useNativeDriver: true }),
+            ]),
+          ]);
+        } else {
+          // --- NET PROFIT FLOW: Income ➡️ Expenses ➡️ Net Profit with Success Pulse ---
+          return Animated.sequence([
+            Animated.delay(startDelay),
+
+            // 1. Emerge at Income Card
+            Animated.parallel([
+              Animated.timing(coin.opacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+              Animated.timing(coin.scale, { toValue: 1.0, duration: 250, useNativeDriver: true }),
+              Animated.timing(coin.rot, { toValue: 0.2, duration: 250, useNativeDriver: true }),
+            ]),
+
+            // 2. Smooth Arc to Expenses Card
+            Animated.parallel([
+              Animated.timing(coin.anim.x, {
+                toValue: pExpenses.x + (Math.random() - 0.5) * 16,
+                duration: 620,
+                easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+                useNativeDriver: true,
+              }),
+              Animated.sequence([
+                Animated.timing(coin.anim.y, {
+                  toValue: peak1Y,
+                  duration: 270,
+                  easing: Easing.out(Easing.quad),
+                  useNativeDriver: true,
+                }),
+                Animated.timing(coin.anim.y, {
+                  toValue: pExpenses.y + (Math.random() - 0.5) * 10,
+                  duration: 350,
+                  easing: Easing.in(Easing.quad),
+                  useNativeDriver: true,
+                }),
+              ]),
+              Animated.timing(coin.rot, { toValue: 0.6, duration: 620, useNativeDriver: true }),
+            ]),
+
+            // 3. Quick Touchdown & Arc Downward to Net Profit
+            Animated.timing(coin.scale, { toValue: 1.15, duration: 80, useNativeDriver: true }),
+
+            // 4. Smooth Curve Downward to Net Profit Card
+            Animated.parallel([
+              Animated.timing(coin.anim.x, {
+                toValue: pProfit.x + (Math.random() - 0.5) * 30,
+                duration: 720,
+                easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+                useNativeDriver: true,
+              }),
+              Animated.sequence([
+                Animated.timing(coin.anim.y, {
+                  toValue: peak2Y,
+                  duration: 300,
+                  easing: Easing.out(Easing.quad),
+                  useNativeDriver: true,
+                }),
+                Animated.timing(coin.anim.y, {
+                  toValue: pProfit.y + (Math.random() - 0.5) * 12,
+                  duration: 420,
+                  easing: Easing.in(Easing.quad),
+                  useNativeDriver: true,
+                }),
+              ]),
+              Animated.timing(coin.rot, { toValue: 1.3, duration: 720, useNativeDriver: true }),
+            ]),
+
+            // 5. Land inside Net Profit & Absorb
+            Animated.parallel([
+              Animated.timing(coin.scale, { toValue: 1.35, duration: 80, useNativeDriver: true }),
+              Animated.timing(coin.rot, { toValue: 1.45, duration: 80, useNativeDriver: true }),
+            ]),
+            Animated.parallel([
+              Animated.timing(coin.opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+              Animated.timing(coin.scale, { toValue: 0.15, duration: 300, useNativeDriver: true }),
+            ]),
+          ]);
+        }
       });
 
-      Animated.parallel(animations).start(() => {
+      // Subtle Glow & Scale Pulse in Net Profit Card when coins finish
+      const profitPulseSequence = Animated.sequence([
+        Animated.delay(1550),
+        Animated.parallel([
+          Animated.sequence([
+            Animated.timing(profitPulseAnim, { toValue: 1.035, duration: 180, useNativeDriver: true }),
+            Animated.spring(profitPulseAnim, { toValue: 1.0, friction: 6, tension: 40, useNativeDriver: true }),
+          ]),
+          Animated.sequence([
+            Animated.timing(profitGlowOpacity, { toValue: 0.8, duration: 180, useNativeDriver: true }),
+            Animated.timing(profitGlowOpacity, { toValue: 0, duration: 450, useNativeDriver: true }),
+          ]),
+        ]),
+      ]);
+
+      Animated.parallel([
+        ...animations,
+        profitPulseSequence
+      ]).start(() => {
         setAnimationFinished(true);
+        isAnimatingRef.current = false;
       });
     }
-  }, [coords, animationFinished]);
-  // ------------------------------
+  }, [incomeLayout, expensesLayout, profitLayout, financeRowLayout, animationFinished, totalIncome, totalExpenses]);
+  // ----------------------------------------------------
 
   // --- Multi-Account Storage Helper ---
   const upsertCurrentAccount = async (phoneOrId, name, profileImg, actualPhone) => {
@@ -371,7 +373,7 @@ export default function OwnerProfile({ navigation }) {
     useCallback(() => {
       if (isConnected !== undefined) {
         setAnimationFinished(false);
-        setCoords(null);
+        isAnimatingRef.current = false;
         loadAccounts();
         fetchOwnerProfile();
         fetchPayments();
@@ -383,7 +385,7 @@ export default function OwnerProfile({ navigation }) {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setAnimationFinished(false);
-    setCoords(null);
+    isAnimatingRef.current = false;
     // loadAccounts() re-fetches account statuses from server so admin
     // suspend/approve changes are reflected immediately on pull-to-refresh.
     await Promise.all([loadAccounts(), fetchOwnerProfile(), fetchPayments(), fetchExpenses()]);
@@ -431,27 +433,35 @@ export default function OwnerProfile({ navigation }) {
       const response = await fetchWithAuth(`${BASE_URL}/api/owner_data/${encodeURIComponent(ownerId)}/`);
       const data = await response.json();
       if (response.ok) {
+        const propDetails = data.step2?.property_details || {};
+        const pName = propDetails.property_name || propDetails.hostelName || propDetails.apartmentName || propDetails.commercialName || data.step1?.property_name;
+        const pLoc = propDetails.location || propDetails.address || propDetails.area || data.step1?.area;
+        const pType = data.property_type ? (data.property_type.charAt(0).toUpperCase() + data.property_type.slice(1)) : (selectedAccount?.property_type || "Hostel");
+        const gallery = propDetails.gallery_images || [];
+        const propImg = (gallery && gallery.length > 0) ? gallery[0] : (propDetails.cover_image || selectedAccount?.property_image || null);
+
         setEditableOwner({
-          name: data.step1.name,
-          role: data.property_type ? `${data.property_type.charAt(0).toUpperCase() + data.property_type.slice(1)} Owner` : "Owner",
-          phone: data.step1.phone,
-          propertyName: data.step1.property_name || "New Property",
-          location: data.step1.area || "Location missing"
+          name: data.step1?.name || selectedAccount?.owner_name || selectedAccount?.name || "Owner",
+          role: `${pType} Owner`,
+          phone: data.step1?.phone || selectedAccount?.phone || "",
+          propertyName: pName || selectedAccount?.property_name || selectedAccount?.name || "",
+          location: pLoc || selectedAccount?.location || "",
+          propertyImage: propImg,
         });
-        setProfileImage(data.step1.owner_img_field ? `${data.step1.owner_img_field}?t=${new Date().getTime()}` : null);
+        setProfileImage(data.step1?.owner_img_field ? `${data.step1.owner_img_field}?t=${new Date().getTime()}` : null);
 
         // Upsert into multi-account storage
-        upsertCurrentAccount(ownerId, data.step1.name, data.step1.owner_img_field, data.step1.phone);
+        upsertCurrentAccount(ownerId, data.step1?.name, data.step1?.owner_img_field, data.step1?.phone);
 
         const stats = data.stats || { total_beds: 0, occupied_beds: 0, total_rent: 0 };
         setProperty({
-          totalBeds: stats.total_beds,
-          occupied: stats.occupied_beds,
-          baseIncome: stats.total_rent,
-          structure: data.step3.building_layout || [],
+          totalBeds: stats.total_beds || 0,
+          occupied: stats.occupied_beds || 0,
+          baseIncome: stats.total_rent || 0,
+          structure: data.step3?.building_layout || [],
         });
       }
-    } catch (e) { console.log(e); }
+    } catch (e) { console.log("Fetch owner profile error:", e); }
     finally { setLoading(false); }
   };
 
@@ -721,7 +731,7 @@ export default function OwnerProfile({ navigation }) {
         >
           <View style={styles.headerTopRow} />
 
-          <View ref={avatarRef} collapsable={false} style={styles.profileCardContainer}>
+          <View style={styles.profileCardContainer}>
             <TouchableOpacity
               style={styles.profileImageWrapper}
               onPress={() => setShowProfileModal(true)}
@@ -748,14 +758,16 @@ export default function OwnerProfile({ navigation }) {
         </LinearGradient>
 
         {/* Financial Overview */}
-        <View style={styles.section}>
+        <View style={[styles.section, { position: 'relative', overflow: 'hidden' }]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{t("financial_summary") || "Financial Overview"}</Text>
-
           </View>
-          <View style={styles.financeRow}>
+          <View
+            style={styles.financeRow}
+            onLayout={(e) => setFinanceRowLayout(e.nativeEvent.layout)}
+          >
             <FinanceCard
-              cardRef={incomeRef}
+              onLayout={(e) => setIncomeLayout(e.nativeEvent.layout)}
               title={t("income") || "Total Income"}
               value={`₹${formatNumber(totalIncome)}`}
               color="#2563EB"
@@ -763,7 +775,7 @@ export default function OwnerProfile({ navigation }) {
               bg="#EFF6FF"
             />
             <FinanceCard
-              cardRef={expensesRef}
+              onLayout={(e) => setExpensesLayout(e.nativeEvent.layout)}
               title={t("expenses") || "Total Expenses"}
               value={`₹${formatNumber(totalExpenses)}`}
               color="#DC2626"
@@ -771,7 +783,11 @@ export default function OwnerProfile({ navigation }) {
               bg="#FEF2F2"
             />
           </View>
-          <View ref={profitRef} collapsable={false}>
+          <Animated.View
+            collapsable={false}
+            onLayout={(e) => setProfitLayout(e.nativeEvent.layout)}
+            style={{ transform: [{ scale: profitPulseAnim }] }}
+          >
             <LinearGradient
               colors={netProfit >= 0 ? ["#ECFDF5", "#D1FAE5"] : ["#FFF1F2", "#FFE4E6"]}
               style={styles.profitCard}
@@ -803,8 +819,174 @@ export default function OwnerProfile({ navigation }) {
                   />
                 </View>
               </View>
+
+              {/* Subtle Success Glow Overlay on Net Profit */}
+              <Animated.View
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    borderRadius: 20,
+                    borderWidth: 2,
+                    borderColor: '#10B981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    opacity: profitGlowOpacity,
+                  }
+                ]}
+                pointerEvents="none"
+              />
             </LinearGradient>
-          </View>
+          </Animated.View>
+
+          {/* Guided Financial Flow Animation Layer (Clipped inside this section) */}
+          {!animationFinished && (
+            <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
+              {coinsAnim.map((coin, index) => {
+                const isNote = index % 2 !== 0;
+
+                if (isNote) {
+                  // RENDER MINI TEAL/GREEN INDIAN RUPEE NOTE (₹500 style)
+                  return (
+                    <Animated.View
+                      key={index}
+                      style={{
+                        position: 'absolute',
+                        width: 44,
+                        height: 24,
+                        shadowColor: '#10B981',
+                        shadowOpacity: 0.7,
+                        shadowRadius: 5,
+                        shadowOffset: { width: 0, height: 2 },
+                        elevation: 4,
+                        opacity: coin.opacity,
+                        transform: [
+                          { translateX: coin.anim.x },
+                          { translateY: coin.anim.y },
+                          { scale: coin.scale },
+                          { rotate: coin.rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) },
+                          { rotateY: coin.rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] }) }
+                        ],
+                        zIndex: 99
+                      }}
+                    >
+                      <LinearGradient
+                        colors={["#A7F3D0", "#34D399", "#059669"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={{
+                          width: 44,
+                          height: 24,
+                          borderRadius: 3,
+                          borderWidth: 0.8,
+                          borderColor: '#ECFDF5',
+                          padding: 2,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <View style={{
+                          width: '100%',
+                          height: '100%',
+                          borderRadius: 1.5,
+                          borderWidth: 0.5,
+                          borderColor: 'rgba(255, 255, 255, 0.45)',
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingHorizontal: 2
+                        }}>
+                          <View style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: 3.5,
+                            backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                            borderWidth: 0.5,
+                            borderColor: 'rgba(255, 255, 255, 0.35)'
+                          }} />
+                          <Text style={{
+                            color: '#FFF',
+                            fontWeight: '900',
+                            fontSize: 8,
+                            letterSpacing: -0.3,
+                            textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                            textShadowOffset: { width: 0.5, height: 0.5 },
+                            textShadowRadius: 1
+                          }}>₹500</Text>
+                          <View style={{
+                            width: 1.2,
+                            height: '100%',
+                            backgroundColor: 'rgba(255, 255, 255, 0.55)',
+                            position: 'absolute',
+                            left: 14
+                          }} />
+                        </View>
+                      </LinearGradient>
+                    </Animated.View>
+                  );
+                } else {
+                  // RENDER SHINY 3D GOLD COIN
+                  return (
+                    <Animated.View
+                      key={index}
+                      style={{
+                        position: 'absolute',
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
+                        shadowColor: '#FF9800',
+                        shadowOpacity: 0.8,
+                        shadowRadius: 6,
+                        shadowOffset: { width: 0, height: 3 },
+                        elevation: 5,
+                        opacity: coin.opacity,
+                        transform: [
+                          { translateX: coin.anim.x },
+                          { translateY: coin.anim.y },
+                          { scale: coin.scale },
+                          { rotate: coin.rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '540deg'] }) },
+                          { rotateY: coin.rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '1080deg'] }) }
+                        ],
+                        zIndex: 99
+                      }}
+                    >
+                      <LinearGradient
+                        colors={["#FFE082", "#FFB300", "#FF8F00"]}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 14,
+                          borderWidth: 1.2,
+                          borderColor: '#FFF8E1',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          padding: 1,
+                        }}
+                      >
+                        <View style={{
+                          width: 19,
+                          height: 19,
+                          borderRadius: 9.5,
+                          borderWidth: 0.8,
+                          borderColor: 'rgba(255, 255, 255, 0.4)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}>
+                          <Text style={{
+                            color: '#FFF',
+                            fontWeight: '900',
+                            fontSize: 11,
+                            textShadowColor: 'rgba(0, 0, 0, 0.35)',
+                            textShadowOffset: { width: 0.5, height: 1 },
+                            textShadowRadius: 1.5
+                          }}>₹</Text>
+                        </View>
+                      </LinearGradient>
+                    </Animated.View>
+                  );
+                }
+              })}
+            </View>
+          )}
         </View>
 
         {/* Quick Actions */}
@@ -849,33 +1031,183 @@ export default function OwnerProfile({ navigation }) {
 
 
 
-        {/* Add Account Section */}
+        {/* Manage Accounts Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("manage_accounts") || "Manage Accounts"}</Text>
-          <TouchableOpacity
-            style={[styles.expensesCard, { flexDirection: 'row', alignItems: 'center', padding: 16, marginTop: 10, shadowColor: '#7C3AED' }]}
-            onPress={async () => {
-              // Refresh account statuses from server before opening the sheet
-              // so admin suspend/approve changes are visible immediately.
-              await loadAccounts();
-              setShowAccountSwitcher(true);
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={styles.sectionTitle}>{t("manage_accounts") || "Manage Accounts"}</Text>
+            <TouchableOpacity
+              onPress={async () => {
+                await loadAccounts();
+                setShowAccountSwitcher(true);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#F5F3FF',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: '#EDE9FE',
+                gap: 5,
+              }}
+            >
+              <Ionicons name="swap-horizontal" size={16} color="#7C3AED" />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#7C3AED' }}>
+                {accounts.length > 1
+                  ? `${t("switch_account") || "Switch Account"} (${accounts.length})`
+                  : (t("switch_account") || "Switch Account")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Single Combined Manage Accounts Card */}
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 20,
+              padding: 18,
+              borderWidth: 1,
+              borderColor: '#EDE9FE',
+              shadowColor: '#7C3AED',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.08,
+              shadowRadius: 12,
+              elevation: 3,
             }}
           >
-            <View style={[styles.expenseIconBox, { backgroundColor: '#F5F3FF' }]}>
-              <Ionicons name="person-add-outline" size={24} color="#7C3AED" />
+            {/* Top Right: ● CURRENT PROPERTY */}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 6 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#7C3AED', marginRight: 5 }} />
+              <Text
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: '800',
+                  color: '#7C3AED',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.6,
+                }}
+              >
+                {t("current_property") || "CURRENT PROPERTY"}
+              </Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1F2937' }}>{t("add_another_Property") || "Add another property"}</Text>
-              <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>{t("login_with_different") || "Login with a different account"}</Text>
+
+            {/* Current Active Property Row */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 16,
+                  backgroundColor: '#F5F3FF',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 14,
+                  borderWidth: 1,
+                  borderColor: '#EDE9FE',
+                  overflow: 'hidden',
+                }}
+              >
+                {(editableOwner.propertyImage || selectedAccount?.property_image) ? (
+                  <Image
+                    source={{ uri: editableOwner.propertyImage || selectedAccount?.property_image }}
+                    style={{ width: '100%', height: '100%', borderRadius: 15 }}
+                  />
+                ) : (
+                  <Ionicons name="business" size={28} color="#7C3AED" />
+                )}
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 17,
+                    fontWeight: '800',
+                    color: '#1F2937',
+                    marginBottom: 4,
+                  }}
+                  numberOfLines={1}
+                >
+                  {editableOwner.propertyName || selectedAccount?.property_name || selectedAccount?.name || "Property Name"}
+                </Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  <Ionicons name="location-sharp" size={14} color="#6B7280" style={{ marginRight: 4 }} />
+                  <Text style={{ fontSize: 13, color: '#6B7280', flex: 1 }} numberOfLines={1}>
+                    {editableOwner.location || selectedAccount?.location || selectedAccount?.area || "Location not set"}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="person-outline" size={13} color="#7C3AED" style={{ marginRight: 4 }} />
+                  <Text style={{ fontSize: 12.5, color: '#7C3AED', fontWeight: '600', flex: 1 }} numberOfLines={1}>
+                    {editableOwner.role || (selectedAccount?.property_type ? `${selectedAccount.property_type.charAt(0).toUpperCase() + selectedAccount.property_type.slice(1)} Owner` : "Property Owner")}
+                  </Text>
+                </View>
+              </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
+
+            {/* Divider Line */}
+            <View
+              style={{
+                height: 1,
+                backgroundColor: '#F1F5F9',
+                marginVertical: 14,
+              }}
+            />
+
+            {/* Add Another Property Action Row */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+              onPress={async () => {
+                await loadAccounts();
+                setShowAddAccountModal(true);
+              }}
+            >
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 16,
+                  backgroundColor: '#F5F3FF',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 14,
+                  borderWidth: 1,
+                  borderColor: '#EDE9FE',
+                }}
+              >
+                <Ionicons name="person-add-outline" size={24} color="#7C3AED" />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#1F2937' }}>
+                  {t("add_another_Property") || "Add Another Property"}
+                </Text>
+                <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>
+                  {t("login_with_different") || "Login with Different Account"}
+                </Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={22} color="#7C3AED" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Account Settings */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t("account_settings") || "Account Settings"}</Text>
           <View style={styles.settingsCard}>
+            <SettingsRow
+              icon="exit-outline"
+              label={t("vacate_requests") || "Vacate Requests"}
+              color="#F59E0B"
+              onPress={() => navigation.navigate('OwnerVacateRequests')}
+            />
             <SettingsRow
               icon="receipt-outline"
               label={t("expenses") || "Expenses"}
@@ -1132,175 +1464,7 @@ export default function OwnerProfile({ navigation }) {
         onClose={() => setShowLangModal(false)}
       />
 
-      {/* Absolute Coin Animation Layer - follows scroll */}
-      {coords && !animationFinished && (
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              zIndex: 9999,
-              elevation: 9999,
-              transform: [{ translateY: Animated.multiply(scrollY, -1) }]
-            }
-          ]}
-          pointerEvents="none"
-        >
-          {coinsAnim.map((coin, index) => {
-            const isNote = index % 2 !== 0;
 
-            if (isNote) {
-              // RENDER MINI TEAL/GREEN INDIAN RUPEE NOTE (₹500 style)
-              return (
-                <Animated.View
-                  key={index}
-                  style={{
-                    position: 'absolute',
-                    width: 52,
-                    height: 28,
-                    shadowColor: '#10B981',
-                    shadowOpacity: 0.8,
-                    shadowRadius: 6,
-                    shadowOffset: { width: 0, height: 3 },
-                    elevation: 5,
-                    opacity: coin.opacity,
-                    transform: [
-                      { translateX: coin.anim.x },
-                      { translateY: coin.anim.y },
-                      { scale: coin.scale },
-                      { rotate: coin.rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) },
-                      { rotateY: coin.rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] }) }
-                    ],
-                    zIndex: 9999
-                  }}
-                >
-                  <LinearGradient
-                    colors={["#A7F3D0", "#34D399", "#059669"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{
-                      width: 52,
-                      height: 28,
-                      borderRadius: 3,
-                      borderWidth: 1,
-                      borderColor: '#ECFDF5',
-                      padding: 2,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <View style={{
-                      width: '100%',
-                      height: '100%',
-                      borderRadius: 1.5,
-                      borderWidth: 0.5,
-                      borderColor: 'rgba(255, 255, 255, 0.45)',
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      paddingHorizontal: 3
-                    }}>
-                      {/* Watermark circle */}
-                      <View style={{
-                        width: 9,
-                        height: 9,
-                        borderRadius: 4.5,
-                        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                        borderWidth: 0.5,
-                        borderColor: 'rgba(255, 255, 255, 0.3)'
-                      }} />
-
-                      {/* Note value */}
-                      <Text style={{
-                        color: '#FFF',
-                        fontWeight: '900',
-                        fontSize: 9,
-                        letterSpacing: -0.3,
-                        textShadowColor: 'rgba(0, 0, 0, 0.3)',
-                        textShadowOffset: { width: 0.5, height: 0.5 },
-                        textShadowRadius: 1
-                      }}>₹500</Text>
-
-                      {/* Security thread strip */}
-                      <View style={{
-                        width: 1.5,
-                        height: '100%',
-                        backgroundColor: 'rgba(255, 255, 255, 0.55)',
-                        position: 'absolute',
-                        left: 16
-                      }} />
-                    </View>
-                  </LinearGradient>
-                </Animated.View>
-              );
-            } else {
-              // RENDER SHINY 3D GOLD COIN
-              return (
-                <Animated.View
-                  key={index}
-                  style={{
-                    position: 'absolute',
-                    width: 34,
-                    height: 34,
-                    borderRadius: 17,
-                    shadowColor: '#FF9800',
-                    shadowOpacity: 0.9,
-                    shadowRadius: 8,
-                    shadowOffset: { width: 0, height: 4 },
-                    elevation: 6,
-                    opacity: coin.opacity,
-                    transform: [
-                      { translateX: coin.anim.x },
-                      { translateY: coin.anim.y },
-                      { scale: coin.scale },
-                      { rotate: coin.rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '540deg'] }) },
-                      { rotateY: coin.rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '1080deg'] }) }
-                    ],
-                    zIndex: 9999
-                  }}
-                >
-                  <LinearGradient
-                    colors={["#FFE082", "#FFB300", "#FF8F00"]}
-                    style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 17,
-                      borderWidth: 1.5,
-                      borderColor: '#FFF8E1',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      padding: 1,
-                    }}
-                  >
-                    <View style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: 'rgba(255, 255, 255, 0.4)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      shadowColor: '#000',
-                      shadowOpacity: 0.1,
-                      shadowRadius: 1,
-                      shadowOffset: { width: 0, height: 1 }
-                    }}>
-                      <Text style={{
-                        color: '#FFF',
-                        fontWeight: '900',
-                        fontSize: 14,
-                        textShadowColor: 'rgba(0, 0, 0, 0.35)',
-                        textShadowOffset: { width: 0.5, height: 1 },
-                        textShadowRadius: 1.5
-                      }}>₹</Text>
-                    </View>
-                  </LinearGradient>
-                </Animated.View>
-              );
-            }
-          })}
-        </Animated.View>
-      )}
 
       {/* Draggable AI Assistant FAB */}
       <Animated.View
@@ -1453,8 +1617,8 @@ export default function OwnerProfile({ navigation }) {
   );
 }
 
-const FinanceCard = ({ title, value, color, icon, bg, cardRef }) => (
-  <View ref={cardRef} collapsable={false} style={[styles.financeCard, { backgroundColor: bg }]}>
+const FinanceCard = ({ title, value, color, icon, bg, cardRef, onLayout }) => (
+  <View ref={cardRef} collapsable={false} onLayout={onLayout} style={[styles.financeCard, { backgroundColor: bg }]}>
     <View style={styles.financeHeader}>
       <View style={[styles.financeIcon, { backgroundColor: 'white' }]}>
         <Ionicons name={icon} size={22} color={color} />

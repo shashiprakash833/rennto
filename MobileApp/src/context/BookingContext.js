@@ -5,6 +5,7 @@ import { useLanguage } from '../utils/LanguageContext';
 import BASE_URL, { fetchWithAuth } from "../config/Api";
 import { useAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
+import { showOnceAlert } from "../utils/alertOnce";
 
 export const BookingContext = createContext();
 
@@ -43,8 +44,9 @@ export const BookingProvider = ({ children }) => {
       return;
     }
     try {
+      const roleParam = userRole ? `&role=${encodeURIComponent(userRole)}` : "";
       const res = await fetchWithAuth(
-        `${BASE_URL}/api/notifications/unread-count/?phone=${encodeURIComponent(userPhone)}`
+        `${BASE_URL}/api/notifications/unread-count/?phone=${encodeURIComponent(userPhone)}${roleParam}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -83,8 +85,11 @@ export const BookingProvider = ({ children }) => {
   const markAllNotificationsRead = useCallback(async () => {
     if (!userPhone) return;
     try {
-      const res = await fetchWithAuth(`${BASE_URL}/api/notifications/${encodeURIComponent(userPhone)}/mark-all-read/`, {
+      const roleParam = userRole ? `?role=${encodeURIComponent(userRole)}` : "";
+      const res = await fetchWithAuth(`${BASE_URL}/api/notifications/${encodeURIComponent(userPhone)}/mark-all-read/${roleParam}`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: userRole }),
       });
       if (res.ok) {
         if (userRole === "tenant") {
@@ -101,6 +106,7 @@ export const BookingProvider = ({ children }) => {
 
   // 1. Initial Data Load & User Phone Sync
   useEffect(() => {
+    let isMounted = true;
     const loadData = async () => {
       try {
         const tenant = await AsyncStorage.getItem("tenantPhone");
@@ -109,142 +115,114 @@ export const BookingProvider = ({ children }) => {
         const storedSeen = await AsyncStorage.getItem("notificationSeenIds");
         const storedCleared = await AsyncStorage.getItem("notificationClearedIds");
 
-        const activePhone = tenant || owner;
-        if (activePhone !== userPhone) {
-          setuserPhone(activePhone);
+        const activePhone = role === "owner" ? (owner || tenant) : (tenant || owner);
+        if (isMounted) {
+          if (activePhone && activePhone !== userPhone) {
+            setuserPhone(activePhone);
+          }
+          if (role && role !== userRole) {
+            setUserRole(role);
+          }
+          if (storedSeen) setSeenIds(JSON.parse(storedSeen));
+          if (storedCleared) setClearedIds(JSON.parse(storedCleared));
         }
-        if (role !== userRole) {
-          setUserRole(role);
-        }
-        if (storedSeen) setSeenIds(JSON.parse(storedSeen));
-        if (storedCleared) setClearedIds(JSON.parse(storedCleared));
       } catch (e) {
         console.log("Error loading context data:", e);
       }
     };
     loadData();
 
-    // Check periodically for user phone changes (login/logout/switch)
-    const interval = setInterval(async () => {
-      try {
-        const tenant = await AsyncStorage.getItem("tenantPhone");
-        const owner = await AsyncStorage.getItem("ownerPhone");
-        const role = await AsyncStorage.getItem("userRole");
-        const activePhone = tenant || owner;
-        if (activePhone !== userPhone || role !== userRole) {
-          console.log("BookingContext user switched:", userPhone, "->", activePhone, "role:", role);
-          setuserPhone(activePhone);
-          setUserRole(role);
-          if (!activePhone) {
-            setRequests([]);
-            setUnreadNotificationCount(0);
-            setIsTenantVacated(false);
-            setTenantStatus("");
-            setIsJoined(false);
-            setJoinedProperty(null);
-          }
-        }
-      } catch (e) {
-        console.log("Error checking user phone in interval:", e);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [userPhone, userRole]);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // 1.5. Fetch Initial Requests & Sync
-  const fetchRequests = async () => {
-    if (!userPhone) return;
+  const fetchRequests = useCallback(async () => {
+    let phone = userPhone;
+    let role = userRole;
+    if (!phone) {
+      const tenant = await AsyncStorage.getItem("tenantPhone");
+      const owner = await AsyncStorage.getItem("ownerPhone");
+      role = role || (await AsyncStorage.getItem("userRole"));
+      phone = role === "owner" ? (owner || tenant) : (tenant || owner);
+      if (phone) {
+        setuserPhone(phone);
+        if (role) setUserRole(role);
+      }
+    }
+    if (!phone) return;
 
     try {
-      const isOwner = userRole === 'owner';
+      const isOwner = role === 'owner';
       const endpoint = isOwner ? "owner_requests" : "tenant_notifications";
 
       const response = await fetchWithAuth(
-        `${BASE_URL}/api/${endpoint}/${encodeURIComponent(userPhone)}/`
+        `${BASE_URL}/api/${endpoint}/${encodeURIComponent(phone)}/`
       );
 
       const data = await response.json();
 
       if (Array.isArray(data)) {
-        setRequests(data);
+        setRequests((prev) => {
+          try {
+            if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
+          } catch (e) {}
+          return data;
+        });
       }
 
       if (!isOwner) {
         const detailsRes = await fetchWithAuth(
-          `${BASE_URL}/api/tenantdetails/${encodeURIComponent(userPhone)}/`
+          `${BASE_URL}/api/tenantdetails/${encodeURIComponent(phone)}/`
         );
         if (detailsRes.ok) {
           const detailsData = await detailsRes.json();
           const isVac = Boolean(
-            detailsData && (detailsData.status === "Vacated" || detailsData.property_name === "N/A" || !detailsData.property_name)
+            !detailsData || detailsData.is_vacant || detailsData.status === "Vacated" || detailsData.property_name === "N/A" || !detailsData.property_name
           );
           setIsTenantVacated(isVac);
           setTenantStatus(detailsData?.status || "");
           if (isVac) {
             setJoinedProperty(null);
+            setIsJoined(false);
           } else {
             setJoinedProperty(detailsData);
+            setIsJoined(true);
           }
         }
       } else {
         setIsTenantVacated(false);
         setTenantStatus("");
         setJoinedProperty(null);
+        setIsJoined(false);
       }
     } catch (error) {
       console.log("Fetch Requests Error:", error);
     }
-  };
+  }, [userPhone, userRole]);
 
   useEffect(() => {
-    if (isTenantVacated || (joinedProperty && (joinedProperty.property_name === "N/A" || !joinedProperty.property_name))) {
+    if (isTenantVacated || !joinedProperty || joinedProperty.property_name === "N/A" || !joinedProperty.property_name || joinedProperty.is_vacant || joinedProperty.status === "Vacated") {
       setIsJoined(false);
-      return;
-    }
-
-    if (tenantStatus === "Active") {
+    } else if (tenantStatus === "Active" && !joinedProperty.is_vacant) {
       setIsJoined(true);
-      return;
-    }
-
-    const joined = requests.some((item) => {
-      const status = (item.status || "").toLowerCase();
-      return ["completed", "joined", "active", "occupied"].includes(status);
-    });
-
-    if (joined) {
-      setIsJoined(true);
-      return;
-    }
-
-    const hasPendingJoinRequest = requests.some((item) => {
-      const type = (item.type || item.notification_type || item.request_type || "").toLowerCase();
-      const status = (item.status || "").toLowerCase();
-      if (type.includes("vacate")) return false;
-      return ["pending", "allotted", "pending_confirmation"].includes(status);
-    });
-
-    if (hasPendingJoinRequest) {
+    } else {
       setIsJoined(false);
-      return;
     }
-
-    setIsJoined(false);
-  }, [requests, isTenantVacated, tenantStatus, joinedProperty]);
+  }, [isTenantVacated, tenantStatus, joinedProperty]);
 
   useEffect(() => {
     fetchRequests();
     fetchUnreadCount();
   }, [userPhone, refreshTrigger, fetchUnreadCount]);
 
-  // Backup polling interval for unread count & UI updates
+  // Poll unread count only — do not bump refreshTrigger on a timer (that re-renders the whole app).
   useEffect(() => {
     if (!userPhone) return;
     const interval = setInterval(() => {
       fetchUnreadCount();
-      setRefreshTrigger((prev) => prev + 1);
-    }, 10000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [userPhone, fetchUnreadCount]);
 
@@ -262,14 +240,20 @@ export const BookingProvider = ({ children }) => {
       ? `${BASE_URL.replace(/^http/, "ws")}/ws/tenant-notifications/${sanitizedPhone}/`
       : `${BASE_URL.replace(/^http/, "ws")}/ws/notifications/${sanitizedPhone}/`;
 
+    let cancelled = false;
+    let reconnectTimer = null;
+
     const connectWS = () => {
+      if (cancelled) return;
+      try {
+        ws.current?.close();
+      } catch (e) {}
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data);
           const msgText = data.content?.message || data.message;
-          const msgType = data.content?.type || data.type;
 
           if (userRole === "tenant") {
             console.log("[TENANT] NEW NOTIFICATION:", msgText || data);
@@ -277,29 +261,32 @@ export const BookingProvider = ({ children }) => {
             console.log("[OWNER] NEW NOTIFICATION:", msgText || data);
           }
 
-          // Immediately update unread count & refresh trigger
           fetchUnreadCount();
           setRefreshTrigger((prev) => prev + 1);
 
           if (msgText) {
             playSound();
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert("New Notification 🔔", msgText);
+            showOnceAlert("New Notification 🔔", msgText);
           }
-
         } catch (err) {
           console.log("WS Message Error:", err);
         }
       };
 
       ws.current.onclose = () => {
-        if (userPhone) {
-          setTimeout(connectWS, 3000);
-        }
+        if (cancelled) return;
+        reconnectTimer = setTimeout(connectWS, 4000);
       };
     };
     connectWS();
-    return () => ws.current?.close();
+    return () => {
+      cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      try {
+        ws.current?.close();
+      } catch (e) {}
+    };
   }, [userPhone, userRole, fetchUnreadCount]);
 
   // Handle Marking As Seen
@@ -314,13 +301,18 @@ export const BookingProvider = ({ children }) => {
     }
   };
 
-  // NEW: Handle Clearing (Hiding) All Notifications
-  const clearAllNotifications = async () => {
-    const newIds = requests.map((r) => r.id);
+  // Handle Clearing All Notifications
+  const clearAllNotifications = async (items = []) => {
+    const targetItems = Array.isArray(items) && items.length > 0 ? items : requests;
+    const newIds = targetItems.map((r) => r.id);
     const uniqueIds = Array.from(new Set([...clearedIds, ...newIds]));
     setClearedIds(uniqueIds);
+    setUnreadNotificationCount(0);
     try {
       await AsyncStorage.setItem("notificationClearedIds", JSON.stringify(uniqueIds));
+      if (userPhone) {
+        await markAllNotificationsRead();
+      }
     } catch (e) {
       console.log("Error clearing notifications:", e);
     }
@@ -391,6 +383,7 @@ export const BookingProvider = ({ children }) => {
   const contextValue = useMemo(() => ({
     requests: combinedRequests,
     setRequests,
+    fetchRequests,
     isJoined,
     joinedProperty,
     pendingCount,
@@ -411,6 +404,7 @@ export const BookingProvider = ({ children }) => {
     updateOwnerRequestStatus
   }), [
     combinedRequests,
+    fetchRequests,
     isJoined,
     joinedProperty,
     pendingCount,

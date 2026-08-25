@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.utils import timezone
+from django.db.models import Q
 
 from HAC.models import Tenent, Owners, AdminPassword, SystemSettings
 from HAC.serializers import TenentSerializer, TenantLoginSerializer, OwnerLoginSerializer
@@ -332,13 +333,33 @@ class AuthService:
     ADMIN_PHONE = "6304601921"
 
     @classmethod
+    def _normalize_phone(cls, phone):
+        if not phone:
+            return ""
+        p = str(phone).strip().replace(" ", "").replace("-", "")
+        if p.startswith("+91"):
+            p = p[3:]
+        elif p.startswith("91") and len(p) == 12:
+            p = p[2:]
+        elif p.startswith("+"):
+            p = p[1:]
+        return p
+
+    @classmethod
     def is_admin_phone(cls, phone):
         if not phone:
             return False
+ sagarika
+        clean_phone = cls._normalize_phone(phone)
+        if clean_phone in cls.ADMIN_PHONES:
+
         clean_phone = str(phone).strip()
         if clean_phone in cls.ADMIN_PHONES or clean_phone == cls.ADMIN_PHONE:
+ajay
             return True
-        return AdminPassword.objects.filter(phone=clean_phone).exists()
+        return AdminPassword.objects.filter(
+            Q(phone=clean_phone) | Q(phone=str(phone).strip()) | Q(phone__endswith=clean_phone)
+        ).exists()
 
     # ⏰ PASSWORD EXPIRY DURATION
     # For TESTING: timedelta(minutes=2)
@@ -347,8 +368,8 @@ class AuthService:
 
     @staticmethod
     def send_admin_otp(phone):
-
-        if not AuthService.is_admin_phone(phone):
+        clean_phone = AuthService._normalize_phone(phone)
+        if not AuthService.is_admin_phone(clean_phone):
             raise ValueError(
                 "Please enter a valid number to access the admin panel"
             )
@@ -356,7 +377,7 @@ class AuthService:
         url = (
             f"https://2factor.in/API/V1/"
             f"{settings.TWO_FACTOR_API_KEY}/SMS/"
-            f"{phone}/AUTOGEN/AdminOTP"
+            f"{clean_phone}/AUTOGEN/AdminOTP"
         )
 
         response = requests.get(url, timeout=15)
@@ -366,7 +387,7 @@ class AuthService:
             raise ValueError("Failed to send OTP")
 
         cache.set(
-            f"admin_session_{phone}",
+            f"admin_session_{clean_phone}",
             data["Details"],
             timeout=300
         )
@@ -377,11 +398,11 @@ class AuthService:
 
     @staticmethod
     def verify_admin_otp(phone, otp):
-
-        if not AuthService.is_admin_phone(phone):
+        clean_phone = AuthService._normalize_phone(phone)
+        if not AuthService.is_admin_phone(clean_phone):
             raise ValueError("Unauthorized access")
 
-        session_id = cache.get(f"admin_session_{phone}")
+        session_id = cache.get(f"admin_session_{clean_phone}")
 
         if not session_id:
             raise ValueError("OTP expired")
@@ -398,10 +419,10 @@ class AuthService:
         if data.get("Status") != "Success":
             raise ValueError("Invalid OTP")
 
-        cache.delete(f"admin_session_{phone}")
+        cache.delete(f"admin_session_{clean_phone}")
 
         admin_password = AdminPassword.objects.filter(
-            phone=phone
+            Q(phone=clean_phone) | Q(phone=phone)
         ).first()
 
         if admin_password:
@@ -426,35 +447,37 @@ class AuthService:
         }
 
     def forgot_admin_password(phone):
-        if not AuthService.is_admin_phone(phone):
+        clean_phone = AuthService._normalize_phone(phone)
+        if not AuthService.is_admin_phone(clean_phone):
             raise ValueError("Unauthorized access")
  
         AdminPassword.objects.filter(
-            phone=phone
+            Q(phone=clean_phone) | Q(phone=phone)
         ).delete()
  
-        return AuthService.send_admin_otp(phone)
+        return AuthService.send_admin_otp(clean_phone)
+
     @staticmethod
     def admin_password_login(phone, password, action):
-
-        if not AuthService.is_admin_phone(phone):
+        clean_phone = AuthService._normalize_phone(phone)
+        if not AuthService.is_admin_phone(clean_phone):
             raise ValueError("Unauthorized access")
 
         if action == "create":
 
             AdminPassword.objects.filter(
-                phone=phone
+                Q(phone=clean_phone) | Q(phone=phone)
             ).delete()
 
             AdminPassword.objects.create(
-                phone=phone,
+                phone=clean_phone,
                 password=password
             )
 
             token = generate_jwt_token(
                 user_id=1,
                 role="admin",
-                phone=phone
+                phone=clean_phone
             )
 
             return {
@@ -465,7 +488,7 @@ class AuthService:
         elif action == "login":
 
             admin = AdminPassword.objects.filter(
-                phone=phone,
+                Q(phone=clean_phone) | Q(phone=phone),
                 password=password
             ).first()
 
@@ -487,7 +510,7 @@ class AuthService:
             token = generate_jwt_token(
                 user_id=1,
                 role="admin",
-                phone=phone
+                phone=clean_phone
             )
 
             return {
@@ -499,12 +522,12 @@ class AuthService:
 
     @staticmethod
     def check_admin_password_status(phone):
-
-        if not AuthService.is_admin_phone(phone):
+        clean_phone = AuthService._normalize_phone(phone)
+        if not AuthService.is_admin_phone(clean_phone):
             raise ValueError("Unauthorized access")
 
         admin = AdminPassword.objects.filter(
-            phone=phone
+            Q(phone=clean_phone) | Q(phone=phone)
         ).first()
 
         if not admin:
@@ -527,4 +550,3 @@ class AuthService:
         return {
             "status": "valid"
         }
-   

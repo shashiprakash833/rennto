@@ -16,6 +16,8 @@ from HAC.models import (
     TenantBeds,
     BlockedTenant,
     Notification,
+    TenantNotification,
+    Issue,
 )
 from .common_service import CommonService
 from .notification_service import NotificationService
@@ -40,15 +42,15 @@ class HostelChangeService:
         try:
             channel_layer = get_channel_layer()
             for group in groups:
+                msg_type = "status_update" if "owner_status" in group else "send_notification"
                 async_to_sync(channel_layer.group_send)(
                     group,
                     {
-                        "type": "send_notification",
+                        "type": msg_type,
                         "content": content,
                     },
                 )
         except Exception:
-            # WebSocket delivery is best-effort; never block the request.
             pass
 
     @staticmethod
@@ -177,6 +179,27 @@ class HostelChangeService:
             related_id=change_request.id,
         )
 
+        Issue.objects.create(
+            tenant=tenant,
+            owner=owner,
+            property_type="hostel",
+            title=f"Hostel Change Request - {tenant.name}",
+            description=(
+                f"{tenant.name} requested to move from {current_hostel.hostelName} "
+                f"to {target_hostel.hostelName} on {joining_date.isoformat()}. "
+                f"Message: {message_to_owner or 'None'}"
+            ),
+            severity="Medium",
+            status="Pending",
+        )
+
+        TenantNotification.objects.create(
+            tenant_phone=tenant.phone,
+            title="Hostel Change Request Submitted",
+            message=f"Your request to move to {target_hostel.hostelName} has been sent to the owner.",
+            is_read=False,
+        )
+
         if owner.push_token:
             NotificationService.send_push_notification(
                 owner.push_token,
@@ -184,12 +207,15 @@ class HostelChangeService:
                 notification_message
             )
 
-        # Send WebSocket notification
         sanitized_owner = HostelChangeService._sanitize_phone(
             owner.owner_id if owner.owner_id else owner.phone
         )
+        sanitized_tenant = HostelChangeService._sanitize_phone(tenant.phone)
         HostelChangeService._send_ws_notification(
-            [f"owner_status_{sanitized_owner}", f"user_notifications_{sanitized_owner}"],
+            [
+                f"owner_status_{sanitized_owner}",
+                f"user_notifications_{sanitized_owner}",
+            ],
             {
                 "type": "hostel_change_request",
                 "message": notification_message,
@@ -207,15 +233,21 @@ class HostelChangeService:
 
     @staticmethod
     @transaction.atomic
-    def approve_change_request(request_id):
+    def approve_change_request(request_id, acting_owner=None):
         """
         Approve a hostel change request.
         This allows the tenant to proceed with booking the new hostel.
+        Does not move the tenant automatically.
         """
         try:
-            change_request = HostelChangeRequest.objects.get(id=request_id)
+            change_request = HostelChangeRequest.objects.select_related(
+                'tenant', 'target_hostel', 'target_owner'
+            ).get(id=request_id)
         except HostelChangeRequest.DoesNotExist:
             raise Exception("Hostel change request not found")
+
+        if acting_owner and change_request.target_owner and not CommonService.is_same_or_authorized_owner(acting_owner, change_request.target_owner):
+            raise ValueError("You are not authorized to approve this request.")
 
         if change_request.status != 'pending':
             raise ValueError(f"Can only approve pending requests. Current status: {change_request.status}")
@@ -223,22 +255,37 @@ class HostelChangeService:
         change_request.status = 'approved'
         change_request.save()
 
-        # Notify the tenant
+        Issue.objects.filter(
+            tenant=change_request.tenant,
+            title__icontains="Hostel Change Request",
+            owner=change_request.target_owner,
+            status="Pending",
+        ).update(status="Completed")
+
         tenant = change_request.tenant
+        tenant_message = (
+            f"Your hostel change request for {change_request.target_hostel.hostelName} "
+            "has been approved. You can now select floor, room, and bed."
+        )
+        TenantNotification.objects.create(
+            tenant_phone=tenant.phone,
+            title="Hostel Change Request Approved",
+            message=tenant_message,
+            is_read=False,
+        )
         if tenant.push_token:
             NotificationService.send_push_notification(
                 tenant.push_token,
                 "Request Approved ✅",
-                f"Your hostel change request for {change_request.target_hostel.hostelName} has been approved! You can now select your room and bed."
+                tenant_message
             )
 
-        # Send WebSocket notification to tenant
         sanitized_tenant = HostelChangeService._sanitize_phone(tenant.phone)
         HostelChangeService._send_ws_notification(
-            [f"user_notifications_{sanitized_tenant}"],
+            [f"user_notifications_{sanitized_tenant}", f"tenant_notifications_{sanitized_tenant}"],
             {
                 "type": "hostel_change_approved",
-                "message": f"Your request for {change_request.target_hostel.hostelName} has been approved",
+                "message": tenant_message,
                 "request_id": change_request.id,
                 "target_hostel_id": change_request.target_hostel.id
             }
@@ -248,38 +295,59 @@ class HostelChangeService:
 
     @staticmethod
     @transaction.atomic
-    def reject_change_request(request_id, rejection_reason=""):
+    def reject_change_request(request_id, rejection_reason="", acting_owner=None):
         """
-        Reject a hostel change request.
+        Reject a hostel change request. Tenant remains in the current hostel.
         """
         try:
-            change_request = HostelChangeRequest.objects.get(id=request_id)
+            change_request = HostelChangeRequest.objects.select_related(
+                'tenant', 'target_hostel', 'target_owner'
+            ).get(id=request_id)
         except HostelChangeRequest.DoesNotExist:
             raise Exception("Hostel change request not found")
+
+        if acting_owner and change_request.target_owner and not CommonService.is_same_or_authorized_owner(acting_owner, change_request.target_owner):
+            raise ValueError("You are not authorized to reject this request.")
 
         if change_request.status != 'pending':
             raise ValueError(f"Can only reject pending requests. Current status: {change_request.status}")
 
         change_request.status = 'rejected'
+        change_request.rejection_reason = rejection_reason or ""
         change_request.save()
 
-        # Notify the tenant
+        Issue.objects.filter(
+            tenant=change_request.tenant,
+            title__icontains="Hostel Change Request",
+            owner=change_request.target_owner,
+            status="Pending",
+        ).update(status="Completed")
+
         tenant = change_request.tenant
         reason_text = f" Reason: {rejection_reason}" if rejection_reason else ""
+        tenant_message = (
+            f"Your hostel change request for {change_request.target_hostel.hostelName} "
+            f"has been rejected.{reason_text} You remain in your current hostel."
+        )
+        TenantNotification.objects.create(
+            tenant_phone=tenant.phone,
+            title="Hostel Change Request Rejected",
+            message=tenant_message,
+            is_read=False,
+        )
         if tenant.push_token:
             NotificationService.send_push_notification(
                 tenant.push_token,
                 "Request Rejected ❌",
-                f"Your hostel change request for {change_request.target_hostel.hostelName} has been rejected.{reason_text}"
+                tenant_message
             )
 
-        # Send WebSocket notification to tenant
         sanitized_tenant = HostelChangeService._sanitize_phone(tenant.phone)
         HostelChangeService._send_ws_notification(
-            [f"user_notifications_{sanitized_tenant}"],
+            [f"user_notifications_{sanitized_tenant}", f"tenant_notifications_{sanitized_tenant}"],
             {
                 "type": "hostel_change_rejected",
-                "message": f"Your request for {change_request.target_hostel.hostelName} has been rejected",
+                "message": tenant_message,
                 "request_id": change_request.id
             }
         )
@@ -291,9 +359,8 @@ class HostelChangeService:
         """
         Get all pending hostel change requests for an owner.
         """
-        try:
-            owner = Owners.objects.get(owner_id=owner_id)
-        except Owners.DoesNotExist:
+        owner = CommonService.get_owner(owner_id)
+        if not owner:
             raise Exception("Owner not found")
 
         requests = HostelChangeRequest.objects.filter(

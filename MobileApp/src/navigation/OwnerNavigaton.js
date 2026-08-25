@@ -171,43 +171,21 @@ export default function OwnerNavigation({ route, navigation }) {
                 text: t("ok") || "OK",
                 onPress: async () => {
                   await AsyncStorage.multiRemove(["userToken", "ownerPhone"]);
-                  // Also remove from logged in accounts if desired, but they will be blocked anyway on next login
                   navigation.reset({ index: 0, routes: [{ name: "OwnerLoginScreen" }] });
                 }
               }
             ],
             { cancelable: false }
           );
-        } else if (msg.type === "incoming_request") {
-          // Play custom sound and vibrate
-          playSound();
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-          Alert.alert(
-            t("new_booking_request_alert") || "New Booking Request! \uD83D\uDD14",
-            msg.message || t("new_join_request_msg") || "You have a new join request from a tenant.",
-            [{ text: t("view_details") || "View Details", onPress: () => navigation.navigate("OwnerNotificationScreen", { phone: activePhone }) }]
-          );
-        } else if (msg.type === "ISSUE") {
-          // Play custom sound and vibrate
-          playSound();
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-
-          Alert.alert(
-            t("new_issue_alert") || "New Issue Raised! \u26A0\uFE0F",
-            msg.message || t("tenant_reported_issue_msg") || "A tenant has reported a new issue.",
-            [{ text: t("view_details") || "View Details", onPress: () => navigation.navigate("OwnerNavigation", { screen: "Issues" }) }]
-          );
-        } else if (msg.type === "PAYMENT") {
-          // Play custom sound and vibrate
-          playSound();
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-          Alert.alert(
-            t("new_payment_alert") || "New Payment \uD83D\uDCB0",
-            msg.message || t("tenant_made_payment_msg") || "A tenant has made a payment.",
-            [{ text: t("view_details") || "View Details", onPress: () => navigation.navigate("OwnerNavigation", { screen: "Payment" }) }]
-          );
+        } else if (
+          msg.type === "incoming_request" ||
+          msg.type === "incoming_vacate_request" ||
+          msg.type === "hostel_change_request" ||
+          msg.type === "ISSUE" ||
+          msg.type === "PAYMENT"
+        ) {
+          // BookingContext already shows a single in-app popup for these events.
+          checkPending();
         }
       } catch (err) { }
     };

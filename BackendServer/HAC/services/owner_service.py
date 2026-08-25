@@ -443,7 +443,7 @@ class OwnerService:
         }
         
         if owner.status == "active":
-            response_data["token"] = generate_jwt_token(user_id=owner.id, role="owner", phone=owner.phone)
+            response_data["token"] = generate_jwt_token(user_id=owner.owner_id, role="owner", phone=owner.phone)
             response_data["owner_id"] = owner.owner_id
             response_data["owner_name"] = owner.name
             response_data["owner_phone"] = owner.phone

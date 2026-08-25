@@ -43,6 +43,10 @@ class Owners(models.Model):
     id_proof_number = models.CharField(max_length=50, blank=True, null=True)
     owner_img_field = models.ImageField(upload_to='owner_profiles/', null=True, blank=True)
  
+    @property
+    def id(self):
+        return self.owner_id
+
     def __str__(self):
         return self.name
    
@@ -841,6 +845,7 @@ class HostelChangeRequest(models.Model):
         choices=STATUS_CHOICES,
         default='pending'
     )
+    rejection_reason = models.TextField(blank=True, null=True)
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -848,7 +853,6 @@ class HostelChangeRequest(models.Model):
     
     class Meta:
         ordering = ['-created_at']
-        unique_together = ('tenant', 'target_hostel', 'status')
 
     def __str__(self):
         return f"{self.tenant.name}: {self.current_hostel.hostelName} → {self.target_hostel.hostelName} ({self.status})"

@@ -15,11 +15,13 @@ import PrivacySecurityScreen from "../screens/owner/PrivacySecurityScreen";
 import OwnerTenantsScreen from "../screens/owner/OwnerTenantsScreen";
 import OwnerPaymentHistoryScreen from "../screens/owner/OwnerPaymentHistoryScreen";
 import OwnerExpenseHistoryScreen from "../screens/owner/OwnerExpenseHistoryScreen";
+import OwnerVacateRequestsScreen from "../screens/owner/OwnerVacateRequestsScreen";
 import RoleSection from "../screens/auth/RoleSection";
 import OnboardingScreen from "../screens/onboarding/OnboardingScreen";
 import TenantNavigation from "./TenantNavigation";
 import TenantNotificationScreen from "../screens/tenant/TenantNotificationScreen";
 import TenantPaymentHistoryScreen from "../screens/tenant/TenantPaymentHistoryScreen";
+import TenantRequestHistoryScreen from "../screens/tenant/TenantRequestHistoryScreen";
 // import ForgetPasswordScreen from "../screens/auth/ForgetPasswordScreen";
 import WaitingScreen from "../screens/auth/WaitingScreen";
 import { useMaintenance } from "../context/MaintenanceContext";
@@ -132,11 +134,13 @@ const checkSession = async () => {
 <Stack.Screen name="OwnerEditBuilding" component={OwnerEditBuildingScreen} />
 <Stack.Screen name="OwnerPaymentHistory" component={OwnerPaymentHistoryScreen} />
 <Stack.Screen name="OwnerExpenseHistory" component={OwnerExpenseHistoryScreen} />
+<Stack.Screen name="OwnerVacateRequests" component={OwnerVacateRequestsScreen} />
 <Stack.Screen
   name="TenantNotification"
   component={TenantNotificationScreen}
 />
 <Stack.Screen name="TenantPaymentHistory" component={TenantPaymentHistoryScreen} />
+<Stack.Screen name="TenantRequestHistory" component={TenantRequestHistoryScreen} />
 
       {/* ✅ KEEP ONLY ONE */}
       <Stack.Screen name="IssuesScreen" component={TenantIssuesScreen} />

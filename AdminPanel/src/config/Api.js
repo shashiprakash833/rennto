@@ -10,8 +10,7 @@ export const WS_BASE_URL = BASE_URL.replace("http://", "ws://").replace("https:/
  * - Graceful 401 handling
  */
 export const fetchWithAuth = async (url, options = {}) => {
-    //const token = localStorage.getItem("adminToken");
-    const token = localStorage.getItem("adminToken");
+    const token = localStorage.getItem("adminToken") || localStorage.getItem("token");
 
     if (!token) {
         console.warn("[AUTH] No token found - skipping Authorization header");
@@ -23,9 +22,6 @@ export const fetchWithAuth = async (url, options = {}) => {
     };
 
     // Attach token if available
-    //if (token) {
-    //  headers["Authorization"] = `Bearer ${token}`;
-    //}
     if (token && token !== "null" && token !== "undefined") {
         headers["Authorization"] = `Bearer ${token}`;
     }
@@ -43,10 +39,8 @@ export const fetchWithAuth = async (url, options = {}) => {
 
             // Clear invalid session
             localStorage.removeItem("adminToken");
+            localStorage.removeItem("token");
             localStorage.removeItem("isLoggedIn");
-
-            // ❌ DO NOT redirect or reload (this was causing infinite loop)
-            // window.location.href = "/login";  <-- REMOVED
 
             return response;
         }
@@ -59,3 +53,4 @@ export const fetchWithAuth = async (url, options = {}) => {
 };
 
 export default BASE_URL;
+

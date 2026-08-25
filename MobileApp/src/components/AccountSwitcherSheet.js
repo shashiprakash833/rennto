@@ -609,4 +609,6 @@ const styles = StyleSheet.create({
   },
 });
 
+AccountSwitcherSheet.displayName = 'AccountSwitcherSheet';
+
 export default AccountSwitcherSheet;
