@@ -3,17 +3,14 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 const getDevBaseUrl = () => {
-  const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
+  const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost || Constants.manifest2?.extra?.expoGo?.debuggerHost;
   if (hostUri) {
     const ip = hostUri.split(':')[0];
-    if (ip && ip !== 'localhost') {
+    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
       return `http://${ip}:8000`;
     }
   }
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:8000';
-  }
-  return 'http://192.168.88.42:8000';
+  return 'http://192.168.88.17:8000';
 };
 
 const BASE_URL = __DEV__

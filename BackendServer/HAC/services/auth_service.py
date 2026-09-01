@@ -167,88 +167,80 @@ class AuthService:
 
     @staticmethod
     def send_otp(phone):
- 
-        # Validate phone number
-        if not phone or len(phone) != 10:
+        clean_phone = AuthService._normalize_phone(phone)
+        if not clean_phone or len(clean_phone) != 10:
             raise ValueError("Invalid phone number")
 
         system_settings = SystemSettings.objects.first()
 
-        print("Demo Mode:", system_settings.demo_mode_enabled)
-        print("Demo Numbers:", system_settings.demo_mobile_numbers)
-        print("Phone:", phone)
-
         if (
             system_settings
             and system_settings.demo_mode_enabled
-            and phone in system_settings.demo_mobile_numbers
+            and clean_phone in system_settings.demo_mobile_numbers
         ):
             return {
                 "message": "Demo OTP enabled",
                 "demo": True
             }
- 
+
         # Check rate limiting
-        attempts = cache.get(f"otp_attempts_{phone}", 0)
- 
-        if attempts >= 3:
+        attempts = cache.get(f"otp_attempts_{clean_phone}", 0)
+
+        if attempts >= 5:
             raise ValueError("Too many OTP requests. Try again later.")
- 
+
         url = (
             f"https://2factor.in/API/V1/"
-            f"{settings.TWO_FACTOR_API_KEY}/SMS/{phone}/AUTOGEN3/OTP1"
+            f"{settings.TWO_FACTOR_API_KEY}/SMS/{clean_phone}/AUTOGEN3/OTP1"
         )
- 
+
         try:
             response = requests.get(url, timeout=15)
- 
             data = response.json()
- 
+
             if data.get("Status") != "Success":
                 raise ValueError(
                     data.get("Details", "Failed to send OTP")
                 )
- 
+
             cache.set(
-                f"otp_session_{phone}",
+                f"otp_session_{clean_phone}",
                 data["Details"],
                 timeout=300
             )
- 
+
             cache.set(
-                f"otp_attempts_{phone}",
+                f"otp_attempts_{clean_phone}",
                 attempts + 1,
                 timeout=600
             )
- 
+
             return {
                 "message": "OTP sent successfully"
             }
- 
+
         except Exception as e:
             raise e
    
     @staticmethod
     def verify_otp(phone, otp, role):
- 
-        phone = str(phone)[-10:]
- 
-        if not phone or not otp:
+        clean_phone = AuthService._normalize_phone(phone)
+        if not clean_phone or not otp:
             raise ValueError("Phone and OTP are required")
+
         system_settings = SystemSettings.objects.first()
 
         is_demo_number = (
             system_settings
             and system_settings.demo_mode_enabled
-            and phone in system_settings.demo_mobile_numbers
+            and clean_phone in system_settings.demo_mobile_numbers
         )
- 
 
         if is_demo_number:
             if str(otp) != "2121":
                 raise ValueError("Invalid OTP")
         else:
-            session_id = cache.get(f"otp_session_{phone}")
+            session_id = cache.get(f"otp_session_{clean_phone}")
 
             if not session_id:
                 raise ValueError("OTP expired or not found")
@@ -265,21 +257,21 @@ class AuthService:
             if data.get("Status") != "Success":
                 raise ValueError("Invalid OTP")
 
-            cache.delete(f"otp_session_{phone}")
-            cache.delete(f"otp_attempts_{phone}")
- 
+            cache.delete(f"otp_session_{clean_phone}")
+            cache.delete(f"otp_attempts_{clean_phone}")
+
         # OWNER LOGIN
         if role == "owner":
- 
-            owner = CommonService.get_owner(phone)
- 
+
+            owner = CommonService.get_owner(clean_phone)
+
             if owner:
                 token = generate_jwt_token(
                     user_id=owner.pk,
                     role="owner",
                     phone=owner.phone
                 )
- 
+
                 return {
                     "verified": True,
                     "exists": True,
@@ -292,24 +284,24 @@ class AuthService:
                         "phone": owner.phone
                     }
                 }
- 
+
             return {
                 "verified": True,
                 "exists": False
             }
- 
+
         # TENANT LOGIN
         elif role == "tenant":
- 
-            tenant = CommonService.get_tenant(phone)
- 
+
+            tenant = CommonService.get_tenant(clean_phone)
+
             if tenant:
                 token = generate_jwt_token(
                     user_id=tenant.id,
                     role="tenant",
                     phone=tenant.phone
                 )
- 
+
                 return {
                     "verified": True,
                     "exists": True,
@@ -321,12 +313,12 @@ class AuthService:
                         "phone": tenant.phone
                     }
                 }
- 
+
             return {
                 "verified": True,
                 "exists": False
             }
- 
+
         raise ValueError("Invalid role")
 
     ADMIN_PHONES = ["6281808454", "9347074726", "8919326265"]
@@ -343,7 +335,7 @@ class AuthService:
             p = p[2:]
         elif p.startswith("+"):
             p = p[1:]
-        return p
+        return p[-10:] if len(p) >= 10 else p
 
     @classmethod
     def is_admin_phone(cls, phone):
@@ -369,6 +361,17 @@ class AuthService:
                 "Please enter a valid number to access the admin panel"
             )
 
+        system_settings = SystemSettings.objects.first()
+        if (
+            system_settings
+            and system_settings.demo_mode_enabled
+            and (clean_phone in system_settings.demo_mobile_numbers or clean_phone in AuthService.ADMIN_PHONES)
+        ):
+            return {
+                "message": "Demo OTP enabled",
+                "demo": True
+            }
+
         url = (
             f"https://2factor.in/API/V1/"
             f"{settings.TWO_FACTOR_API_KEY}/SMS/"
@@ -379,7 +382,7 @@ class AuthService:
         data = response.json()
 
         if data.get("Status") != "Success":
-            raise ValueError("Failed to send OTP")
+            raise ValueError(data.get("Details", "Failed to send OTP"))
 
         cache.set(
             f"admin_session_{clean_phone}",
@@ -397,24 +400,35 @@ class AuthService:
         if not AuthService.is_admin_phone(clean_phone):
             raise ValueError("Unauthorized access")
 
-        session_id = cache.get(f"admin_session_{clean_phone}")
-
-        if not session_id:
-            raise ValueError("OTP expired")
-
-        url = (
-            f"https://2factor.in/API/V1/"
-            f"{settings.TWO_FACTOR_API_KEY}/SMS/VERIFY/"
-            f"{session_id}/{otp}"
+        system_settings = SystemSettings.objects.first()
+        is_demo = (
+            system_settings
+            and system_settings.demo_mode_enabled
+            and (clean_phone in system_settings.demo_mobile_numbers or clean_phone in AuthService.ADMIN_PHONES)
         )
 
-        response = requests.get(url, timeout=15)
-        data = response.json()
+        if is_demo:
+            if str(otp) != "2121":
+                raise ValueError("Invalid OTP")
+        else:
+            session_id = cache.get(f"admin_session_{clean_phone}")
 
-        if data.get("Status") != "Success":
-            raise ValueError("Invalid OTP")
+            if not session_id:
+                raise ValueError("OTP expired")
 
-        cache.delete(f"admin_session_{clean_phone}")
+            url = (
+                f"https://2factor.in/API/V1/"
+                f"{settings.TWO_FACTOR_API_KEY}/SMS/VERIFY/"
+                f"{session_id}/{otp}"
+            )
+
+            response = requests.get(url, timeout=15)
+            data = response.json()
+
+            if data.get("Status") != "Success":
+                raise ValueError("Invalid OTP")
+
+            cache.delete(f"admin_session_{clean_phone}")
 
         admin_password = AdminPassword.objects.filter(
             Q(phone=clean_phone) | Q(phone=phone)
@@ -441,6 +455,7 @@ class AuthService:
             "message": "Create a new password"
         }
 
+    @staticmethod
     def forgot_admin_password(phone):
         clean_phone = AuthService._normalize_phone(phone)
         if not AuthService.is_admin_phone(clean_phone):

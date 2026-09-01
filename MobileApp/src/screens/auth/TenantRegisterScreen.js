@@ -233,78 +233,43 @@ return;
         // UPDATE PUSH TOKEN ON LOGIN
 
 try {
+  console.log("========== LOGIN PUSH START ==========");
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
 
-console.log(
-  "========== LOGIN PUSH START =========="
-);
+  if (existingStatus !== "granted") {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
 
-const { status: existingStatus } =
-  await Notifications.getPermissionsAsync();
+  if (finalStatus === "granted") {
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: Constants.expoConfig?.extra?.eas?.projectId,
+    });
+    console.log("LOGIN EXPO TOKEN:", tokenData.data);
 
-let finalStatus = existingStatus;
-
-if (existingStatus !== "granted") {
-
-  const { status } =
-    await Notifications.requestPermissionsAsync();
-
-  finalStatus = status;
-}
-
-if (finalStatus !== "granted") {
-
-  console.log(
-    "NOTIFICATION PERMISSION DENIED"
-  );
-
-  return;
-}
-
-const tokenData =
-await Notifications.getExpoPushTokenAsync({
-  projectId:
-    Constants.expoConfig?.extra?.eas?.projectId,
-});
-
-  console.log(
-    "LOGIN EXPO TOKEN:",
-    tokenData.data
-  );
-
-  const pushResponse = await fetchWithAuth(
-    `${BASE_URL}/api/save-push-token/`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        phone: phone,
-        role: "tenant",
-        push_token: tokenData.data,
-      }),
-    }
-  );
-
-  const pushResult =
-    await pushResponse.json();
-
-  console.log(
-    "LOGIN PUSH SAVE RESPONSE:",
-    pushResult
-  );
-
-  console.log(
-    "========== LOGIN PUSH END =========="
-  );
-
+    const pushResponse = await fetchWithAuth(
+      `${BASE_URL}/api/save-push-token/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phone: phone,
+          role: "tenant",
+          push_token: tokenData.data,
+        }),
+      }
+    );
+    const pushResult = await pushResponse.json();
+    console.log("LOGIN PUSH SAVE RESPONSE:", pushResult);
+  } else {
+    console.log("NOTIFICATION PERMISSION NOT GRANTED - SKIPPING PUSH TOKEN");
+  }
+  console.log("========== LOGIN PUSH END ==========");
 } catch (pushError) {
-
-  console.log(
-    "❌ LOGIN PUSH TOKEN ERROR:",
-    pushError
-  );
-
+  console.log("❌ LOGIN PUSH TOKEN ERROR:", pushError);
 }
 
         if (global.triggerMaintenanceCheck) {
@@ -330,8 +295,8 @@ await Notifications.getExpoPushTokenAsync({
 
     } catch (error) {
 
-      console.log("LOG  CHECK USER ERROR:", error);
-      console.log("Error", "Something went wrong");
+      console.log(error);
+      Alert.alert(t("error") || "Error", t("something_went_wrong") || "Something went wrong");
 
     } finally {
 
@@ -343,84 +308,43 @@ await Notifications.getExpoPushTokenAsync({
   /* ---------------- REGISTER ---------------- */
 
   const handleRegister = async () => {
-
-    const e = {};
-
-    if (!name.trim() || !validateName(name)) {
-      e.name = t("name_error") || "Name must be 3-30 letters only";
+    if (!validateName(name)) {
+      setErrors((prev) => ({
+        ...prev,
+        name: "Name must be 3+ letters",
+      }));
+      return;
     }
-
-    if (!isPhoneVerified) {
-      e.phone = "Mobile number must be verified";
-    }
-
-    setErrors(e);
-    if (Object.keys(e).length > 0) return;
 
     try {
-
       setLoadingRegister(true);
 
       const formData = new FormData();
       formData.append("name", name);
       formData.append("phone", phone);
-try {
+      try {
+        console.log("========== REGISTER PUSH START ==========");
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
 
-console.log(
-  "========== REGISTER PUSH START =========="
-);
+        if (existingStatus !== "granted") {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
 
-const { status: existingStatus } =
-  await Notifications.getPermissionsAsync();
-
-let finalStatus = existingStatus;
-
-if (existingStatus !== "granted") {
-
-  const { status } =
-    await Notifications.requestPermissionsAsync();
-
-  finalStatus = status;
-}
-
-if (finalStatus !== "granted") {
-
-  console.log(
-    "NOTIFICATION PERMISSION DENIED"
-  );
-
-  return;
-}
-
-const tokenData =
-await Notifications.getExpoPushTokenAsync({
-  projectId:
-    Constants.expoConfig?.extra?.eas?.projectId,
-});
-
-  console.log(
-    "REGISTER EXPO TOKEN:",
-    tokenData.data
-  );
-
-  formData.append(
-    "push_token",
-    tokenData.data
-  );
-
-  console.log(
-    "REGISTER PUSH TOKEN:",
-    tokenData.data
-  );
-
-} catch (pushError) {
-
-  console.log(
-    "❌ REGISTER PUSH TOKEN ERROR:",
-    pushError
-  );
-
-}
+        if (finalStatus === "granted") {
+          const tokenData = await Notifications.getExpoPushTokenAsync({
+            projectId: Constants.expoConfig?.extra?.eas?.projectId,
+          });
+          console.log("REGISTER EXPO TOKEN:", tokenData.data);
+          formData.append("push_token", tokenData.data);
+          console.log("REGISTER PUSH TOKEN:", tokenData.data);
+        } else {
+          console.log("NOTIFICATION PERMISSION NOT GRANTED - SKIPPING PUSH TOKEN");
+        }
+      } catch (pushError) {
+        console.log("❌ REGISTER PUSH TOKEN ERROR:", pushError);
+      }
 
       const response = await fetchWithAuth(`${BASE_URL}/api/tenent/`, {
         method: "POST",

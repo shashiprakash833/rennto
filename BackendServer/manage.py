@@ -9,6 +9,9 @@ def main():
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'BMS.settings')
     try:
         from django.core.management import execute_from_command_line
+        from django.core.management.commands.runserver import Command as runserver
+        runserver.default_addr = '0.0.0.0'
+        runserver.default_port = '8000'
     except ImportError as exc:
         raise ImportError(
             "Couldn't import Django. Are you sure it's installed and "

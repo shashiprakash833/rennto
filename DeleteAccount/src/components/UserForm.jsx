@@ -72,7 +72,7 @@ const UserForm = () => {
       const payload = { userType, name, number, propertyName, description };
 
       try {
-        const response = await fetch('http://192.168.88.42:8000/api/account-deletion-request/', {
+        const response = await fetch('http://192.168.88.17:8000/api/account-deletion-request/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
